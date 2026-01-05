@@ -149,6 +149,9 @@ async def generate_trial_contract(
             'cleaning_time_per_sqft': 90,
             'cleaners_small_job': 1,
             'cleaners_large_job': 2,
+            'discount_weekly': 10.0,
+            'discount_monthly': 5.0,
+            'discount_long_term': 15.0,
             'standard_inclusions': [
                 'Dusting and wiping all surfaces',
                 'Vacuuming and mopping floors',
