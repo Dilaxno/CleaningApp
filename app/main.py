@@ -19,6 +19,7 @@ from .routes.status_automation import router as status_router
 from .routes.trial import router as trial_router
 from .routes.verification import router as verification_router
 from .routes.security import router as security_router
+from .routes.notifications import router as notifications_router
 
 # Configure logging
 logging.basicConfig(
@@ -89,6 +90,7 @@ app.include_router(dodopayments_webhooks_router)
 app.include_router(email_router)
 app.include_router(calendly_router)
 app.include_router(trial_router)
+app.include_router(notifications_router)
 
 
 @app.get("/")

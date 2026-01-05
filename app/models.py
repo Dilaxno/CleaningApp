@@ -30,6 +30,13 @@ class User(Base):
     recovery_email = Column(String(255), nullable=True)  # Secondary email for recovery
     recovery_email_verified = Column(Boolean, default=False, nullable=False)  # Is recovery email verified
     backup_codes = Column(JSON, default=list, nullable=True)  # Encrypted backup codes
+    # Notification preferences
+    notify_new_clients = Column(Boolean, default=True, nullable=False)  # Email when new client submits form
+    notify_contract_signed = Column(Boolean, default=True, nullable=False)  # Email when contract is signed
+    notify_schedule_confirmed = Column(Boolean, default=True, nullable=False)  # Email when schedule is confirmed
+    notify_payment_received = Column(Boolean, default=True, nullable=False)  # Email when payment is received
+    notify_reminders = Column(Boolean, default=True, nullable=False)  # Email for upcoming appointments
+    notify_marketing = Column(Boolean, default=False, nullable=False)  # Marketing and product updates
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
