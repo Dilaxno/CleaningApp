@@ -714,6 +714,15 @@ async def sign_contract(
     
     logger.info(f"✅ Contract signed by client: contract_id={contract.id}")
     
+    # Generate presigned URL for the new signed PDF
+    signed_pdf_url = None
+    if contract.pdf_key:
+        try:
+            signed_pdf_url = generate_presigned_url(contract.pdf_key, expiration=604800)  # 7 days
+            logger.info(f"✅ Generated presigned URL for signed contract PDF")
+        except Exception as url_err:
+            logger.warning(f"⚠️ Failed to generate presigned URL: {url_err}")
+    
     # Send notification to business owner
     try:
         config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
@@ -732,7 +741,8 @@ async def sign_contract(
     
     return {
         "success": True,
-        "message": "Contract signed successfully. Awaiting service provider signature."
+        "message": "Contract signed successfully. Awaiting service provider signature.",
+        "signedPdfUrl": signed_pdf_url
     }
 
 
