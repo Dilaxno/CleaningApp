@@ -123,6 +123,7 @@ def get_user(firebase_uid: str, db: Session = Depends(get_db)):
         "id": user.id,
         "firebase_uid": user.firebase_uid,
         "email": user.email,
+        "email_verified": user.email_verified,
         "full_name": user.full_name,
         "profile_picture_key": user.profile_picture_url,
         "profile_picture_url": profile_picture_presigned,
