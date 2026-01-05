@@ -527,7 +527,7 @@ def generate_contract_html(
         <div class="signature-box">
             <h4>Client</h4>
             <div class="signature-line">
-                {"<img src='" + client_signature + "' alt='Client Signature'>" if client_signature else "<span style='color: #94A3B8; font-size: 9pt;'>Awaiting signature</span>"}
+                {"<img src='" + client_signature + "' alt='Client Signature' style='max-width: 200px; max-height: 80px;'>" if client_signature else "<span style='color: #94A3B8; font-size: 9pt;'>Awaiting signature</span>"}
             </div>
             <div class="signature-name">{client_name}</div>
             <div class="signature-role">Client Representative</div>

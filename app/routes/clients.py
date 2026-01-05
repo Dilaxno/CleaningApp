@@ -621,6 +621,10 @@ async def sign_contract(
         if config and client.form_data:
             form_data = client.form_data
             
+            # Log old PDF key
+            old_pdf_key = contract.pdf_key
+            logger.info(f"📄 Old PDF key: {old_pdf_key}")
+            
             # Calculate quote for regeneration
             from .contracts_pdf import calculate_quote
             quote = calculate_quote(config, form_data)
@@ -634,6 +638,12 @@ async def sign_contract(
                 client_signature=data.signature,
                 provider_signature=contract.provider_signature if contract else None
             )
+            
+            # Verify signature is in HTML
+            if data.signature in html:
+                logger.info("✅ Client signature IS in generated HTML")
+            else:
+                logger.warning("⚠️ Client signature NOT found in generated HTML!")
             
             # Generate PDF
             pdf_bytes = await html_to_pdf(html)
@@ -657,6 +667,7 @@ async def sign_contract(
                 contract.pdf_hash = pdf_hash
                 
                 logger.info(f"✅ Signed contract PDF uploaded: {pdf_key}")
+                logger.info(f"📝 Updated contract.pdf_key from {old_pdf_key} to {pdf_key}")
             except Exception as upload_err:
                 logger.warning(f"⚠️ Failed to upload signed PDF: {upload_err}")
                 
