@@ -9,6 +9,7 @@ from .routes.users import router as users_router
 from .routes.clients import router as clients_router
 from .routes.upload import router as upload_router
 from .routes.contracts import router as contracts_router
+from .routes.contract_revisions import router as contract_revisions_router
 from .routes.schedules import router as schedules_router
 from .routes.billing import router as billing_router, webhooks_router as dodopayments_webhooks_router
 from .routes.contracts_pdf import router as contracts_pdf_router
@@ -84,6 +85,7 @@ app.include_router(business_router)
 app.include_router(clients_router)
 app.include_router(upload_router)
 app.include_router(contracts_router)
+app.include_router(contract_revisions_router)
 app.include_router(contracts_pdf_router)
 app.include_router(scheduling_router)
 app.include_router(schedules_router)

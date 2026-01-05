@@ -146,6 +146,16 @@ class Contract(Base):
     client_signature_timestamp = Column(DateTime, nullable=True)
     # Legal
     jurisdiction = Column(String(255), nullable=True)  # e.g., "State of California, USA"
+    
+    # Revision request system
+    revision_requested = Column(Boolean, default=False)  # True if provider requested changes
+    revision_type = Column(String(50), nullable=True)  # 'pricing', 'scope', 'both'
+    revision_notes = Column(String(2000), nullable=True)  # Provider's notes about requested changes
+    revision_requested_at = Column(DateTime, nullable=True)
+    revision_count = Column(Integer, default=0)  # Track number of revision rounds
+    custom_quote = Column(JSON, nullable=True)  # Provider's custom pricing if different from auto-quote
+    custom_scope = Column(JSON, nullable=True)  # Provider's custom scope (inclusions/exclusions)
+    
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
