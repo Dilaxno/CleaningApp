@@ -3,10 +3,13 @@ Unified Email Service using Resend
 Provides a consistent email template for all automated emails
 """
 import resend
+import logging
 from datetime import datetime
 from typing import Optional, Union, List
 from jinja2 import Template
 from .config import RESEND_API_KEY, EMAIL_FROM_ADDRESS
+
+logger = logging.getLogger(__name__)
 
 # Initialize Resend
 resend.api_key = RESEND_API_KEY
@@ -275,8 +278,8 @@ async def send_email(
         Resend API response
     """
     if not RESEND_API_KEY:
-        print("Warning: RESEND_API_KEY not configured, skipping email")
-        return {"error": "Email not configured"}
+        logger.error("❌ RESEND_API_KEY not configured - emails cannot be sent!")
+        raise Exception("Email service not configured - RESEND_API_KEY missing")
     
     html_content = render_email(
         subject=subject,
@@ -291,16 +294,18 @@ async def send_email(
     recipients = [to] if isinstance(to, str) else to
     
     try:
+        logger.info(f"📧 Sending email to {recipients} - Subject: {subject}")
         response = resend.Emails.send({
             "from": from_address or EMAIL_FROM_ADDRESS,
             "to": recipients,
             "subject": subject,
             "html": html_content,
         })
+        logger.info(f"✅ Email sent successfully to {recipients} - Response: {response}")
         return response
     except Exception as e:
-        print(f"Email send error: {e}")
-        return {"error": str(e)}
+        logger.error(f"❌ Email send error to {recipients}: {e}")
+        raise Exception(f"Failed to send email: {str(e)}")
 
 
 # ============================================
