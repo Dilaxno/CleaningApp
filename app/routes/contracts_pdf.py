@@ -103,6 +103,11 @@ def generate_contract_html(
 ) -> str:
     """Generate HTML for the contract"""
     
+    # Debug logging for signatures
+    logger.info(f"🖊️ Generating PDF - Client signature present: {bool(client_signature)}, Provider signature present: {bool(provider_signature)}")
+    if client_signature:
+        logger.info(f"📝 Client signature format: {client_signature[:50]}..." if len(client_signature) > 50 else f"📝 Client signature: {client_signature}")
+    
     # Get branding
     business_name = business_config.business_name or "Cleaning Service"
     logo_url = None
