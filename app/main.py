@@ -18,6 +18,7 @@ from .routes.calendly import router as calendly_router
 from .routes.status_automation import router as status_router
 from .routes.trial import router as trial_router
 from .routes.verification import router as verification_router
+from .routes.security import router as security_router
 
 # Configure logging
 logging.basicConfig(
@@ -75,6 +76,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(verification_router)
+app.include_router(security_router)
 app.include_router(business_router)
 app.include_router(clients_router)
 app.include_router(upload_router)

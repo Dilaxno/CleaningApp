@@ -21,6 +21,15 @@ class User(Base):
     clients_this_month = Column(Integer, default=0, nullable=False)  # Counter for monthly client limit
     month_reset_date = Column(DateTime, nullable=True)  # Track when to reset the counter
     onboarding_completed = Column(Boolean, default=False)
+    # Two-Factor Authentication fields
+    totp_secret = Column(String(100), nullable=True)  # TOTP secret for authenticator app
+    totp_enabled = Column(Boolean, default=False, nullable=False)  # Is TOTP enabled
+    phone_number = Column(String(50), nullable=True)  # Phone number for SMS 2FA
+    phone_verified = Column(Boolean, default=False, nullable=False)  # Is phone verified
+    phone_2fa_enabled = Column(Boolean, default=False, nullable=False)  # Is SMS 2FA enabled
+    recovery_email = Column(String(255), nullable=True)  # Secondary email for recovery
+    recovery_email_verified = Column(Boolean, default=False, nullable=False)  # Is recovery email verified
+    backup_codes = Column(JSON, default=list, nullable=True)  # Encrypted backup codes
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
