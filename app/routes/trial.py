@@ -133,7 +133,7 @@ async def generate_trial_contract(
         # Generate trial contract using default business config
         from .contracts_pdf import calculate_quote, generate_contract_html, html_to_pdf, upload_pdf_to_r2
         
-        # Create mock business config for trial
+        # Create mock business config for trial (matches BusinessConfig model exactly)
         trial_config = type('obj', (object,), {
             'business_name': 'CleanEnroll Demo',
             'logo_url': None,
@@ -144,14 +144,20 @@ async def generate_trial_contract(
             'hourly_rate': None,
             'flat_rate': None,
             'minimum_charge': 75,
-            'payment_due_days': 15,
-            'late_fee_percent': 1.5,
             'cleaning_time_per_sqft': 90,
             'cleaners_small_job': 1,
             'cleaners_large_job': 2,
+            'buffer_time': 30,
+            'premium_evening_weekend': None,
+            'premium_deep_clean': None,
             'discount_weekly': 10.0,
             'discount_monthly': 5.0,
             'discount_long_term': 15.0,
+            'addon_windows': None,
+            'addon_carpets': None,
+            'payment_due_days': 15,
+            'late_fee_percent': 1.5,
+            'preferred_units': 'sqft',
             'standard_inclusions': [
                 'Dusting and wiping all surfaces',
                 'Vacuuming and mopping floors',
