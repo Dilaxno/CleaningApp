@@ -202,7 +202,20 @@ async def generate_contract_html(
     # Contract details
     contract_date = datetime.now().strftime("%B %d, %Y")
     contract_number = f"CLN-{datetime.now().strftime('%Y%m%d')}-{client.id:04d}"
-    start_date = (datetime.now() + timedelta(days=7)).strftime("%B %d, %Y")
+    
+    # Smart start date logic based on service type
+    frequency = quote["frequency"]
+    is_recurring = frequency not in ["One-time", "one-time"]
+    
+    if is_recurring:
+        # Recurring contracts: billing starts on signing date
+        start_date = datetime.now().strftime("%B %d, %Y")
+        start_date_note = "Agreement effective immediately upon signing. First service will be scheduled separately."
+    else:
+        # One-time/deep cleans: align with service date (typically 7 days out)
+        start_date = (datetime.now() + timedelta(days=7)).strftime("%B %d, %Y")
+        start_date_note = "Agreement effective on scheduled service date."
+    
     payment_due_days = business_config.payment_due_days or 15
     late_fee = business_config.late_fee_percent or 1.5
     
@@ -216,8 +229,7 @@ async def generate_contract_html(
     property_size = form_data.get("squareFootage", "N/A")
     property_type = client.property_type or "Commercial"
     
-    # Service details
-    frequency = quote["frequency"]
+    # Service details (frequency already extracted above for start_date logic)
     inclusions = business_config.standard_inclusions or []
     exclusions = business_config.standard_exclusions or []
     
@@ -556,13 +568,18 @@ async def generate_contract_html(
     <div class="section">
         <div class="section-title">Terms & Conditions</div>
         <ul class="terms-list">
-            <li><strong>Service Start Date:</strong> {start_date}</li>
+            <li><strong>Service Start Date:</strong> {start_date}<br/>
+                <span style="font-size: 8pt; color: #64748B; font-style: italic;">{start_date_note}</span>
+            </li>
             <li><strong>Payment Terms:</strong> Payment due within {payment_due_days} days of service completion. All amounts are in USD.</li>
             <li><strong>Late Payment:</strong> {late_fee}% late fee applies after due date</li>
             <li><strong>Cancellation:</strong> 24-hour notice required for cancellations to avoid charges</li>
             <li><strong>Access:</strong> Client agrees to provide necessary access to the property</li>
             <li><strong>Liability:</strong> Service provider maintains appropriate insurance coverage</li>
         </ul>
+        <p style="margin-top: 15px; font-size: 9pt; color: #64748B; line-height: 1.6;">
+            <strong>Note on Service Start Date:</strong> The Service Start Date activates the agreement terms and conditions. {'For recurring services, billing begins immediately upon signing, and the first cleaning will be scheduled separately based on your availability.' if is_recurring else 'For one-time services, the Service Start Date aligns with your scheduled service appointment.'}
+        </p>
     </div>
 
     <!-- Legal Clauses -->
