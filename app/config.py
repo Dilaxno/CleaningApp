@@ -23,6 +23,9 @@ DODO_PAYMENTS_WEBHOOK_SECRET = os.getenv("DODO_PAYMENTS_WEBHOOK_SECRET")
 # "test_mode" or "live_mode" - default to test for safety
 DODO_PAYMENTS_ENVIRONMENT = os.getenv("DODO_PAYMENTS_ENVIRONMENT", "test_mode")
  
+# Security
+SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
+
 # Frontend base URL for redirects
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
