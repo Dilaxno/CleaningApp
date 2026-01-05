@@ -21,13 +21,18 @@ class CalendlyService:
     
     def get_authorization_url(self, state: str) -> str:
         """Generate OAuth authorization URL"""
+        if not self.redirect_uri:
+            logger.error("CALENDLY_REDIRECT_URI not configured in environment variables")
+            raise ValueError("Calendly redirect URI not configured")
+        
         params = {
             "client_id": self.client_id,
             "response_type": "code",
             "redirect_uri": self.redirect_uri,
             "state": state
         }
-        query = "&".join([f"{k}={v}" for k, v in params.items()])
+        from urllib.parse import urlencode
+        query = urlencode(params)
         return f"{self.AUTH_URL}?{query}"
     
     async def exchange_code_for_token(self, code: str) -> Dict[str, Any]:
