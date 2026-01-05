@@ -98,7 +98,8 @@ def generate_contract_html(
     client: Client,
     form_data: dict,
     quote: dict,
-    client_signature: Optional[str] = None
+    client_signature: Optional[str] = None,
+    provider_signature: Optional[str] = None
 ) -> str:
     """Generate HTML for the contract"""
     
@@ -114,7 +115,11 @@ def generate_contract_html(
         except Exception as e:
             logger.error(f"❌ Failed to generate presigned URL for logo: {e}")
     
-    if business_config.signature_url:
+    # Use provider_signature parameter if provided, otherwise fall back to business config
+    if provider_signature:
+        signature_url = provider_signature
+        logger.info(f"✅ Using provider signature from parameter (base64)")
+    elif business_config.signature_url:
         try:
             signature_url = generate_presigned_url(business_config.signature_url)
             logger.info(f"✅ Generated presigned URL for signature: {business_config.signature_url}")
