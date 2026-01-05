@@ -614,6 +614,32 @@ async def sign_contract(
     contract.client_signature_timestamp = datetime.now()
     # Status remains 'new' until both parties sign (provider signs last)
     
+    # Upload client signature to R2 for PDF rendering
+    client_signature_url = None
+    if data.signature and data.signature.startswith("data:image"):
+        try:
+            import base64
+            import uuid
+            # Extract base64 data from data URL
+            header, encoded = data.signature.split(",", 1)
+            signature_bytes = base64.b64decode(encoded)
+            
+            # Upload to R2
+            signature_key = f"signatures/clients/{user.firebase_uid}/{uuid.uuid4()}.png"
+            r2_client = get_r2_client()
+            r2_client.put_object(
+                Bucket=R2_BUCKET_NAME,
+                Key=signature_key,
+                Body=signature_bytes,
+                ContentType="image/png"
+            )
+            
+            # Generate presigned URL
+            client_signature_url = generate_presigned_url(signature_key, expiration=31536000)  # 1 year
+            logger.info(f"✅ Client signature uploaded to R2: {signature_key}")
+        except Exception as sig_err:
+            logger.warning(f"⚠️ Failed to upload client signature to R2: {sig_err}")
+    
     # Regenerate PDF with client signature
     try:
         config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
@@ -629,19 +655,27 @@ async def sign_contract(
             from .contracts_pdf import calculate_quote
             quote = calculate_quote(config, form_data)
             
-            # Generate HTML with signature
+            # Get provider signature URL if exists
+            provider_signature_url = None
+            if contract.provider_signature and contract.provider_signature.startswith("data:image"):
+                # Provider signature is base64, need to upload it too if not already done
+                provider_signature_url = contract.provider_signature
+            
+            # Generate HTML with signature URLs
             html = generate_contract_html(
                 config, 
                 client, 
                 form_data, 
                 quote,
-                client_signature=data.signature,
-                provider_signature=contract.provider_signature if contract else None
+                client_signature=client_signature_url or data.signature,  # Use URL if available
+                provider_signature=provider_signature_url
             )
             
-            # Verify signature is in HTML
-            if data.signature in html:
-                logger.info("✅ Client signature IS in generated HTML")
+            # Verify signature URL is in HTML
+            if client_signature_url and client_signature_url in html:
+                logger.info("✅ Client signature URL IS in generated HTML")
+            elif data.signature in html:
+                logger.info("✅ Client signature (base64) IS in generated HTML")
             else:
                 logger.warning("⚠️ Client signature NOT found in generated HTML!")
             
