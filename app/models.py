@@ -12,12 +12,15 @@ class User(Base):
     full_name = Column(String(255), nullable=True)
     email = Column(String(255), unique=True, index=True, nullable=False)
     email_verified = Column(Boolean, default=False, nullable=False)  # Email verification status
+    pending_email = Column(String(255), nullable=True)  # Pending new email during email change
     verification_otp = Column(String(10), nullable=True)  # Current OTP for email verification
     otp_expires_at = Column(DateTime, nullable=True)  # OTP expiration time
     profile_picture_url = Column(String(500), nullable=True)  # R2 key for profile picture
     account_type = Column(String(50), nullable=True)
     hear_about = Column(String(100), nullable=True)
     plan = Column(String(50), default="free", nullable=False)  # free, solo, team, enterprise
+    # Dodo subscription identifier for this user's active subscription; used for change/cancel flows
+    subscription_id = Column(String(255), nullable=True)
     clients_this_month = Column(Integer, default=0, nullable=False)  # Counter for monthly client limit
     month_reset_date = Column(DateTime, nullable=True)  # Track when to reset the counter
     onboarding_completed = Column(Boolean, default=False)

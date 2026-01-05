@@ -78,6 +78,21 @@ class UpdatePlanRequest(BaseModel):
     plan: str  # "free", "solo", "team", "enterprise"
 
 
+class CancelRequest(BaseModel):
+    # When true, subscription remains active until the end of the current billing period
+    cancel_at_period_end: bool = True
+    # When true, immediately set user's local plan to free (app state). Dodo will still process scheduled cancel if cancel_at_period_end=True
+    set_free_now: bool = False
+
+
+class ChangePlanRequest(BaseModel):
+    product_id: str
+    quantity: int = 1
+    proration_billing_mode: str = "prorated_immediately"  # per docs
+    # optional local plan update for app gating ("solo" | "team" | "enterprise")
+    plan: Optional[str] = None
+
+
 # Plan limits configuration
 PLAN_LIMITS = {
     "free": {"clients": 2, "contracts": 2, "schedules": 2},
@@ -239,6 +254,87 @@ async def create_checkout_session(
         raise HTTPException(status_code=400, detail="Failed to create checkout session")
 
 
+@router.post("/cancel")
+async def cancel_subscription(
+    body: CancelRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Schedule or request cancellation on Dodo; optionally set app plan to free immediately.
+    Docs:
+      - Cancel at period end via PATCH: https://docs.dodopayments.com/api-reference/subscriptions/patch-subscriptions
+      - Webhook 'subscription.cancelled' will be sent when cancellation takes effect
+    """
+    if not DODO_PAYMENTS_API_KEY:
+        raise HTTPException(status_code=500, detail="Billing not configured")
+
+    if not getattr(user, "subscription_id", None):
+        raise HTTPException(status_code=400, detail="No active subscription on file for this user")
+
+    try:
+        # Schedule cancellation or cancel immediately if supported by status patch
+        # Per docs, scheduling uses cancel_at_next_billing_date flag.
+        await dodo_client.subscriptions.update(
+            subscription_id=user.subscription_id,
+            cancel_at_next_billing_date=body.cancel_at_period_end,
+        )
+
+        if body.set_free_now:
+            user.plan = "free"
+            db.commit()
+            logger.info(f"User {user.id} plan set to free locally on cancel request")
+
+        return {
+            "status": "ok",
+            "scheduled_at_period_end": body.cancel_at_period_end,
+            "local_plan_updated": body.set_free_now,
+        }
+    except Exception as e:
+        logger.error(f"Failed to cancel subscription: {e}")
+        raise HTTPException(status_code=400, detail="Failed to cancel subscription")
+
+
+@router.post("/change-plan")
+async def change_subscription_plan(
+    body: ChangePlanRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Change plan for an active subscription (paid→paid) using Dodo Change Plan API.
+    Charges are handled by Dodo per proration_billing_mode; no checkout required.
+    Docs:
+      - Change Plan: https://docs.dodopayments.com/api-reference/subscriptions/change-plan
+      - Proration guidance: https://docs.dodopayments.com/developer-resources/subscription-upgrade-downgrade
+    """
+    if not DODO_PAYMENTS_API_KEY:
+        raise HTTPException(status_code=500, detail="Billing not configured")
+
+    if not getattr(user, "subscription_id", None):
+        raise HTTPException(status_code=400, detail="No active subscription on file for this user")
+
+    if not body.product_id:
+        raise HTTPException(status_code=400, detail="product_id is required")
+
+    try:
+        await dodo_client.subscriptions.change_plan(
+            subscription_id=user.subscription_id,
+            product_id=body.product_id,
+            quantity=body.quantity,
+            proration_billing_mode=body.proration_billing_mode,
+        )
+        # Optionally update local plan immediately for app gating; webhook will correct if needed
+        if body.plan:
+            user.plan = body.plan
+            db.commit()
+            logger.info(f"User {user.id} plan locally updated to {body.plan} after change_plan")
+        return {"status": "ok"}
+    except Exception as e:
+        logger.error(f"Failed to change plan: {e}")
+        raise HTTPException(status_code=400, detail="Failed to change subscription plan")
+
+
 def _constant_time_compare(a: str, b: str) -> bool:
     return hmac.compare_digest(a, b)
 
@@ -285,7 +381,7 @@ async def handle_dodopayments_webhook(request: Request, db: Session = Depends(ge
 
     try:
         # Python 3.9 compatible if/elif instead of match
-        if event_type in ("subscription.active", "subscription.renewed", "checkout.session.completed"):
+        if event_type in ("subscription.active", "subscription.renewed", "subscription.plan_changed", "checkout.session.completed"):
             # Identify the user
             meta = (data.get("metadata") or {})
             logger.info(f"Webhook metadata: {meta}")
@@ -302,11 +398,23 @@ async def handle_dodopayments_webhook(request: Request, db: Session = Depends(ge
 
             # Determine target plan from metadata selected_plan
             selected_plan = meta.get("selected_plan")
-            logger.info(f"Selected plan from metadata: {selected_plan}, user found: {user is not None}")
+            subscription_id = data.get("subscription_id") or data.get("id")
+
+            logger.info(f"Selected plan from metadata: {selected_plan}, user found: {user is not None}, sub_id={subscription_id}")
 
             if not user:
                 logger.warning("User not found for webhook event; skipping")
             else:
+                # Persist subscription_id if provided
+                if subscription_id and getattr(user, "subscription_id", None) != subscription_id:
+                    try:
+                        setattr(user, "subscription_id", subscription_id)
+                        db.commit()
+                        logger.info(f"Persisted subscription_id for user {user.id}: {subscription_id}")
+                    except Exception as e:
+                        db.rollback()
+                        logger.warning(f"Failed to persist subscription_id for user {user.id}: {e}")
+
                 if selected_plan and selected_plan != "unknown":
                     user.plan = selected_plan
                     db.commit()
@@ -319,6 +427,7 @@ async def handle_dodopayments_webhook(request: Request, db: Session = Depends(ge
             meta = (data.get("metadata") or {})
             firebase_uid = meta.get("firebase_uid")
             email = (data.get("customer") or {}).get("email") or data.get("email")
+            subscription_id = data.get("subscription_id") or data.get("id")
             user: Optional[User] = None
             if firebase_uid:
                 user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
@@ -327,6 +436,12 @@ async def handle_dodopayments_webhook(request: Request, db: Session = Depends(ge
 
             if user:
                 user.plan = "free"
+                # clear stored subscription_id as it's now cancelled
+                try:
+                    if subscription_id and getattr(user, "subscription_id", None) == subscription_id:
+                        setattr(user, "subscription_id", None)
+                except Exception:
+                    pass
                 db.commit()
                 logger.info(f"User {user.id} plan set to free (cancelled)")
 

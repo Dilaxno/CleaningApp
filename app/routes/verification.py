@@ -44,6 +44,24 @@ class VerificationStatusResponse(BaseModel):
     otp_expires_at: str | None
 
 
+class RequestEmailChangeRequest(BaseModel):
+    """Request to change email"""
+    new_email: str
+
+
+class VerifyEmailChangeRequest(BaseModel):
+    """Verify OTP and complete email change"""
+    otp: str
+    new_email: str
+
+
+class EmailChangeResponse(BaseModel):
+    """Response after email change"""
+    success: bool
+    message: str
+    new_email: str
+
+
 def generate_otp(length: int = 6) -> str:
     """Generate a random numeric OTP code"""
     otp = ''.join(random.choices(string.digits, k=length))
@@ -214,6 +232,197 @@ async def verify_otp(
         raise
     except Exception as e:
         logger.error(f"❌ Unexpected error in verify_otp: {str(e)}")
+        logger.exception("Full error traceback:")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+
+@router.post("/request-email-change")
+async def request_email_change(
+    request: RequestEmailChangeRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Initiate email change by sending OTP to new email address
+    """
+    try:
+        new_email = request.new_email.strip().lower()
+        
+        logger.info(f"📧 Email change request from {current_user.email} to {new_email}")
+        
+        # Validate new email is different
+        if new_email == current_user.email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="New email must be different from current email"
+            )
+        
+        # Check if new email is already in use
+        existing_user = db.query(User).filter(User.email == new_email).first()
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This email is already registered to another account"
+            )
+        
+        # Generate OTP for email change
+        otp = generate_otp(6)
+        otp_expires_at = datetime.utcnow() + timedelta(minutes=10)
+        
+        logger.info(f"🔐 Generated email change OTP: {otp} (expires at {otp_expires_at})")
+        
+        # Store pending email change info
+        current_user.pending_email = new_email
+        current_user.verification_otp = otp
+        current_user.otp_expires_at = otp_expires_at
+        db.commit()
+        db.refresh(current_user)
+        
+        logger.info(f"💾 Pending email change saved for user {current_user.id}")
+        
+        # Send OTP to new email
+        try:
+            from ..email_service import send_email
+            
+            content = f"""
+            <p>Hi {current_user.full_name or 'there'},</p>
+            <p>You requested to change your email address to <strong>{new_email}</strong>.</p>
+            <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
+              <p style="color: #64748b; font-size: 14px; margin-bottom: 12px;">Your verification code is:</p>
+              <div style="font-size: 36px; font-weight: bold; color: #00C4B4; letter-spacing: 8px; font-family: monospace;">
+                {otp}
+              </div>
+              <p style="color: #64748b; font-size: 13px; margin-top: 12px;">This code expires in 10 minutes</p>
+            </div>
+            <p style="color: #64748b; font-size: 14px;">
+              If you didn't request this change, please ignore this email or contact support if you're concerned.
+            </p>
+            """
+            
+            await send_email(
+                to=new_email,
+                subject="Verify Your New Email Address",
+                title="Email Change Verification",
+                content_html=content
+            )
+            
+            logger.info(f"✅ Email change OTP sent to {new_email}")
+            
+            return {
+                "success": True,
+                "message": f"Verification code sent to {new_email}",
+                "expires_in_minutes": 10
+            }
+            
+        except Exception as email_error:
+            logger.error(f"❌ Failed to send OTP to {new_email}: {str(email_error)}")
+            
+            # Rollback pending email change
+            current_user.pending_email = None
+            current_user.verification_otp = None
+            current_user.otp_expires_at = None
+            db.commit()
+            
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to send verification email: {str(email_error)}"
+            )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Unexpected error in request_email_change: {str(e)}")
+        logger.exception("Full error traceback:")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+
+@router.post("/verify-email-change", response_model=EmailChangeResponse)
+async def verify_email_change(
+    request: VerifyEmailChangeRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Verify OTP and complete email change
+    """
+    try:
+        new_email = request.new_email.strip().lower()
+        
+        logger.info(f"🔍 Email change verification for user {current_user.email} to {new_email}")
+        
+        # Refresh user from database
+        db.refresh(current_user)
+        
+        # Check if there's a pending email change
+        if not current_user.pending_email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No pending email change found"
+            )
+        
+        # Verify the new email matches pending
+        if current_user.pending_email != new_email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email does not match pending change request"
+            )
+        
+        # Check if OTP exists
+        if not current_user.verification_otp:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No verification code found. Please request a new code."
+            )
+        
+        # Check if OTP expired
+        now = datetime.utcnow()
+        if current_user.otp_expires_at and current_user.otp_expires_at < now:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Verification code expired. Please request a new code."
+            )
+        
+        # Verify OTP
+        submitted_otp = request.otp.strip()
+        stored_otp = current_user.verification_otp.strip()
+        
+        if stored_otp != submitted_otp:
+            logger.warning(f"❌ Invalid OTP for email change")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid verification code. Please try again."
+            )
+        
+        logger.info(f"✅ OTP verified! Changing email from {current_user.email} to {new_email}")
+        
+        # Update email and clear pending change
+        old_email = current_user.email
+        current_user.email = new_email
+        current_user.pending_email = None
+        current_user.verification_otp = None
+        current_user.otp_expires_at = None
+        current_user.email_verified = True  # New email is now verified
+        db.commit()
+        db.refresh(current_user)
+        
+        logger.info(f"🎉 Email successfully changed from {old_email} to {new_email}")
+        
+        return EmailChangeResponse(
+            success=True,
+            message="Email changed successfully!",
+            new_email=new_email
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Unexpected error in verify_email_change: {str(e)}")
         logger.exception("Full error traceback:")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

@@ -734,3 +734,133 @@ async def sign_contract(
         "success": True,
         "message": "Contract signed successfully. Awaiting service provider signature."
     }
+
+
+class ScheduleDecisionRequest(BaseModel):
+    action: str  # 'confirm' or 'request_change'
+    proposed_start_time: Optional[str] = None
+    proposed_end_time: Optional[str] = None
+
+
+@router.post("/{client_id}/schedule-decision")
+async def handle_schedule_decision(
+    client_id: int,
+    data: ScheduleDecisionRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Handle provider's decision on client's scheduled time
+    Provider can confirm or propose a different time
+    """
+    from ..email_service import send_email
+    
+    try:
+        # Get client
+        client = db.query(Client).filter(Client.id == client_id).first()
+        if not client:
+            raise HTTPException(status_code=404, detail="Client not found")
+        
+        # Get business config for business name
+        config = db.query(BusinessConfig).filter(BusinessConfig.user_id == client.user_id).first()
+        business_name = config.business_name if config else "Your Service Provider"
+        
+        if data.action == 'confirm':
+            # Provider confirmed the client's selected time
+            client.scheduling_status = 'confirmed'
+            db.commit()
+            
+            # Send confirmation email to client
+            if client.email:
+                content = f"""
+                <p>Hi {client.contact_name or client.business_name},</p>
+                <p>Great news! <strong>{business_name}</strong> has confirmed your preferred cleaning schedule.</p>
+                <div style="background: #f0fdf4; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #22c55e;">
+                  <p style="color: #15803d; font-weight: 600; margin-bottom: 12px;">✓ Confirmed Cleaning Date & Time</p>
+                  <p style="color: #15803d; font-size: 16px; margin: 8px 0;">
+                    📅 {datetime.fromisoformat(client.scheduled_start_time.replace('Z', '+00:00')).strftime('%A, %B %d, %Y')}
+                  </p>
+                  <p style="color: #15803d; font-size: 16px; margin: 8px 0;">
+                    ⏰ {datetime.fromisoformat(client.scheduled_start_time.replace('Z', '+00:00')).strftime('%I:%M %p')} - {datetime.fromisoformat(client.scheduled_end_time.replace('Z', '+00:00')).strftime('%I:%M %p')}
+                  </p>
+                </div>
+                <p>Your first cleaning is all set! We look forward to serving you.</p>
+                """
+                
+                await send_email(
+                    to=client.email,
+                    subject=f"Cleaning Schedule Confirmed - {business_name}",
+                    title="Your Cleaning is Scheduled! 🎉",
+                    content_html=content
+                )
+                
+            logger.info(f"✅ Provider confirmed schedule for client {client_id}")
+            
+        elif data.action == 'request_change':
+            # Provider requested a different time
+            if not data.proposed_start_time or not data.proposed_end_time:
+                raise HTTPException(status_code=400, detail="Proposed times are required")
+            
+            # Update scheduling status
+            client.scheduling_status = 'provider_requested_change'
+            
+            # Store proposed times temporarily (you might want to add these fields to the model)
+            # For now, we'll send them via email
+            db.commit()
+            
+            # Send notification to client with provider's proposed time
+            if client.email:
+                proposed_start = datetime.fromisoformat(data.proposed_start_time.replace('Z', '+00:00'))
+                proposed_end = datetime.fromisoformat(data.proposed_end_time.replace('Z', '+00:00'))
+                
+                content = f"""
+                <p>Hi {client.contact_name or client.business_name},</p>
+                <p><strong>{business_name}</strong> has reviewed your preferred cleaning schedule and would like to propose an alternative time that better fits their availability.</p>
+                
+                <div style="background: #fef3c7; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #f59e0b;">
+                  <p style="color: #92400e; font-weight: 600; margin-bottom: 12px;">📅 Your Selected Time</p>
+                  <p style="color: #92400e; font-size: 15px; margin: 8px 0;">
+                    {datetime.fromisoformat(client.scheduled_start_time.replace('Z', '+00:00')).strftime('%A, %B %d, %Y')}
+                  </p>
+                  <p style="color: #92400e; font-size: 15px; margin: 8px 0;">
+                    {datetime.fromisoformat(client.scheduled_start_time.replace('Z', '+00:00')).strftime('%I:%M %p')} - {datetime.fromisoformat(client.scheduled_end_time.replace('Z', '+00:00')).strftime('%I:%M %p')}
+                  </p>
+                </div>
+                
+                <div style="background: #dbeafe; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #3b82f6;">
+                  <p style="color: #1e40af; font-weight: 600; margin-bottom: 12px;">✨ Provider's Proposed Time</p>
+                  <p style="color: #1e40af; font-size: 16px; margin: 8px 0;">
+                    📅 {proposed_start.strftime('%A, %B %d, %Y')}
+                  </p>
+                  <p style="color: #1e40af; font-size: 16px; margin: 8px 0;">
+                    ⏰ {proposed_start.strftime('%I:%M %p')} - {proposed_end.strftime('%I:%M %p')}
+                  </p>
+                </div>
+                
+                <p>The service provider will reach out to you shortly to confirm this new time or discuss other options that work for both of you.</p>
+                <p style="color: #64748b; font-size: 14px; margin-top: 20px;">
+                  If you have any questions or concerns, please contact {business_name} directly.
+                </p>
+                """
+                
+                await send_email(
+                    to=client.email,
+                    subject=f"Alternative Cleaning Time Proposed - {business_name}",
+                    title="Schedule Change Request",
+                    content_html=content
+                )
+                
+            logger.info(f"✅ Provider requested schedule change for client {client_id}")
+            
+        else:
+            raise HTTPException(status_code=400, detail="Invalid action")
+        
+        return {
+            "success": True,
+            "message": f"Schedule {data.action} processed successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error handling schedule decision: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
