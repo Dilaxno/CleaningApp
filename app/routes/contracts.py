@@ -291,17 +291,17 @@ async def sign_contract_as_provider(
         quote = calculate_quote(business_config, form_data)
         
         # Generate HTML with both signatures
-        html = generate_contract_html(
+        html = await generate_contract_html(
             business_config,
             client,
             form_data,
             quote,
             client_signature=contract.client_signature,
-            provider_signature=contract.provider_signature
+            provider_signature=data.signature_data
         )
         
         # Convert to PDF
-        pdf_bytes = html_to_pdf(html)
+        pdf_bytes = await html_to_pdf(html)
         pdf_hash = hashlib.sha256(pdf_bytes).hexdigest()
         
         # Upload to R2

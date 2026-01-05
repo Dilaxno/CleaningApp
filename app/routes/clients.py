@@ -448,7 +448,7 @@ async def submit_public_form(
             logger.info(f"💰 Quote calculated: {quote}")
             
             # Generate HTML (without client signature - they'll sign after reviewing)
-            html = generate_contract_html(
+            html = await generate_contract_html(
                 config, 
                 client, 
                 data.formData, 
@@ -662,7 +662,7 @@ async def sign_contract(
                 provider_signature_url = contract.provider_signature
             
             # Generate HTML with signature URLs
-            html = generate_contract_html(
+            html = await generate_contract_html(
                 config, 
                 client, 
                 form_data, 

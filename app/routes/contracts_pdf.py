@@ -93,7 +93,7 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
     }
 
 
-def generate_contract_html(
+async def generate_contract_html(
     business_config: BusinessConfig,
     client: Client,
     form_data: dict,
@@ -113,23 +113,50 @@ def generate_contract_html(
     logo_url = None
     signature_url = None
     
+    # Download and convert logo to base64 for Playwright
     if business_config.logo_url:
         try:
-            logo_url = generate_presigned_url(business_config.logo_url)
+            presigned_logo_url = generate_presigned_url(business_config.logo_url)
             logger.info(f"✅ Generated presigned URL for logo: {business_config.logo_url}")
+            logo_url = await download_image_as_base64(presigned_logo_url)
+            if logo_url:
+                logger.info("✅ Logo downloaded and converted to base64")
         except Exception as e:
-            logger.error(f"❌ Failed to generate presigned URL for logo: {e}")
+            logger.warning(f"⚠️ Failed to generate logo URL: {e}")
     
-    # Use provider_signature parameter if provided, otherwise fall back to business config
+    # Download and convert provider signature to base64
     if provider_signature:
-        signature_url = provider_signature
-        logger.info(f"✅ Using provider signature from parameter (base64)")
+        # Check if it's already base64 or a URL
+        if provider_signature.startswith("data:image"):
+            signature_url = provider_signature
+        elif provider_signature.startswith("http"):
+            signature_url = await download_image_as_base64(provider_signature)
+            if signature_url:
+                logger.info("✅ Provider signature downloaded and converted to base64")
+        else:
+            signature_url = provider_signature
     elif business_config.signature_url:
         try:
-            signature_url = generate_presigned_url(business_config.signature_url)
+            presigned_sig_url = generate_presigned_url(business_config.signature_url)
             logger.info(f"✅ Generated presigned URL for signature: {business_config.signature_url}")
+            signature_url = await download_image_as_base64(presigned_sig_url)
+            if signature_url:
+                logger.info("✅ Provider signature downloaded and converted to base64")
         except Exception as e:
-            logger.error(f"❌ Failed to generate presigned URL for signature: {e}")
+            logger.warning(f"⚠️ Failed to generate signature URL: {e}")
+    
+    # Download and convert client signature to base64
+    if client_signature:
+        if client_signature.startswith("data:image"):
+            # Already base64, use as-is
+            pass
+        elif client_signature.startswith("http"):
+            # Download from URL
+            client_signature_b64 = await download_image_as_base64(client_signature)
+            if client_signature_b64:
+                client_signature = client_signature_b64
+                logger.info("✅ Client signature downloaded and converted to base64")
+        # else: assume it's already in correct format
     
     # Contract details
     contract_date = datetime.now().strftime("%B %d, %Y")
@@ -546,6 +573,33 @@ def generate_contract_html(
     return html
 
 
+async def download_image_as_base64(url: str) -> str:
+    """
+    Download an image from a URL and return it as a base64 data URL.
+    This is needed because Playwright cannot access external URLs during PDF generation.
+    """
+    import httpx
+    import base64
+    
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            
+            # Determine content type
+            content_type = response.headers.get('content-type', 'image/png')
+            
+            # Convert to base64
+            image_bytes = response.content
+            b64_encoded = base64.b64encode(image_bytes).decode('utf-8')
+            
+            # Return as data URL
+            return f"data:{content_type};base64,{b64_encoded}"
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to download image from {url}: {e}")
+        return None
+
+
 async def html_to_pdf(html: str) -> bytes:
     """
     Convert HTML to PDF using Playwright via subprocess.
@@ -640,12 +694,12 @@ async def generate_contract_pdf(
         quote = calculate_quote(config, data.formData)
         
         # Generate HTML
-        html = generate_contract_html(
+        html = await generate_contract_html(
             config, 
             client, 
             data.formData, 
             quote,
-            data.clientSignature
+            client_signature=data.clientSignature
         )
         
         # Generate PDF
@@ -778,6 +832,6 @@ async def preview_contract(
     form_data = client.form_data if client.form_data else {}
     
     quote = calculate_quote(config, form_data)
-    html = generate_contract_html(config, client, form_data, quote)
+    html = await generate_contract_html(config, client, form_data, quote)
     
     return Response(content=html, media_type="text/html")

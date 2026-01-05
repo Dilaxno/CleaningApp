@@ -187,7 +187,7 @@ async def generate_trial_contract(
         quote = calculate_quote(trial_config, form_data)
         
         # Generate HTML
-        html = generate_contract_html(
+        html = await generate_contract_html(
             trial_config,
             trial_client,
             form_data,
