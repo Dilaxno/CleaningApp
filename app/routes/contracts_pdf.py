@@ -524,15 +524,15 @@ async def generate_contract_html(
                 <tr>
                     <td>Base Service Rate</td>
                     <td>{frequency} cleaning service</td>
-                    <td style="text-align: right;">USD ${quote['base_price']:.2f}</td>
+                    <td style="text-align: right;">USD ${quote['base_price']:,.2f}</td>
                 </tr>
-                {"<tr><td>Frequency Discount</td><td>" + str(quote['discount_percent']) + "% off for " + frequency.lower() + " service</td><td style='text-align: right; color: #000000;'>-USD $" + f"{quote['discount_amount']:.2f}" + "</td></tr>" if quote['discount_amount'] > 0 else ""}
+                {"<tr><td>Frequency Discount</td><td>" + str(quote['discount_percent']) + "% off for " + frequency.lower() + " service</td><td style='text-align: right; color: #000000;'>-USD $" + f"{quote['discount_amount']:,.2f}" + "</td></tr>" if quote['discount_amount'] > 0 else ""}
                 <tr class="total-row">
                     <td><strong>Total Per Visit</strong></td>
                     <td>Estimated {quote['estimated_hours']} hours, {quote['cleaners']} cleaner(s)</td>
-                    <td style="text-align: right;"><strong>USD ${quote['final_price']:.2f}</strong></td>
+                    <td style="text-align: right;"><strong>USD ${quote['final_price']:,.2f}</strong></td>
                 </tr>
-                {f"<tr><td colspan='3' style='padding-top: 15px; border-top: 2px solid #e5e7eb;'></td></tr><tr style='background-color: #f8fafc;'><td><strong>Contract Term</strong></td><td>{quote['term_duration']} {quote['term_unit']} ({quote['service_occurrences']} visits)</td><td style='text-align: right;'></td></tr><tr class='total-row' style='background-color: #00C4B4; color: white;'><td><strong>Total Contract Value</strong></td><td>For entire {quote['term_duration']} {quote['term_unit'].lower()} term</td><td style='text-align: right;'><strong>USD ${quote['total_term_rate']:.2f}</strong></td></tr>" if quote.get('total_term_rate') else ""}
+                {f"<tr><td colspan='3' style='padding-top: 15px; border-top: 2px solid #e5e7eb;'></td></tr><tr style='background-color: #f8fafc;'><td><strong>Contract Term</strong></td><td>{quote['term_duration']} {quote['term_unit']} ({quote['service_occurrences']} visits)</td><td style='text-align: right;'></td></tr><tr class='total-row' style='background-color: #00C4B4; color: white;'><td><strong>Total Contract Value</strong></td><td>For entire {quote['term_duration']} {quote['term_unit'].lower()} term</td><td style='text-align: right;'><strong>USD ${quote['total_term_rate']:,.2f}</strong></td></tr>" if quote.get('total_term_rate') else ""}
             </tbody>
         </table>
     </div>
