@@ -65,6 +65,9 @@ class ScheduleResponse(BaseModel):
     price: Optional[float]
     isRecurring: bool
     recurrencePattern: Optional[str]
+    calendlyEventUri: Optional[str]
+    calendlyEventId: Optional[str]
+    calendlyBookingMethod: Optional[str]
     createdAt: datetime
 
     class Config:
@@ -99,6 +102,9 @@ async def get_schedules(
             price=s.price,
             isRecurring=s.is_recurring or False,
             recurrencePattern=s.recurrence_pattern,
+            calendlyEventUri=s.calendly_event_uri,
+            calendlyEventId=s.calendly_event_id,
+            calendlyBookingMethod=s.calendly_booking_method,
             createdAt=s.created_at
         ))
     return result

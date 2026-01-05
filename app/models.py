@@ -173,6 +173,13 @@ class Schedule(Base):
     price = Column(Float, nullable=True)
     is_recurring = Column(Boolean, default=False)
     recurrence_pattern = Column(String(50), nullable=True)  # weekly, bi-weekly, monthly
+    
+    # Calendly integration fields
+    calendly_event_uri = Column(String(500), nullable=True, index=True)  # Unique Calendly event URI
+    calendly_event_id = Column(String(255), nullable=True)  # Calendly event UUID
+    calendly_invitee_uri = Column(String(500), nullable=True)  # Invitee URI for tracking
+    calendly_booking_method = Column(String(50), nullable=True)  # 'client_selected', 'provider_created', 'synced'
+    
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 

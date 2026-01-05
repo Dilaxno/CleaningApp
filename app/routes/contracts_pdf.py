@@ -81,6 +81,43 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
     if property_size > 2000:
         cleaners = config.cleaners_large_job or 2
     
+    # Calculate term duration total if provided (for recurring services)
+    term_duration = form_data.get("contractTermDuration")
+    term_unit = form_data.get("contractTermUnit", "Months")
+    total_term_rate = None
+    service_occurrences = None
+    
+    if term_duration and frequency != "One-time":
+        try:
+            duration_value = int(term_duration)
+            # Convert term to months
+            duration_months = duration_value if term_unit == "Months" else duration_value * 12
+            
+            # Calculate number of service occurrences based on frequency
+            if frequency == "Daily":
+                # Approximate 22 working days per month
+                service_occurrences = duration_months * 22
+            elif frequency == "Weekly":
+                service_occurrences = duration_months * 4
+            elif frequency == "Bi-weekly":
+                service_occurrences = duration_months * 2
+            elif frequency == "Monthly":
+                service_occurrences = duration_months
+            elif frequency == "Twice daily":
+                service_occurrences = duration_months * 44
+            elif frequency == "Multiple times daily":
+                service_occurrences = duration_months * 66  # 3 times per day
+            elif frequency == "After each shift":
+                service_occurrences = duration_months * 44  # 2 shifts per day
+            elif frequency == "Weekly deep clean":
+                service_occurrences = duration_months * 4
+            else:
+                service_occurrences = duration_months * 4  # Default to weekly
+            
+            total_term_rate = final_price * service_occurrences
+        except (ValueError, TypeError):
+            pass
+    
     return {
         "base_price": round(base_price, 2),
         "discount_percent": discount_percent,
@@ -90,6 +127,10 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
         "cleaners": cleaners,
         "pricing_model": pricing_model,
         "frequency": frequency,
+        "term_duration": term_duration,
+        "term_unit": term_unit,
+        "total_term_rate": round(total_term_rate, 2) if total_term_rate else None,
+        "service_occurrences": service_occurrences,
     }
 
 
@@ -491,6 +532,7 @@ async def generate_contract_html(
                     <td>Estimated {quote['estimated_hours']} hours, {quote['cleaners']} cleaner(s)</td>
                     <td style="text-align: right;"><strong>USD ${quote['final_price']:.2f}</strong></td>
                 </tr>
+                {f"<tr><td colspan='3' style='padding-top: 15px; border-top: 2px solid #e5e7eb;'></td></tr><tr style='background-color: #f8fafc;'><td><strong>Contract Term</strong></td><td>{quote['term_duration']} {quote['term_unit']} ({quote['service_occurrences']} visits)</td><td style='text-align: right;'></td></tr><tr class='total-row' style='background-color: #00C4B4; color: white;'><td><strong>Total Contract Value</strong></td><td>For entire {quote['term_duration']} {quote['term_unit'].lower()} term</td><td style='text-align: right;'><strong>USD ${quote['total_term_rate']:.2f}</strong></td></tr>" if quote.get('total_term_rate') else ""}
             </tbody>
         </table>
     </div>
