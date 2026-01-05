@@ -3,10 +3,11 @@ Calendly Scheduling Routes
 Public endpoint for client scheduling via Calendly
 """
 import logging
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
+from datetime import datetime
 from ..database import get_db
 from ..models import Client, CalendlyIntegration
 from ..services.calendly_service import CalendlyService
@@ -119,4 +120,88 @@ async def get_client_preferences(
         raise
     except Exception as e:
         logger.error(f"❌ Error getting client preferences: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/webhook")
+async def calendly_webhook(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Webhook endpoint for Calendly to notify when a client books an appointment
+    This captures the client's preferred cleaning time for provider review
+    """
+    try:
+        payload = await request.json()
+        logger.info(f"📅 Received Calendly webhook: {payload.get('event')}")
+        
+        event_type = payload.get("event")
+        
+        # Handle event.created (when client books a time)
+        if event_type == "invitee.created":
+            event_data = payload.get("payload", {})
+            event_obj = event_data.get("event", {})
+            invitee = event_data.get("invitee", {})
+            
+            # Extract event details
+            start_time_str = event_obj.get("start_time")
+            end_time_str = event_obj.get("end_time")
+            event_id = event_obj.get("uuid")
+            invitee_email = invitee.get("email")
+            
+            if not all([start_time_str, end_time_str, invitee_email]):
+                logger.warning("⚠️ Missing required fields in Calendly webhook")
+                return {"status": "ignored", "reason": "missing_fields"}
+            
+            # Parse times
+            start_time = datetime.fromisoformat(start_time_str.replace('Z', '+00:00'))
+            end_time = datetime.fromisoformat(end_time_str.replace('Z', '+00:00'))
+            
+            # Find client by email
+            client = db.query(Client).filter(Client.email == invitee_email).first()
+            
+            if client:
+                # Update client with scheduled time
+                client.scheduled_start_time = start_time
+                client.scheduled_end_time = end_time
+                client.calendly_event_id = event_id
+                client.scheduling_status = "client_selected"
+                
+                db.commit()
+                
+                logger.info(f"✅ Updated client {client.id} with scheduled time: {start_time} - {end_time}")
+                
+                # TODO: Send notification to provider about client's selected time
+                
+                return {
+                    "status": "success",
+                    "client_id": client.id,
+                    "scheduled_time": start_time_str
+                }
+            else:
+                logger.warning(f"⚠️ No client found with email {invitee_email}")
+                return {"status": "ignored", "reason": "client_not_found"}
+        
+        # Handle event.cancelled
+        elif event_type == "invitee.canceled":
+            event_data = payload.get("payload", {})
+            invitee = event_data.get("invitee", {})
+            invitee_email = invitee.get("email")
+            
+            client = db.query(Client).filter(Client.email == invitee_email).first()
+            if client:
+                client.scheduled_start_time = None
+                client.scheduled_end_time = None
+                client.calendly_event_id = None
+                client.scheduling_status = "pending"
+                db.commit()
+                
+                logger.info(f"✅ Cleared scheduling for client {client.id}")
+                return {"status": "success", "action": "cleared"}
+        
+        return {"status": "success", "event": event_type}
+    
+    except Exception as e:
+        logger.error(f"❌ Error processing Calendly webhook: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

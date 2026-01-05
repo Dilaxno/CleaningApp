@@ -345,31 +345,31 @@ async def send_new_client_notification(
 ) -> dict:
     """Notify business owner of new client submission"""
     content = f"""
-    <p>Great news! You have a new client submission.</p>
+    <p>Hi {business_name},</p>
+    <p>{client_name} ({client_email}) completed a {property_type} cleaning intake form for {business_name}.</p>
+    
     <div style="background: {THEME['background']}; border-radius: 12px; padding: 20px; margin: 20px 0;">
+      <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: {THEME['text_primary']};">Key Details Captured:</h3>
       <div style="margin-bottom: 12px;">
-        <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 4px;">Client Name</div>
-        <div style="font-weight: 600; font-size: 16px; color: {THEME['text_primary']};">{client_name}</div>
-      </div>
-      <div style="margin-bottom: 12px;">
-        <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 4px;">Email</div>
-        <div style="font-size: 15px; color: {THEME['primary']};">{client_email}</div>
-      </div>
-      <div>
-        <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 4px;">Property Type</div>
-        <div style="font-size: 15px; color: {THEME['text_primary']}; text-transform: capitalize;">{property_type}</div>
+        <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 4px;">Property type: {property_type}</div>
+        <div style="font-size: 14px; color: {THEME['text_muted']};">Full intake details available in dashboard (sq ft, peak hours, security codes, fragile displays, photos?)</div>
       </div>
     </div>
-    <p>Review their submission and send a quote to get started.</p>
+    
+    <div style="background: {THEME['background']}; border-radius: 12px; padding: 20px; margin: 20px 0;">
+      <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: {THEME['text_primary']};">Next Steps:</h3>
+      <p style="margin: 0; font-size: 14px; color: {THEME['text_primary']};">Review property specifics in dashboard → Wait for auto-generated contract to be reviewed and signed by client</p>
+    </div>
+    
+    <p style="font-size: 15px; color: {THEME['text_primary']}; font-weight: 600;">First booking awaits! 🚀</p>
+    
+    <p style="margin-top: 20px;">Best,<br/><strong>Cleanenroll Team</strong></p>
     """
     return await send_email(
         to=to,
-        subject=f"New Client Submission: {client_name}",
-        title="New Client Submission",
-        intro=f"A new client has submitted a form for {business_name}.",
+        subject=f"New {property_type} Property Intake: {client_name} Ready to Review 📋",
+        title="New Client Property Intake Submission",
         content_html=content,
-        cta_url="https://cleanenroll.com/clients",
-        cta_label="View Client Details",
     )
 
 
@@ -490,25 +490,41 @@ async def send_form_submission_confirmation(
     to: str,
     client_name: str,
     business_name: str,
+    property_type: str = "Property",
 ) -> dict:
     """Send confirmation to client after form submission"""
     content = f"""
     <p>Hi {client_name},</p>
-    <p>Thank you for submitting your information to <strong>{business_name}</strong>!</p>
-    <p>Your submission has been received and is being reviewed. You can expect to hear back soon with next steps.</p>
-    <div style="background: {THEME['background']}; border-radius: 12px; padding: 16px; margin: 20px 0; text-align: center;">
-      <p style="margin: 0; color: {THEME['text_muted']}; font-size: 14px;">
-        ✓ Submission received successfully
-      </p>
+    <p>Thank you for completing your {property_type} cleaning intake form for {business_name}!</p>
+    <p>Your property details (square footage, peak hours, security codes, fragile displays) have been received and processed successfully.</p>
+    
+    <div style="background: {THEME['background']}; border-radius: 12px; padding: 20px; margin: 20px 0;">
+      <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: {THEME['text_primary']};">What's Next:</h3>
+      <div style="font-size: 14px; color: {THEME['text_primary']};">
+        <div style="margin-bottom: 8px;">✓ Auto-generated contract with dynamic pricing sent to your email</div>
+        <div style="margin-bottom: 8px;">✓ Review & sign at your convenience</div>
+        <div>✓ Schedule first cleaning with {business_name}</div>
+      </div>
     </div>
+    
+    <div style="background: {THEME['background']}; border-radius: 12px; padding: 20px; margin: 20px 0;">
+      <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: {THEME['text_primary']};">Quick Confirmation:</h3>
+      <div style="font-size: 14px; color: {THEME['text_primary']};">
+        <div style="margin-bottom: 8px;">✅ {property_type} property intake completed</div>
+        <div>✅ Ready for your review</div>
+      </div>
+    </div>
+    
     <p style="color: {THEME['text_muted']}; font-size: 14px;">
-      If you have any questions, please contact {business_name} directly.
+      Questions? Contact {business_name} directly. Excited to get your store sparkling! ✨
     </p>
+    
+    <p style="margin-top: 20px;">Best,<br/><strong>Cleanenroll</strong></p>
     """
     return await send_email(
         to=to,
-        subject=f"Submission Received - {business_name}",
-        title="Thank You for Your Submission!",
+        subject=f"Thank You for Your {property_type} Cleaning Intake, {client_name}! 📋",
+        title=f"Thank You for Your {property_type} Cleaning Intake, {client_name}! 📋",
         content_html=content,
     )
 
@@ -563,8 +579,41 @@ async def send_contract_fully_executed_email(
     property_address: Optional[str] = None,
     business_phone: Optional[str] = None,
     contract_pdf_url: Optional[str] = None,
+    scheduled_time_confirmed: bool = False,
+    scheduled_start_time: Optional[str] = None,
 ) -> dict:
     """Notify client when contract is fully signed by both parties"""
+    
+    # Build scheduled time section if applicable
+    schedule_section = ""
+    if scheduled_time_confirmed and scheduled_start_time:
+        schedule_section = f"""
+        <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
+          <p style="margin: 0 0 8px 0; color: #166534; font-size: 14px; font-weight: 600;">
+            ✓ First Cleaning Confirmed
+          </p>
+          <p style="margin: 0; color: #166534; font-size: 14px;">
+            📅 {scheduled_start_time}
+          </p>
+        </div>
+        """
+    elif start_date:
+        schedule_section = f"""
+        <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0; text-align: center;">
+          <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
+            🚀 Your signed contract PDF is attached. First service starts {start_date}!
+          </p>
+        </div>
+        """
+    else:
+        schedule_section = f"""
+        <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0; text-align: center;">
+          <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
+            🚀 Your signed contract PDF is attached. We'll confirm your service schedule shortly!
+          </p>
+        </div>
+        """
+    
     content = f"""
     <p>Hi {client_name},</p>
     <p>Perfect! <strong>{business_name}</strong> has reviewed and signed your service agreement{f' for {property_address}' if property_address else ''}.</p>
@@ -580,16 +629,11 @@ async def send_contract_fully_executed_email(
           <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 4px;">Service Type</div>
           <div style="font-size: 15px; color: {THEME['text_primary']};">{service_type}</div>
         </div>
-        {f'<div style="margin-bottom: 12px;"><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 4px;">Start Date</div><div style="font-size: 15px; color: {THEME["text_primary"]};">{start_date}</div></div>' if start_date else ''}
         {f'<div style="margin-bottom: 12px;"><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 4px;">Total</div><div style="font-weight: 600; font-size: 16px; color: {THEME["primary"]};">${total_value:,.2f}</div></div>' if total_value else ''}
       </div>
     </div>
     
-    <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0; text-align: center;">
-      <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
-        🚀 Your signed contract PDF is attached. Schedule your first service anytime!
-      </p>
-    </div>
+    {schedule_section}
     
     <p style="color: {THEME['text_muted']}; font-size: 14px;">
       Questions? Reply here{f' or call {business_phone}' if business_phone else ''}.

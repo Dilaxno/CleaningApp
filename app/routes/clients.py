@@ -537,6 +537,7 @@ async def submit_public_form(
                 to=data.email,
                 client_name=data.contactName or data.businessName,
                 business_name=business_name,
+                property_type=data.propertyType or "Property",
             )
             logger.info(f"📧 Confirmation email sent to client: {data.email}")
             
