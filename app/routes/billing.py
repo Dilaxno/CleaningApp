@@ -80,9 +80,9 @@ class UpdatePlanRequest(BaseModel):
 
 # Plan limits configuration
 PLAN_LIMITS = {
-    "free": {"clients": 2, "contracts": 5, "schedules": 10},
-    "solo": {"clients": 10, "contracts": 25, "schedules": 50},
-    "team": {"clients": 50, "contracts": 100, "schedules": 200},
+    "free": {"clients": 2, "contracts": 2, "schedules": 2},
+    "solo": {"clients": 10, "contracts": 10, "schedules": 10},
+    "team": {"clients": 50, "contracts": 50, "schedules": 50},
     "enterprise": {"clients": 999999, "contracts": 999999, "schedules": 999999},  # Unlimited
 }
 
