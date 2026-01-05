@@ -634,8 +634,8 @@ async def sign_contract(
                 ContentType="image/png"
             )
             
-            # Generate presigned URL
-            client_signature_url = generate_presigned_url(signature_key, expiration=31536000)  # 1 year
+            # Generate presigned URL (7 days max for R2)
+            client_signature_url = generate_presigned_url(signature_key, expiration=604800)  # 7 days
             logger.info(f"✅ Client signature uploaded to R2: {signature_key}")
         except Exception as sig_err:
             logger.warning(f"⚠️ Failed to upload client signature to R2: {sig_err}")
