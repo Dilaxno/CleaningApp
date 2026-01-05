@@ -776,3 +776,36 @@ async def send_scheduling_counter_proposal_email(
         intro=f"{client_name} has suggested different times.",
         content_html=content
     )
+
+
+async def send_email_verification_otp(to: str, user_name: str, otp: str) -> dict:
+    """Send OTP for email verification"""
+    content = f"""
+    <p>Hi {user_name},</p>
+    <p>To verify your email address, please use the verification code below:</p>
+    
+    <div style="background: {THEME['background']}; border-radius: 16px; padding: 32px; margin: 32px 0; text-align: center;">
+        <div style="color: {THEME['text_muted']}; font-size: 14px; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Your Verification Code</div>
+        <div style="font-size: 42px; font-weight: 700; letter-spacing: 8px; color: {THEME['primary']}; font-family: 'Courier New', monospace; text-align: center;">
+            {otp}
+        </div>
+        <div style="color: {THEME['text_muted']}; font-size: 13px; margin-top: 12px;">This code expires in 10 minutes</div>
+    </div>
+    
+    <p style="color: {THEME['text_muted']}; font-size: 14px;">
+        Enter this code in the verification page to confirm your email address.
+    </p>
+    
+    <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;">
+        <p style="margin: 0; color: #92400e; font-size: 13px;">
+            ⚠️ If you didn't request this code, you can safely ignore this email.
+        </p>
+    </div>
+    """
+    return await send_email(
+        to=to,
+        subject="Verify Your Email - CleanEnroll",
+        title="Verify Your Email Address",
+        intro="Please confirm your email to secure your account.",
+        content_html=content,
+    )

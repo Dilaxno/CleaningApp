@@ -30,6 +30,7 @@ class UserResponse(BaseModel):
     id: int
     firebase_uid: str
     email: str
+    email_verified: bool = False
     full_name: Optional[str]
     profile_picture_url: Optional[str]
     profile_picture_presigned: Optional[str] = None

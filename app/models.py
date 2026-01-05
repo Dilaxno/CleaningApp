@@ -11,6 +11,9 @@ class User(Base):
     firebase_uid = Column(String(255), unique=True, index=True, nullable=False)
     full_name = Column(String(255), nullable=True)
     email = Column(String(255), unique=True, index=True, nullable=False)
+    email_verified = Column(Boolean, default=False, nullable=False)  # Email verification status
+    verification_otp = Column(String(10), nullable=True)  # Current OTP for email verification
+    otp_expires_at = Column(DateTime, nullable=True)  # OTP expiration time
     profile_picture_url = Column(String(500), nullable=True)  # R2 key for profile picture
     account_type = Column(String(50), nullable=True)
     hear_about = Column(String(100), nullable=True)
