@@ -40,19 +40,14 @@ def generate_otp(length: int = 6) -> str:
 
 @router.post("/send-otp")
 async def send_verification_otp(
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Generate and send OTP to user's email
     """
-    # Get user from database
-    user = db.query(User).filter(User.firebase_uid == current_user["uid"]).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
+    # current_user is already the User object from database
+    user = current_user
     
     # Check if already verified
     if user.email_verified:
@@ -92,19 +87,14 @@ async def send_verification_otp(
 @router.post("/verify-otp", response_model=VerifyOTPResponse)
 async def verify_otp(
     request: VerifyOTPRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Verify OTP and mark email as verified
     """
-    # Get user from database
-    user = db.query(User).filter(User.firebase_uid == current_user["uid"]).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
+    # current_user is already the User object from database
+    user = current_user
     
     # Check if already verified
     if user.email_verified:
@@ -150,18 +140,14 @@ async def verify_otp(
 
 @router.get("/status")
 async def get_verification_status(
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Get current email verification status
     """
-    user = db.query(User).filter(User.firebase_uid == current_user["uid"]).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
+    # current_user is already the User object from database
+    user = current_user
     
     return {
         "email": user.email,
