@@ -2,6 +2,7 @@ import logging
 import httpx
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
+from urllib.parse import urlencode
 from ..config import GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI
 
 logger = logging.getLogger(__name__)
@@ -35,7 +36,7 @@ class GoogleCalendarService:
             "state": state
         }
         
-        query_string = "&".join([f"{k}={httpx.URL(v).raw_path.decode()}" for k, v in params.items()])
+        query_string = urlencode(params)
         auth_url = f"{self.AUTH_URL}?{query_string}"
         
         logger.info(f"🔗 Generating authorization URL with redirect_uri: {GOOGLE_REDIRECT_URI}")
