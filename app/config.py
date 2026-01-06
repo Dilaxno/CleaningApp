@@ -32,3 +32,8 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 # Resend Email Configuration
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 EMAIL_FROM_ADDRESS = os.getenv("EMAIL_FROM_ADDRESS", "CleanEnroll <noreply@cleanenroll.com>")
+
+# Google Calendar OAuth Configuration
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
+GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", f"{FRONTEND_URL}/auth/google-calendar")
