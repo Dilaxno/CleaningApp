@@ -61,8 +61,12 @@ class BusinessConfig(Base):
     logo_url = Column(String(500), nullable=True)
     signature_url = Column(String(500), nullable=True)
     onboarding_complete = Column(Boolean, default=False)
-    # Pricing
-    pricing_model = Column(String(50), nullable=False)
+    pricing_model = Column(String(50), nullable=True)  # sqft, room, hourly, flat
+    
+    # Availability settings
+    working_days = Column(JSON, nullable=True)  # e.g., ["monday", "tuesday", "wednesday", "thursday", "friday"]
+    working_hours = Column(JSON, nullable=True)  # e.g., {"start": "09:00", "end": "17:00"}
+    break_times = Column(JSON, nullable=True)  # e.g., [{"start": "12:00", "end": "13:00"}]
     rate_per_sqft = Column(Float, nullable=True)
     rate_per_room = Column(Float, nullable=True)
     hourly_rate = Column(Float, nullable=True)
@@ -194,6 +198,10 @@ class Schedule(Base):
     calendly_event_id = Column(String(255), nullable=True)  # Calendly event UUID
     calendly_invitee_uri = Column(String(500), nullable=True)  # Invitee URI for tracking
     calendly_booking_method = Column(String(50), nullable=True)  # 'client_selected', 'provider_created', 'synced'
+    
+    # Google Calendar integration fields
+    google_calendar_event_id = Column(String(500), nullable=True, index=True)  # Google Calendar event ID
+    location = Column(String(500), nullable=True)  # Event location (separate from address)
     
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

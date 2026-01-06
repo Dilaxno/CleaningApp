@@ -2,7 +2,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict
 from ..database import get_db
 from ..models import User, BusinessConfig
 from ..auth import get_current_user
@@ -19,9 +19,12 @@ class BusinessConfigCreate(BaseModel):
     businessName: Optional[str] = None
     logoUrl: Optional[str] = None
     signatureUrl: Optional[str] = None
-    onboardingComplete: Optional[bool] = False
+    onboardingComplete: Optional[bool] = None
     # Pricing
-    pricingModel: str
+    pricingModel: Optional[str] = None
+    workingDays: Optional[List[str]] = None
+    workingHours: Optional[Dict[str, str]] = None
+    breakTimes: Optional[List[str]] = None
     ratePerSqft: Optional[str] = None
     ratePerRoom: Optional[str] = None
     hourlyRate: Optional[str] = None
@@ -98,6 +101,9 @@ def get_current_user_business_config(current_user: User = Depends(get_current_us
         "signatureUrl": signature_presigned_url,
         "onboardingComplete": config.onboarding_complete,
         "pricingModel": config.pricing_model,
+        "workingDays": config.working_days,
+        "workingHours": config.working_hours,
+        "breakTimes": config.break_times,
         "ratePerSqft": config.rate_per_sqft,
         "ratePerRoom": config.rate_per_room,
         "hourlyRate": config.hourly_rate,
@@ -143,6 +149,9 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
             existing.signature_url = data.signatureUrl
             existing.onboarding_complete = data.onboardingComplete
             existing.pricing_model = data.pricingModel
+            existing.working_days = data.workingDays
+            existing.working_hours = data.workingHours
+            existing.break_times = data.breakTimes
             existing.rate_per_sqft = to_float(data.ratePerSqft)
             existing.rate_per_room = to_float(data.ratePerRoom)
             existing.hourly_rate = to_float(data.hourlyRate)
@@ -175,6 +184,9 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 signature_url=data.signatureUrl,
                 onboarding_complete=data.onboardingComplete,
                 pricing_model=data.pricingModel,
+                working_days=data.workingDays,
+                working_hours=data.workingHours,
+                break_times=data.breakTimes,
                 rate_per_sqft=to_float(data.ratePerSqft),
                 rate_per_room=to_float(data.ratePerRoom),
                 hourly_rate=to_float(data.hourlyRate),

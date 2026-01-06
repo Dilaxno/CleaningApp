@@ -9,8 +9,9 @@ from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime, timedelta
 from ..database import get_db
-from ..models import Client, GoogleCalendarIntegration
+from ..models import Client, GoogleCalendarIntegration, Schedule, User, BusinessConfig
 from ..services.google_calendar_service import GoogleCalendarService
+from .. import email_service
 
 logger = logging.getLogger(__name__)
 
@@ -151,9 +152,45 @@ async def schedule_appointment(
         client.scheduled_start_time = request.start_time
         client.scheduled_end_time = request.end_time
         client.scheduling_status = "scheduled"
+        
+        # Create Schedule record for provider's schedule page
+        duration_minutes = int((request.end_time - request.start_time).total_seconds() / 60)
+        schedule = Schedule(
+            user_id=client.user_id,
+            client_id=client.id,
+            title=event_summary,
+            description=event_description,
+            service_type="first_cleaning",
+            scheduled_date=request.start_time,
+            start_time=request.start_time.strftime("%H:%M"),
+            end_time=request.end_time.strftime("%H:%M"),
+            duration_minutes=duration_minutes,
+            status="scheduled",
+            location=client_address,
+            google_calendar_event_id=event.get("id"),
+            notes=request.notes
+        )
+        db.add(schedule)
         db.commit()
         
-        logger.info(f"✅ Created Google Calendar event for client {request.client_id}")
+        # Send email notification to provider
+        provider = db.query(User).filter(User.id == client.user_id).first()
+        if provider and provider.email:
+            try:
+                await email_service.send_appointment_notification(
+                    provider_email=provider.email,
+                    provider_name=provider.full_name or provider.email,
+                    client_name=client.business_name or client.contact_name,
+                    appointment_time=request.start_time,
+                    location=client_address,
+                    event_link=event.get("htmlLink")
+                )
+                logger.info(f"✅ Sent appointment notification to {provider.email}")
+            except Exception as e:
+                logger.error(f"⚠️ Failed to send email notification: {str(e)}")
+                # Don't fail the whole request if email fails
+        
+        logger.info(f"✅ Created Google Calendar event and schedule for client {request.client_id}")
         
         return {
             "success": True,
@@ -195,14 +232,34 @@ async def get_available_slots(
         if not integration:
             raise HTTPException(status_code=404, detail="Google Calendar not connected")
         
+        # Get provider's availability settings
+        business_config = db.query(BusinessConfig).filter(
+            BusinessConfig.user_id == client.user_id
+        ).first()
+        
+        # Parse date and check if it's a working day
+        target_date = datetime.strptime(date, "%Y-%m-%d")
+        day_name = target_date.strftime("%A").lower()
+        
+        # Check if provider works on this day
+        working_days = business_config.working_days if business_config else ["monday", "tuesday", "wednesday", "thursday", "friday"]
+        if day_name not in working_days:
+            return {"date": date, "slots": [], "duration_minutes": 60, "message": "Provider is not available on this day"}
+        
+        # Get working hours (default 9 AM - 5 PM)
+        working_hours = business_config.working_hours if business_config and business_config.working_hours else {"start": "09:00", "end": "17:00"}
+        start_hour, start_minute = map(int, working_hours["start"].split(":"))
+        end_hour, end_minute = map(int, working_hours["end"].split(":"))
+        
+        time_min = target_date.replace(hour=start_hour, minute=start_minute, second=0)
+        time_max = target_date.replace(hour=end_hour, minute=end_minute, second=0)
+        
+        # Get break times if any
+        break_times = business_config.break_times if business_config and business_config.break_times else []
+        
         # Ensure token is fresh
         from ..routes.google_calendar import _ensure_fresh_token
         access_token = await _ensure_fresh_token(integration, db)
-        
-        # Parse date and create time range (8 AM to 6 PM business hours)
-        target_date = datetime.strptime(date, "%Y-%m-%d")
-        time_min = target_date.replace(hour=8, minute=0, second=0)
-        time_max = target_date.replace(hour=18, minute=0, second=0)
         
         # Get free/busy info
         free_busy = await google_calendar_service.get_free_busy(
@@ -212,7 +269,7 @@ async def get_available_slots(
             time_max=time_max
         )
         
-        # Extract busy periods
+        # Extract busy periods from Google Calendar
         busy_periods = []
         calendars = free_busy.get("calendars", {})
         calendar_data = calendars.get(integration.google_calendar_id, {})
@@ -222,6 +279,14 @@ async def get_available_slots(
             start = datetime.fromisoformat(busy["start"].replace('Z', '+00:00'))
             end = datetime.fromisoformat(busy["end"].replace('Z', '+00:00'))
             busy_periods.append({"start": start, "end": end})
+        
+        # Add break times as busy periods
+        for break_time in break_times:
+            break_start_hour, break_start_minute = map(int, break_time["start"].split(":"))
+            break_end_hour, break_end_minute = map(int, break_time["end"].split(":"))
+            break_start = target_date.replace(hour=break_start_hour, minute=break_start_minute, second=0)
+            break_end = target_date.replace(hour=break_end_hour, minute=break_end_minute, second=0)
+            busy_periods.append({"start": break_start, "end": break_end})
         
         # Generate available slots (1-hour slots)
         duration_minutes = integration.default_appointment_duration or 60
