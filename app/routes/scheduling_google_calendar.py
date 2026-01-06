@@ -131,6 +131,11 @@ async def schedule_appointment(
         if request.notes:
             event_description += f"\n\nClient notes: {request.notes}"
         
+        # Extract address from form_data JSON field
+        client_address = None
+        if client.form_data and isinstance(client.form_data, dict):
+            client_address = client.form_data.get("address")
+        
         event = await google_calendar_service.create_event(
             access_token=access_token,
             calendar_id=integration.google_calendar_id,
@@ -139,7 +144,7 @@ async def schedule_appointment(
             start_time=request.start_time,
             end_time=request.end_time,
             attendee_email=client.email,
-            location=client.address
+            location=client_address
         )
         
         # Update client with scheduled time
