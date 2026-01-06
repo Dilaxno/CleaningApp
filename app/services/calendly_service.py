@@ -38,16 +38,27 @@ class CalendlyService:
     async def exchange_code_for_token(self, code: str) -> Dict[str, Any]:
         """Exchange authorization code for access token"""
         async with httpx.AsyncClient() as client:
+            payload = {
+                "grant_type": "authorization_code",
+                "code": code,
+                "client_id": self.client_id,
+                "client_secret": self.client_secret,
+                "redirect_uri": self.redirect_uri
+            }
+            
+            logger.info(f"🔄 Exchanging OAuth code for token with redirect_uri: {self.redirect_uri}")
+            
             response = await client.post(
                 self.TOKEN_URL,
-                data={
-                    "grant_type": "authorization_code",
-                    "code": code,
-                    "client_id": self.client_id,
-                    "client_secret": self.client_secret,
-                    "redirect_uri": self.redirect_uri
-                }
+                data=payload
             )
+            
+            if response.status_code != 200:
+                error_body = response.text
+                logger.error(f"❌ Calendly token exchange failed: {response.status_code}")
+                logger.error(f"❌ Error response: {error_body}")
+                logger.error(f"❌ Redirect URI sent: {self.redirect_uri}")
+            
             response.raise_for_status()
             return response.json()
     
