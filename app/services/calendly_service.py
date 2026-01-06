@@ -25,6 +25,8 @@ class CalendlyService:
             logger.error("CALENDLY_REDIRECT_URI not configured in environment variables")
             raise ValueError("Calendly redirect URI not configured")
         
+        logger.info(f"🔗 Generating authorization URL with redirect_uri: {self.redirect_uri}")
+        
         params = {
             "client_id": self.client_id,
             "response_type": "code",
@@ -33,7 +35,9 @@ class CalendlyService:
         }
         from urllib.parse import urlencode
         query = urlencode(params)
-        return f"{self.AUTH_URL}?{query}"
+        auth_url = f"{self.AUTH_URL}?{query}"
+        logger.info(f"🔗 Full auth URL: {auth_url}")
+        return auth_url
     
     async def exchange_code_for_token(self, code: str) -> Dict[str, Any]:
         """Exchange authorization code for access token"""
