@@ -22,6 +22,7 @@ class BusinessConfigCreate(BaseModel):
     onboardingComplete: Optional[bool] = None
     # Pricing
     pricingModel: Optional[str] = None
+    meetingsRequired: Optional[bool] = None
     workingDays: Optional[List[str]] = None
     workingHours: Optional[Dict[str, str]] = None
     breakTimes: Optional[List[str]] = None
@@ -101,6 +102,7 @@ def get_current_user_business_config(current_user: User = Depends(get_current_us
         "signatureUrl": signature_presigned_url,
         "onboardingComplete": config.onboarding_complete,
         "pricingModel": config.pricing_model,
+        "meetingsRequired": config.meetings_required,
         "workingDays": config.working_days,
         "workingHours": config.working_hours,
         "breakTimes": config.break_times,
@@ -149,6 +151,7 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
             existing.signature_url = data.signatureUrl
             existing.onboarding_complete = data.onboardingComplete
             existing.pricing_model = data.pricingModel
+            existing.meetings_required = data.meetingsRequired
             existing.working_days = data.workingDays
             existing.working_hours = data.workingHours
             existing.break_times = data.breakTimes
@@ -184,6 +187,7 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 signature_url=data.signatureUrl,
                 onboarding_complete=data.onboardingComplete,
                 pricing_model=data.pricingModel,
+                meetings_required=data.meetingsRequired,
                 working_days=data.workingDays,
                 working_hours=data.workingHours,
                 break_times=data.breakTimes,
