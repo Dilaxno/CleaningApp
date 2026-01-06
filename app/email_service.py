@@ -868,16 +868,16 @@ async def send_appointment_notification(
     location: Optional[str] = None,
     event_link: Optional[str] = None
 ) -> dict:
-    """Notify provider when client schedules an appointment"""
+    """Notify provider when client schedules an appointment (pending approval)"""
     formatted_time = appointment_time.strftime("%A, %B %d, %Y at %I:%M %p")
     
     content = f"""
     <p>Hi {provider_name},</p>
-    <p><strong>{client_name}</strong> has scheduled their first cleaning appointment.</p>
+    <p><strong>{client_name}</strong> has requested their first cleaning appointment.</p>
     
     <div style="background: {THEME['background']}; border-radius: 12px; padding: 24px; margin: 24px 0;">
         <div style="margin-bottom: 16px;">
-            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">📅 Date & Time</div>
+            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">📅 Requested Date & Time</div>
             <div style="font-size: 16px; color: {THEME['text_primary']}; font-weight: 600;">{formatted_time}</div>
         </div>
         {f'<div style="margin-bottom: 16px;"><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 6px;">📍 Location</div><div style="font-size: 15px; color: {THEME["text_primary"]};">{location}</div></div>' if location else ''}
@@ -887,19 +887,115 @@ async def send_appointment_notification(
         </div>
     </div>
     
-    <div style="background: #d1fae5; border: 1px solid #10b981; border-radius: 12px; padding: 16px; margin: 20px 0;">
-        <p style="margin: 0; color: #065f46; font-size: 14px; font-weight: 600;">
-            ✅ This appointment has been added to your Google Calendar and Schedule page
+    <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;">
+        <p style="margin: 0; color: #92400e; font-size: 14px; font-weight: 600;">
+            ⏳ Action Required: Please review and accept or request a different time
         </p>
     </div>
     
-    {f'<p style="text-align: center; margin: 24px 0;"><a href="{event_link}" style="display: inline-block; background: {THEME["primary"]}; color: white; padding: 14px 28px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 15px;">View in Google Calendar →</a></p>' if event_link else ''}
+    <p style="color: {THEME['text_muted']}; font-size: 14px;">
+        Visit your Schedule page to accept this appointment or propose an alternative time to the client.
+    </p>
     """
     
     return await send_email(
         to=provider_email,
-        subject=f"New Appointment: {client_name} - {appointment_time.strftime('%b %d, %Y')}",
-        title="New Appointment Scheduled",
-        intro=f"{client_name} has booked their first cleaning.",
+        subject=f"Pending Appointment Request: {client_name} - {appointment_time.strftime('%b %d, %Y')}",
+        title="New Appointment Request",
+        intro=f"{client_name} has requested a cleaning appointment.",
+        content_html=content
+    )
+
+
+async def send_appointment_confirmation(
+    client_email: str,
+    client_name: str,
+    provider_name: str,
+    appointment_time: datetime,
+    location: Optional[str] = None,
+    event_link: Optional[str] = None
+) -> dict:
+    """Confirm appointment to client after provider accepts"""
+    formatted_time = appointment_time.strftime("%A, %B %d, %Y at %I:%M %p")
+    
+    content = f"""
+    <p>Hi {client_name},</p>
+    <p>Great news! <strong>{provider_name}</strong> has confirmed your cleaning appointment.</p>
+    
+    <div style="background: {THEME['background']}; border-radius: 12px; padding: 24px; margin: 24px 0;">
+        <div style="margin-bottom: 16px;">
+            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">📅 Confirmed Date & Time</div>
+            <div style="font-size: 16px; color: {THEME['text_primary']}; font-weight: 600;">{formatted_time}</div>
+        </div>
+        {f'<div style="margin-bottom: 16px;"><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 6px;">📍 Location</div><div style="font-size: 15px; color: {THEME["text_primary"]};">{location}</div></div>' if location else ''}
+        <div>
+            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">🧹 Service Provider</div>
+            <div style="font-size: 15px; color: {THEME['text_primary']};">{provider_name}</div>
+        </div>
+    </div>
+    
+    <div style="background: #d1fae5; border: 1px solid #10b981; border-radius: 12px; padding: 16px; margin: 20px 0;">
+        <p style="margin: 0; color: #065f46; font-size: 14px; font-weight: 600;">
+            ✅ Your appointment is confirmed and has been added to your calendar
+        </p>
+    </div>
+    
+    {f'<p style="text-align: center; margin: 24px 0;"><a href="{event_link}" style="display: inline-block; background: {THEME["primary"]}; color: white; padding: 14px 28px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 15px;">Add to Calendar →</a></p>' if event_link else ''}
+    """
+    
+    return await send_email(
+        to=client_email,
+        subject=f"Appointment Confirmed - {appointment_time.strftime('%b %d, %Y')}",
+        title="Appointment Confirmed!",
+        intro=f"Your cleaning appointment with {provider_name} is confirmed.",
+        content_html=content
+    )
+
+
+async def send_schedule_change_request(
+    client_email: str,
+    client_name: str,
+    provider_name: str,
+    original_time: datetime,
+    proposed_time: datetime,
+    proposed_start: str,
+    proposed_end: str,
+    schedule_id: int
+) -> dict:
+    """Notify client when provider requests alternative time"""
+    original_formatted = original_time.strftime("%A, %B %d, %Y at %I:%M %p")
+    proposed_formatted = proposed_time.strftime("%A, %B %d, %Y")
+    
+    content = f"""
+    <p>Hi {client_name},</p>
+    <p><strong>{provider_name}</strong> has reviewed your appointment request and would like to propose an alternative time.</p>
+    
+    <div style="background: {THEME['background']}; border-radius: 12px; padding: 24px; margin: 24px 0;">
+        <div style="margin-bottom: 20px;">
+            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">📅 Your Requested Time</div>
+            <div style="font-size: 15px; color: {THEME['text_muted']}; text-decoration: line-through;">{original_formatted}</div>
+        </div>
+        <div>
+            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">✨ Proposed Alternative</div>
+            <div style="font-size: 16px; color: {THEME['text_primary']}; font-weight: 600;">{proposed_formatted} from {proposed_start} to {proposed_end}</div>
+        </div>
+    </div>
+    
+    <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;">
+        <p style="margin: 0; color: #92400e; font-size: 14px; font-weight: 600;">
+            ⏳ Response Needed: Please confirm or suggest another time
+        </p>
+    </div>
+    
+    <p style="color: {THEME['text_muted']}; font-size: 14px;">
+        Please reply to this email to confirm the proposed time or suggest an alternative that works better for you.
+    </p>
+    """
+    
+    return await send_email(
+        to=client_email,
+        subject=f"Alternative Time Proposed by {provider_name}",
+        title="Alternative Time Proposed",
+        intro=f"{provider_name} has suggested a different appointment time.",
         content_html=content
     )

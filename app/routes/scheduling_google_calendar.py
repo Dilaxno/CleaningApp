@@ -125,7 +125,7 @@ async def schedule_appointment(
         from ..routes.google_calendar import _ensure_fresh_token
         access_token = await _ensure_fresh_token(integration, db)
         
-        # Create calendar event
+        # Prepare event details
         event_summary = f"First Cleaning - {client.business_name or client.contact_name}"
         event_description = f"Initial cleaning appointment for {client.business_name or client.contact_name}"
         
@@ -137,23 +137,13 @@ async def schedule_appointment(
         if client.form_data and isinstance(client.form_data, dict):
             client_address = client.form_data.get("address")
         
-        event = await google_calendar_service.create_event(
-            access_token=access_token,
-            calendar_id=integration.google_calendar_id,
-            summary=event_summary,
-            description=event_description,
-            start_time=request.start_time,
-            end_time=request.end_time,
-            attendee_email=client.email,
-            location=client_address
-        )
-        
+        # DO NOT create Google Calendar event yet - wait for provider approval
         # Update client with scheduled time
         client.scheduled_start_time = request.start_time
         client.scheduled_end_time = request.end_time
-        client.scheduling_status = "scheduled"
+        client.scheduling_status = "pending_approval"
         
-        # Create Schedule record for provider's schedule page
+        # Create Schedule record with pending approval status
         duration_minutes = int((request.end_time - request.start_time).total_seconds() / 60)
         schedule = Schedule(
             user_id=client.user_id,
@@ -166,14 +156,16 @@ async def schedule_appointment(
             end_time=request.end_time.strftime("%H:%M"),
             duration_minutes=duration_minutes,
             status="scheduled",
+            approval_status="pending",  # Requires provider approval
             location=client_address,
-            google_calendar_event_id=event.get("id"),
+            google_calendar_event_id=None,  # Will be set when provider accepts
             notes=request.notes
         )
         db.add(schedule)
         db.commit()
+        db.refresh(schedule)
         
-        # Send email notification to provider
+        # Send email notification to provider about pending appointment
         provider = db.query(User).filter(User.id == client.user_id).first()
         if provider and provider.email:
             try:
@@ -183,19 +175,19 @@ async def schedule_appointment(
                     client_name=client.business_name or client.contact_name,
                     appointment_time=request.start_time,
                     location=client_address,
-                    event_link=event.get("htmlLink")
+                    event_link=None  # No event link yet, pending approval
                 )
-                logger.info(f"✅ Sent appointment notification to {provider.email}")
+                logger.info(f"✅ Sent pending appointment notification to {provider.email}")
             except Exception as e:
                 logger.error(f"⚠️ Failed to send email notification: {str(e)}")
                 # Don't fail the whole request if email fails
         
-        logger.info(f"✅ Created Google Calendar event and schedule for client {request.client_id}")
+        logger.info(f"✅ Created pending schedule for client {request.client_id} - awaiting provider approval")
         
         return {
             "success": True,
-            "message": "Appointment scheduled successfully",
-            "event_id": event.get("id"),
+            "message": "Appointment request submitted - awaiting provider approval",
+            "schedule_id": schedule.id,
             "event_link": event.get("htmlLink"),
             "start_time": request.start_time.isoformat(),
             "end_time": request.end_time.isoformat()

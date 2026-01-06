@@ -187,6 +187,10 @@ class Schedule(Base):
     end_time = Column(String(10), nullable=True)
     duration_minutes = Column(Integer, nullable=True)
     status = Column(String(50), default="scheduled")  # scheduled, in-progress, completed, cancelled
+    approval_status = Column(String(50), default="pending")  # pending, accepted, change_requested
+    proposed_date = Column(DateTime, nullable=True)  # Provider's proposed alternative date
+    proposed_start_time = Column(String(10), nullable=True)  # Provider's proposed alternative start
+    proposed_end_time = Column(String(10), nullable=True)  # Provider's proposed alternative end
     notes = Column(String(1000), nullable=True)
     address = Column(String(500), nullable=True)
     assigned_to = Column(String(255), nullable=True)  # cleaner name or team

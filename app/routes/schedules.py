@@ -59,6 +59,10 @@ class ScheduleResponse(BaseModel):
     endTime: Optional[str]
     durationMinutes: Optional[int]
     status: str
+    approvalStatus: Optional[str] = "accepted"  # pending, accepted, change_requested
+    proposedDate: Optional[datetime] = None
+    proposedStartTime: Optional[str] = None
+    proposedEndTime: Optional[str] = None
     notes: Optional[str]
     address: Optional[str]
     assignedTo: Optional[str]
@@ -68,6 +72,7 @@ class ScheduleResponse(BaseModel):
     calendlyEventUri: Optional[str]
     calendlyEventId: Optional[str]
     calendlyBookingMethod: Optional[str]
+    googleCalendarEventId: Optional[str] = None
     createdAt: datetime
 
     class Config:
@@ -249,3 +254,152 @@ async def delete_schedule(
     db.delete(schedule)
     db.commit()
     return {"message": "Schedule deleted"}
+
+
+class ScheduleApprovalRequest(BaseModel):
+    action: str  # 'accept' or 'request_change'
+    proposedDate: Optional[datetime] = None
+    proposedStartTime: Optional[str] = None
+    proposedEndTime: Optional[str] = None
+
+
+@router.post("/{schedule_id}/approve")
+async def approve_schedule(
+    schedule_id: int,
+    request: ScheduleApprovalRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Accept or request change for a pending schedule"""
+    from ..models import GoogleCalendarIntegration
+    from ..services.google_calendar_service import GoogleCalendarService
+    from ..routes.google_calendar import _ensure_fresh_token
+    from .. import email_service
+    
+    schedule = db.query(Schedule).filter(
+        Schedule.id == schedule_id, 
+        Schedule.user_id == current_user.id
+    ).first()
+    
+    if not schedule:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    
+    if request.action == "accept":
+        # Accept the appointment and add to Google Calendar
+        integration = db.query(GoogleCalendarIntegration).filter(
+            GoogleCalendarIntegration.user_id == current_user.id
+        ).first()
+        
+        if integration:
+            try:
+                # Ensure token is fresh
+                access_token = await _ensure_fresh_token(integration, db)
+                
+                # Create Google Calendar event
+                google_calendar_service = GoogleCalendarService()
+                
+                # Combine date and time for datetime object
+                start_datetime = schedule.scheduled_date
+                end_datetime = schedule.scheduled_date
+                
+                if schedule.start_time and schedule.end_time:
+                    from datetime import time
+                    start_parts = schedule.start_time.split(":")
+                    end_parts = schedule.end_time.split(":")
+                    start_datetime = start_datetime.replace(
+                        hour=int(start_parts[0]), 
+                        minute=int(start_parts[1])
+                    )
+                    end_datetime = end_datetime.replace(
+                        hour=int(end_parts[0]), 
+                        minute=int(end_parts[1])
+                    )
+                
+                client = db.query(Client).filter(Client.id == schedule.client_id).first()
+                
+                event = await google_calendar_service.create_event(
+                    access_token=access_token,
+                    calendar_id=integration.google_calendar_id,
+                    summary=schedule.title,
+                    description=schedule.description,
+                    start_time=start_datetime,
+                    end_time=end_datetime,
+                    attendee_email=client.email if client else None,
+                    location=schedule.location
+                )
+                
+                # Update schedule with Google Calendar event ID
+                schedule.google_calendar_event_id = event.get("id")
+                schedule.approval_status = "accepted"
+                
+                logger.info(f"✅ Added schedule {schedule_id} to Google Calendar")
+                
+                # Send confirmation email to client
+                if client and client.email:
+                    try:
+                        await email_service.send_appointment_confirmation(
+                            client_email=client.email,
+                            client_name=client.business_name or client.contact_name,
+                            provider_name=current_user.full_name or current_user.email,
+                            appointment_time=start_datetime,
+                            location=schedule.location,
+                            event_link=event.get("htmlLink")
+                        )
+                        logger.info(f"✅ Sent confirmation email to client {client.email}")
+                    except Exception as e:
+                        logger.error(f"⚠️ Failed to send confirmation email: {str(e)}")
+                
+            except Exception as e:
+                logger.error(f"⚠️ Failed to add to Google Calendar: {str(e)}")
+                # Still mark as accepted even if calendar sync fails
+                schedule.approval_status = "accepted"
+        else:
+            # No Google Calendar integration, just mark as accepted
+            schedule.approval_status = "accepted"
+        
+        db.commit()
+        return {"message": "Schedule accepted", "schedule_id": schedule_id}
+    
+    elif request.action == "request_change":
+        # Request alternative date/time
+        if not request.proposedDate or not request.proposedStartTime or not request.proposedEndTime:
+            raise HTTPException(
+                status_code=400, 
+                detail="Proposed date and time required for change request"
+            )
+        
+        schedule.approval_status = "change_requested"
+        schedule.proposed_date = request.proposedDate
+        schedule.proposed_start_time = request.proposedStartTime
+        schedule.proposed_end_time = request.proposedEndTime
+        
+        db.commit()
+        
+        # Send email to client with proposed alternative
+        client = db.query(Client).filter(Client.id == schedule.client_id).first()
+        if client and client.email:
+            try:
+                await email_service.send_schedule_change_request(
+                    client_email=client.email,
+                    client_name=client.business_name or client.contact_name,
+                    provider_name=current_user.full_name or current_user.email,
+                    original_time=schedule.scheduled_date,
+                    proposed_time=request.proposedDate,
+                    proposed_start=request.proposedStartTime,
+                    proposed_end=request.proposedEndTime,
+                    schedule_id=schedule_id
+                )
+                logger.info(f"✅ Sent change request email to client {client.email}")
+            except Exception as e:
+                logger.error(f"⚠️ Failed to send change request email: {str(e)}")
+        
+        return {
+            "message": "Change request sent to client", 
+            "schedule_id": schedule_id,
+            "proposed_date": request.proposedDate.isoformat(),
+            "proposed_start_time": request.proposedStartTime,
+            "proposed_end_time": request.proposedEndTime
+        }
+    
+    else:
+        raise HTTPException(status_code=400, detail="Invalid action")
