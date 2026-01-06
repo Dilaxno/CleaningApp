@@ -19,6 +19,7 @@ class BusinessConfigCreate(BaseModel):
     businessName: Optional[str] = None
     logoUrl: Optional[str] = None
     signatureUrl: Optional[str] = None
+    onboardingComplete: Optional[bool] = False
     # Pricing
     pricingModel: str
     ratePerSqft: Optional[str] = None
@@ -95,6 +96,7 @@ def get_current_user_business_config(current_user: User = Depends(get_current_us
         "logoUrl": logo_presigned_url,
         "signatureKey": config.signature_url,
         "signatureUrl": signature_presigned_url,
+        "onboardingComplete": config.onboarding_complete,
         "pricingModel": config.pricing_model,
         "ratePerSqft": config.rate_per_sqft,
         "ratePerRoom": config.rate_per_room,
@@ -139,6 +141,7 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
             existing.business_name = data.businessName
             existing.logo_url = data.logoUrl
             existing.signature_url = data.signatureUrl
+            existing.onboarding_complete = data.onboardingComplete
             existing.pricing_model = data.pricingModel
             existing.rate_per_sqft = to_float(data.ratePerSqft)
             existing.rate_per_room = to_float(data.ratePerRoom)
@@ -170,6 +173,7 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 business_name=data.businessName,
                 logo_url=data.logoUrl,
                 signature_url=data.signatureUrl,
+                onboarding_complete=data.onboardingComplete,
                 pricing_model=data.pricingModel,
                 rate_per_sqft=to_float(data.ratePerSqft),
                 rate_per_room=to_float(data.ratePerRoom),

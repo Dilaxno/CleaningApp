@@ -60,6 +60,7 @@ class BusinessConfig(Base):
     business_name = Column(String(255), nullable=True)
     logo_url = Column(String(500), nullable=True)
     signature_url = Column(String(500), nullable=True)
+    onboarding_complete = Column(Boolean, default=False)
     # Pricing
     pricing_model = Column(String(50), nullable=False)
     rate_per_sqft = Column(Float, nullable=True)
