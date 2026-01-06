@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 from ..database import get_db
 from ..models import User, BusinessConfig
+from ..auth import get_current_user
 from .upload import generate_presigned_url
 
 logger = logging.getLogger(__name__)
@@ -59,6 +60,64 @@ def to_int(val: Optional[str]) -> Optional[int]:
         return int(val)
     except ValueError:
         return None
+
+
+@router.get("")
+def get_current_user_business_config(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Get business config for the currently authenticated user"""
+    logger.info(f"📥 Getting business config for current user: {current_user.id}")
+    
+    config = db.query(BusinessConfig).filter(BusinessConfig.user_id == current_user.id).first()
+    if not config:
+        logger.warning(f"⚠️ Business config not found for user_id: {current_user.id}")
+        raise HTTPException(status_code=404, detail="Business config not found")
+
+    # Generate presigned URLs for logo and signature if they exist
+    logo_presigned_url = None
+    signature_presigned_url = None
+    
+    if config.logo_url:
+        try:
+            logo_presigned_url = generate_presigned_url(config.logo_url)
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to generate presigned URL for logo: {e}")
+    
+    if config.signature_url:
+        try:
+            signature_presigned_url = generate_presigned_url(config.signature_url)
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to generate presigned URL for signature: {e}")
+
+    logger.info(f"✅ Found business config for user_id: {current_user.id}")
+    return {
+        "businessName": config.business_name,
+        "logoKey": config.logo_url,
+        "logoUrl": logo_presigned_url,
+        "signatureKey": config.signature_url,
+        "signatureUrl": signature_presigned_url,
+        "pricingModel": config.pricing_model,
+        "ratePerSqft": config.rate_per_sqft,
+        "ratePerRoom": config.rate_per_room,
+        "hourlyRate": config.hourly_rate,
+        "flatRate": config.flat_rate,
+        "minimumCharge": config.minimum_charge,
+        "cleaningTimePerSqft": config.cleaning_time_per_sqft,
+        "cleanersSmallJob": config.cleaners_small_job,
+        "cleanersLargeJob": config.cleaners_large_job,
+        "bufferTime": config.buffer_time,
+        "premiumEveningWeekend": config.premium_evening_weekend,
+        "premiumDeepClean": config.premium_deep_clean,
+        "discountWeekly": config.discount_weekly,
+        "discountMonthly": config.discount_monthly,
+        "discountLongTerm": config.discount_long_term,
+        "addonWindows": config.addon_windows,
+        "addonCarpets": config.addon_carpets,
+        "paymentDueDays": config.payment_due_days,
+        "lateFeePercent": config.late_fee_percent,
+        "standardInclusions": config.standard_inclusions,
+        "standardExclusions": config.standard_exclusions,
+        "preferredUnits": config.preferred_units,
+    }
 
 
 @router.post("")
