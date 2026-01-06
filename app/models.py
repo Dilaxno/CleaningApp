@@ -207,8 +207,8 @@ class CalendlyIntegration(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
     
     # OAuth tokens
-    access_token = Column(String(500), nullable=False)
-    refresh_token = Column(String(500), nullable=False)
+    access_token = Column(Text, nullable=False)
+    refresh_token = Column(Text, nullable=False)
     token_expires_at = Column(DateTime, nullable=False)
     
     # Calendly user info

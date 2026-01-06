@@ -37,22 +37,31 @@ async def get_booking_info(
     """
     try:
         # Get client
+        logger.info(f"🔍 Looking up client with ID: {client_id}")
         client = db.query(Client).filter(Client.id == client_id).first()
         if not client:
+            logger.error(f"❌ Client not found: client_id={client_id}")
             raise HTTPException(status_code=404, detail="Client not found")
         
+        logger.info(f"✅ Found client {client_id}, user_id={client.user_id}")
+        
         # Get service provider's Calendly integration
+        logger.info(f"🔍 Looking up Calendly integration for user_id: {client.user_id}")
         integration = db.query(CalendlyIntegration).filter(
             CalendlyIntegration.user_id == client.user_id
         ).first()
         
         if not integration:
+            logger.error(f"❌ No Calendly integration found for user_id={client.user_id}")
             raise HTTPException(
                 status_code=404,
                 detail="Service provider has not connected Calendly"
             )
         
+        logger.info(f"✅ Found Calendly integration for user {client.user_id}")
+        
         if not integration.default_event_type_url:
+            logger.error(f"❌ Calendly integration exists but default_event_type_url is not set for user_id={client.user_id}")
             raise HTTPException(
                 status_code=404,
                 detail="Service provider has not configured a default event type"
