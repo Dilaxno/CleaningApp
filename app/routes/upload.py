@@ -70,9 +70,33 @@ async def upload_logo(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    # Allowed image types for business logos
+    LOGO_IMAGE_TYPES = [
+        "image/png",
+        "image/jpeg",
+        "image/jpg",
+        "image/webp",
+        "image/gif",
+        "image/svg+xml",
+    ]
+
     # Validate file type
-    if file.content_type not in ALLOWED_IMAGE_TYPES:
-        raise HTTPException(status_code=400, detail="Invalid file type. Please upload an image file.")
+    if file.content_type not in LOGO_IMAGE_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid file type. Only PNG, JPEG, WebP, GIF, and SVG images are allowed."
+        )
+
+    # Read file contents
+    contents = await file.read()
+    
+    # Validate file size (5MB = 5 * 1024 * 1024 bytes)
+    MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+    if len(contents) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File size exceeds 5MB limit. Your file is {len(contents) / (1024 * 1024):.2f}MB."
+        )
 
     # Generate unique filename (store the key, not the URL)
     ext = file.filename.split(".")[-1] if file.filename else "png"
@@ -80,7 +104,6 @@ async def upload_logo(
 
     try:
         r2 = get_r2_client()
-        contents = await file.read()
 
         r2.put_object(
             Bucket=R2_BUCKET_NAME,
@@ -204,9 +227,32 @@ async def upload_profile_picture(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    # Allowed image types for profile pictures
+    PROFILE_PICTURE_TYPES = [
+        "image/png",
+        "image/jpeg",
+        "image/jpg",
+        "image/webp",
+        "image/gif",
+    ]
+
     # Validate file type
-    if file.content_type not in ALLOWED_IMAGE_TYPES:
-        raise HTTPException(status_code=400, detail="Invalid file type. Please upload an image file.")
+    if file.content_type not in PROFILE_PICTURE_TYPES:
+        raise HTTPException(
+            status_code=400, 
+            detail="Invalid file type. Only PNG, JPEG, WebP, and GIF images are allowed."
+        )
+
+    # Read file contents
+    contents = await file.read()
+    
+    # Validate file size (5MB = 5 * 1024 * 1024 bytes)
+    MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+    if len(contents) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File size exceeds 5MB limit. Your file is {len(contents) / (1024 * 1024):.2f}MB."
+        )
 
     # Generate unique filename
     ext = file.filename.split(".")[-1] if file.filename else "png"
@@ -214,7 +260,6 @@ async def upload_profile_picture(
 
     try:
         r2 = get_r2_client()
-        contents = await file.read()
 
         r2.put_object(
             Bucket=R2_BUCKET_NAME,
