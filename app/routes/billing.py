@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from ..auth import get_current_user
 from ..database import get_db
 from ..models import User
+from ..rate_limiter import create_rate_limiter
 from ..config import (
     DODO_PAYMENTS_API_KEY,
     DODO_PAYMENTS_ENVIRONMENT,
@@ -38,6 +39,14 @@ dodo_client = AsyncDodoPayments(
 
 router = APIRouter(prefix="/billing", tags=["Billing"])
 webhooks_router = APIRouter(tags=["Webhooks"])
+
+# Rate limiter for payment webhooks - 100 requests per minute
+rate_limit_billing_webhook = create_rate_limiter(
+    limit=100,
+    window_seconds=60,
+    key_prefix="webhook_billing",
+    use_ip=False  # Global limit for all webhooks
+)
 
 
 class CheckoutRequest(BaseModel):
@@ -347,9 +356,13 @@ def _compute_signature(secret: str, payload: bytes) -> str:
 
 
 @webhooks_router.post("/webhooks/dodopayments")
-async def handle_dodopayments_webhook(request: Request, db: Session = Depends(get_db)):
+async def handle_dodopayments_webhook(
+    request: Request, 
+    db: Session = Depends(get_db),
+    _: None = Depends(rate_limit_billing_webhook)
+):
     """
-    Verify signature and process subscription lifecycle events.
+    Verify signature and process subscription lifecycle events - Rate limited to 100 requests per minute.
     Security per docs:
       - Header: 'webhook-signature' (HMAC-SHA256 of raw body with your webhook secret)
       - Optional headers: 'webhook-id', 'webhook-timestamp' for idempotency/logging

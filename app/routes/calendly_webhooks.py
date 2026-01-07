@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 from ..database import get_db
 from ..models import Schedule, CalendlyIntegration, Client
+from ..rate_limiter import create_rate_limiter
 import hmac
 import hashlib
 import os
@@ -15,6 +16,14 @@ import os
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/webhooks/calendly", tags=["calendly-webhooks"])
+
+# Rate limiter for webhooks - 100 requests per minute
+rate_limit_webhook = create_rate_limiter(
+    limit=100,
+    window_seconds=60,
+    key_prefix="webhook_calendly",
+    use_ip=False  # Global limit for all webhooks
+)
 
 CALENDLY_WEBHOOK_SECRET = os.getenv("CALENDLY_WEBHOOK_SECRET")
 
@@ -37,10 +46,11 @@ def verify_webhook_signature(payload: bytes, signature: str) -> bool:
 @router.post("/events")
 async def handle_calendly_webhook(
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: None = Depends(rate_limit_webhook)
 ):
     """
-    Handle Calendly webhook events
+    Handle Calendly webhook events - Rate limited to 100 requests per minute
     Supported events: invitee.created, invitee.canceled
     """
     try:

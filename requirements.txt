@@ -19,3 +19,4 @@ pyotp==2.9.0
 qrcode[pil]==7.4.2
 twilio==9.0.0
 cryptography==42.0.5
+redis==5.0.1

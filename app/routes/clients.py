@@ -11,10 +11,26 @@ from typing import Optional, List
 from ..database import get_db
 from ..models import User, Client, BusinessConfig
 from ..auth import get_current_user
+from ..rate_limiter import create_rate_limiter, rate_limit_dependency
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/clients", tags=["Clients"])
+
+# Rate limiters for public form submissions
+rate_limit_form_per_ip = create_rate_limiter(
+    limit=5,
+    window_seconds=60,  # 5 submissions per minute per IP
+    key_prefix="form_submit_ip",
+    use_ip=True
+)
+
+rate_limit_form_global = create_rate_limiter(
+    limit=15,
+    window_seconds=60,  # 15 submissions per minute globally
+    key_prefix="form_submit_global",
+    use_ip=False
+)
 
 
 def validate_us_phone(phone: str) -> str:
@@ -385,10 +401,13 @@ class PublicSubmitResponse(BaseModel):
 async def submit_public_form(
     data: PublicClientCreate,
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _ip: None = Depends(rate_limit_form_per_ip),
+    _global: None = Depends(rate_limit_form_global)
 ):
     """
     Public endpoint for clients to submit intake forms.
+    Rate limited: 5 per minute per IP, 15 per minute globally.
     Uses the business owner's Firebase UID to associate the client.
     Automatically generates a PDF contract.
     No authentication required - this is accessed via shareable link.

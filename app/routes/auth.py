@@ -2,7 +2,7 @@ import random
 import string
 import logging
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
@@ -11,6 +11,7 @@ from ..models import User
 from ..schemas import UserResponse, UserUpdate, MessageResponse
 from ..auth import get_current_user
 from ..email_service import send_email
+from ..rate_limiter import create_rate_limiter
 
 # Firebase Admin SDK for password updates
 import firebase_admin
@@ -60,12 +61,22 @@ def generate_otp() -> str:
     return ''.join(random.choices(string.digits, k=6))
 
 
+# Rate limiters
+rate_limit_password_reset = create_rate_limiter(
+    limit=5,
+    window_seconds=3600,  # 1 hour
+    key_prefix="password_reset",
+    use_ip=True
+)
+
+
 @router.post("/request-otp")
 async def request_password_reset_otp(
     data: RequestOTPRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: None = Depends(rate_limit_password_reset)
 ):
-    """Request OTP for password reset"""
+    """Request OTP for password reset - Rate limited to 5 requests per hour per IP"""
     # Check if user exists
     user = db.query(User).filter(User.email == data.email).first()
     if not user:
