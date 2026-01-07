@@ -25,6 +25,7 @@ from .routes.trial import router as trial_router
 from .routes.verification import router as verification_router
 from .routes.security import router as security_router
 from .routes.notifications import router as notifications_router
+from .routes.jobs import router as jobs_router
 
 # Configure logging
 logging.basicConfig(
@@ -43,6 +44,15 @@ async def lifespan(app: FastAPI):
         logger.info("✅ Database tables created")
     except Exception as e:
         logger.error(f"❌ Failed to create tables: {e}")
+    
+    # Test Redis connection for rate limiting
+    try:
+        from .rate_limiter import get_redis_client
+        redis_client = get_redis_client()
+        logger.info("✅ Redis rate limiting is ready")
+    except Exception as e:
+        logger.warning(f"⚠️ Redis connection failed - Rate limiting will operate in fail-open mode: {e}")
+    
     yield
     # Shutdown
     logger.info("👋 Shutting down...")
@@ -102,6 +112,7 @@ app.include_router(scheduling_google_calendar_router)
 app.include_router(status_router)
 app.include_router(trial_router)
 app.include_router(notifications_router)
+app.include_router(jobs_router)
 
 
 @app.get("/")

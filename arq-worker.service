@@ -1,0 +1,23 @@
+[Unit]
+Description=ARQ Background Worker for Contract Generation
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/CleaningApp/backend
+Environment="PATH=/home/ubuntu/CleaningApp/backend/venv/bin"
+ExecStart=/home/ubuntu/CleaningApp/backend/venv/bin/arq app.worker.WorkerSettings
+Restart=always
+RestartSec=10
+
+# Environment file
+EnvironmentFile=/home/ubuntu/CleaningApp/backend/.env
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=arq-worker
+
+[Install]
+WantedBy=multi-user.target

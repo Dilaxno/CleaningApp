@@ -7,7 +7,7 @@ import os
 import uuid
 from datetime import datetime, timedelta
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -16,10 +16,29 @@ from ..models import User, BusinessConfig, Client, Contract
 from ..auth import get_current_user
 from .upload import generate_presigned_url, get_r2_client
 from ..config import R2_BUCKET_NAME
+from ..rate_limiter import create_rate_limiter, rate_limit_dependency
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/contracts", tags=["Contracts PDF"])
+
+# Rate limiters for contract download
+rate_limit_download_per_ip = create_rate_limiter(
+    limit=5,
+    window_seconds=60,
+    key_prefix="contract_download_ip",
+    use_ip=True
+)
+
+async def rate_limit_per_contract(request: Request, contract_id: int):
+    """Rate limit by contract ID - 3 downloads per minute per contract"""
+    await rate_limit_dependency(
+        request=request,
+        limit=3,
+        window_seconds=60,
+        key_prefix=f"contract_download_id_{contract_id}",
+        use_ip=False
+    )
 
 
 class ContractGenerateRequest(BaseModel):
@@ -836,10 +855,17 @@ async def get_contract_pdf(
 @router.get("/pdf/download/{contract_id}")
 async def download_contract_pdf(
     contract_id: int,
+    request: Request,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _ip: None = Depends(rate_limit_download_per_ip)
 ):
-    """Download a contract PDF directly"""
+    """
+    Download a contract PDF directly
+    Rate limited: 5 downloads per minute per IP, 3 downloads per minute per contract
+    """
+    # Apply per-contract rate limit
+    await rate_limit_per_contract(request, contract_id)
     contract = db.query(Contract).filter(
         Contract.id == contract_id,
         Contract.user_id == current_user.id

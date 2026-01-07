@@ -11,7 +11,8 @@ from typing import Optional, List
 from ..database import get_db
 from ..models import User, Client, BusinessConfig
 from ..auth import get_current_user
-from ..rate_limiter import create_rate_limiter, rate_limit_dependency
+from ..rate_limiter import create_rate_limiter, rate_limit_dependency, get_redis_client
+from ..turnstile import verify_turnstile
 
 logger = logging.getLogger(__name__)
 
@@ -382,6 +383,7 @@ class PublicClientCreate(BaseModel):
     notes: Optional[str] = None
     formData: Optional[dict] = None  # Store all form fields as JSON
     clientSignature: Optional[str] = None  # Base64 signature from client
+    turnstileToken: Optional[str] = None  # Cloudflare Turnstile token for bot prevention
     
     @field_validator('phone')
     @classmethod
@@ -394,7 +396,9 @@ class PublicClientCreate(BaseModel):
 class PublicSubmitResponse(BaseModel):
     client: ClientResponse
     contractPdfUrl: Optional[str] = None
+    jobId: Optional[str] = None
     message: str
+    requiresCaptcha: bool = False
 
 
 @router.post("/public/submit")
@@ -408,24 +412,57 @@ async def submit_public_form(
     """
     Public endpoint for clients to submit intake forms.
     Rate limited: 5 per minute per IP, 15 per minute globally.
-    Uses the business owner's Firebase UID to associate the client.
-    Automatically generates a PDF contract.
+    Requires Cloudflare Turnstile CAPTCHA after 3 submissions per IP in 24 hours.
+    Contract generation is queued asynchronously to prevent timeouts.
     No authentication required - this is accessed via shareable link.
     """
-    import json
-    import hashlib
-    from ..models import Contract
-    from .contracts_pdf import calculate_quote, generate_contract_html, html_to_pdf
-    from .upload import get_r2_client, generate_presigned_url, R2_BUCKET_NAME
+    from arq import create_pool
+    from arq.connections import RedisSettings
+    from ..worker import get_redis_settings
     from ..email_service import send_new_client_notification, send_form_submission_confirmation
     
-    # Capture signature audit data
+    # Capture client info
     client_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "unknown")
     if client_ip and "," in client_ip:
         client_ip = client_ip.split(",")[0].strip()
     user_agent = request.headers.get("User-Agent", "unknown")
     
-    logger.info(f"📥 Public form submission for owner UID: {data.ownerUid}")
+    logger.info(f"📥 Public form submission for owner UID: {data.ownerUid} from IP: {client_ip}")
+    
+    # Check submission count for this IP (24 hour window)
+    redis_client = get_redis_client()
+    ip_submission_key = f"submissions:ip:{client_ip}"
+    submission_count = redis_client.get(ip_submission_key)
+    submission_count = int(submission_count) if submission_count else 0
+    
+    # Require CAPTCHA after 3 submissions in 24 hours
+    CAPTCHA_THRESHOLD = 3
+    requires_captcha = submission_count >= CAPTCHA_THRESHOLD
+    
+    if requires_captcha:
+        if not data.turnstileToken:
+            logger.warning(f"🤖 CAPTCHA required for IP {client_ip} - {submission_count} submissions")
+            return PublicSubmitResponse(
+                client=None,
+                contractPdfUrl=None,
+                jobId=None,
+                message="CAPTCHA verification required",
+                requiresCaptcha=True
+            )
+        
+        # Verify Turnstile token
+        is_valid = await verify_turnstile(data.turnstileToken, client_ip)
+        if not is_valid:
+            logger.warning(f"❌ Invalid CAPTCHA for IP {client_ip}")
+            raise HTTPException(status_code=400, detail="Invalid CAPTCHA verification")
+        
+        logger.info(f"✅ CAPTCHA verified for IP {client_ip}")
+    
+    # Increment submission count (24 hour expiry)
+    redis_client.incr(ip_submission_key)
+    redis_client.expire(ip_submission_key, 86400)  # 24 hours
+    
+    logger.info(f"📊 Submission count for IP {client_ip}: {submission_count + 1}")
     
     # Find the user by Firebase UID
     user = db.query(User).filter(User.firebase_uid == data.ownerUid).first()
@@ -453,85 +490,34 @@ async def submit_public_form(
     
     logger.info(f"✅ Public form client created: id={client.id} for user_id={user.id}")
     
-    # Try to generate PDF contract
-    contract_pdf_url = None
-    try:
-        # Get business config for pricing calculation
-        config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
-        
-        logger.info(f"📋 Config found: {config is not None}, formData provided: {data.formData is not None}")
-        
-        if config and data.formData:
-            # Calculate quote
-            quote = calculate_quote(config, data.formData)
-            logger.info(f"💰 Quote calculated: {quote}")
+    # Queue contract PDF generation as background job (async to prevent timeout)
+    job_id = None
+    if data.formData:
+        try:
+            # Get business config to check if it exists
+            config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
             
-            # Generate HTML (without client signature - they'll sign after reviewing)
-            html = await generate_contract_html(
-                config, 
-                client, 
-                data.formData, 
-                quote,
-                None  # No signature yet - client will sign after reviewing PDF
-            )
-            logger.info(f"📄 HTML generated, length: {len(html)} chars")
-            
-            # Generate PDF
-            logger.info("🔄 Starting PDF generation...")
-            pdf_bytes = await html_to_pdf(html)
-            logger.info(f"✅ PDF generated: {len(pdf_bytes)} bytes")
-            
-            # Upload PDF to R2
-            from datetime import datetime
-            
-            pdf_key = f"contracts/{user.firebase_uid}/{client.id}-{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
-            
-            # Upload to R2 and get URL
-            try:
-                r2_client = get_r2_client()
-                r2_client.put_object(
-                    Bucket=R2_BUCKET_NAME,
-                    Key=pdf_key,
-                    Body=pdf_bytes,
-                    ContentType="application/pdf"
+            if config:
+                # Enqueue contract generation job
+                redis_settings = get_redis_settings()
+                pool = await create_pool(redis_settings)
+                
+                job = await pool.enqueue_job(
+                    'generate_contract_pdf_task',
+                    client.id,
+                    data.ownerUid,
+                    data.formData,
+                    data.clientSignature
                 )
                 
-                # Generate presigned URL for download
-                contract_pdf_url = generate_presigned_url(pdf_key)
+                job_id = job.job_id
+                logger.info(f"📋 Contract generation job queued: {job_id}")
+            else:
+                logger.warning(f"⚠️ No business config found for user {user.id} - skipping contract generation")
                 
-                # Calculate PDF hash for integrity verification
-                pdf_hash = hashlib.sha256(pdf_bytes).hexdigest()
-                
-                logger.info(f"✅ Contract PDF uploaded: {pdf_key}")
-            except Exception as upload_err:
-                logger.warning(f"⚠️ Failed to upload PDF to R2: {upload_err}")
-                pdf_key = None
-                pdf_hash = None
-            
-            # Create contract record - awaiting client signature
-            contract = Contract(
-                user_id=user.id,
-                client_id=client.id,
-                title=f"Service Agreement - {client.business_name}",
-                description=f"Auto-generated contract for {quote['frequency']} cleaning service",
-                contract_type="recurring" if quote.get('frequency', '') not in ['One-time', 'one-time'] else "one-time",
-                status="new",  # New lead/contract awaiting signatures
-                total_value=quote['final_price'],
-                currency="USD",
-                payment_terms=f"Net {config.payment_due_days or 15} days",
-                pdf_key=pdf_key,
-                pdf_hash=pdf_hash,
-            )
-            db.add(contract)
-            db.commit()
-            
-            logger.info(f"✅ Contract record created: id={contract.id}")
-            
-    except Exception as pdf_err:
-        import traceback
-        logger.warning(f"⚠️ Failed to generate contract PDF: {pdf_err}")
-        logger.warning(f"Traceback: {traceback.format_exc()}")
-        # Continue without PDF - client submission still succeeds
+        except Exception as queue_err:
+            logger.error(f"❌ Failed to queue contract generation: {queue_err}")
+            # Continue without queuing - form submission still succeeds
     
     # Send email notifications (async, don't block response)
     try:
@@ -564,8 +550,8 @@ async def submit_public_form(
         logger.warning(f"⚠️ Failed to send email notifications: {email_err}")
         # Continue - email failure shouldn't fail the submission
     
-    return {
-        "client": ClientResponse(
+    return PublicSubmitResponse(
+        client=ClientResponse(
             id=client.id,
             businessName=client.business_name,
             contactName=client.contact_name,
@@ -577,9 +563,11 @@ async def submit_public_form(
             status=client.status,
             notes=client.notes
         ),
-        "contractPdfUrl": contract_pdf_url,
-        "message": "Form submitted successfully" + (" - Contract generated" if contract_pdf_url else "")
-    }
+        contractPdfUrl=None,  # Will be available via job status endpoint
+        jobId=job_id,
+        message="Form submitted successfully - Contract generation in progress" if job_id else "Form submitted successfully",
+        requiresCaptcha=False
+    )
 
 
 class SignContractRequest(BaseModel):

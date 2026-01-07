@@ -84,6 +84,11 @@ DODO_PAYMENTS_ENVIRONMENT=test_mode  # or production
 DODO_PAYMENTS_WEBHOOK_SECRET=your-dodo-webhook-secret
 ```
 
+### Cloudflare Turnstile (CAPTCHA for bot prevention)
+```env
+TURNSTILE_SECRET_KEY=your-turnstile-secret-key
+```
+
 ### LangCache (Optional - for caching)
 ```env
 LANGCACHE_API_KEY=your-langcache-api-key
