@@ -22,10 +22,16 @@ def get_redis_client() -> redis.Redis:
     global redis_client
     
     if redis_client is None:
+        logger.info("🔄 Initializing Redis connection for rate limiting...")
+        
         # Check if using Upstash Redis URL (preferred method)
         redis_url = os.getenv("REDIS_URL")
         
         if redis_url:
+            # Mask password in URL for logging
+            masked_url = redis_url.split('@')[0].split(':')[0] + ":****@" + redis_url.split('@')[1] if '@' in redis_url else "****"
+            logger.info(f"📡 Using Redis URL connection: {masked_url}")
+            
             # Use Redis URL (Upstash or other managed Redis)
             try:
                 redis_client = redis.from_url(
@@ -35,10 +41,12 @@ def get_redis_client() -> redis.Redis:
                     socket_timeout=5
                 )
                 # Test connection
-                redis_client.ping()
-                logger.info(f"✅ Connected to Redis via URL")
+                info = redis_client.ping()
+                logger.info(f"✅ Redis connected successfully via URL - Rate limiting is ACTIVE")
+                logger.info(f"📊 Redis connection test: PONG received")
             except Exception as e:
                 logger.error(f"❌ Failed to connect to Redis via URL: {str(e)}")
+                logger.error(f"⚠️ Rate limiting will NOT work - all requests will be allowed (fail-open mode)")
                 raise
         else:
             # Use individual Redis configuration (self-hosted or Upstash)
@@ -47,6 +55,13 @@ def get_redis_client() -> redis.Redis:
             redis_password = os.getenv("REDIS_PASSWORD", None)
             redis_db = int(os.getenv("REDIS_DB", "0"))
             redis_ssl = os.getenv("REDIS_SSL", "false").lower() == "true"
+            
+            logger.info(f"📡 Using individual Redis configuration:")
+            logger.info(f"   Host: {redis_host}")
+            logger.info(f"   Port: {redis_port}")
+            logger.info(f"   Database: {redis_db}")
+            logger.info(f"   SSL: {'Enabled' if redis_ssl else 'Disabled'}")
+            logger.info(f"   Password: {'Set' if redis_password else 'Not set'}")
             
             try:
                 redis_client = redis.Redis(
@@ -62,9 +77,11 @@ def get_redis_client() -> redis.Redis:
                 # Test connection
                 redis_client.ping()
                 ssl_status = "with SSL" if redis_ssl else "without SSL"
-                logger.info(f"✅ Connected to Redis at {redis_host}:{redis_port} ({ssl_status})")
+                logger.info(f"✅ Redis connected successfully at {redis_host}:{redis_port} ({ssl_status})")
+                logger.info(f"📊 Redis connection test: PONG received - Rate limiting is ACTIVE")
             except Exception as e:
                 logger.error(f"❌ Failed to connect to Redis: {str(e)}")
+                logger.error(f"⚠️ Rate limiting will NOT work - all requests will be allowed (fail-open mode)")
                 raise
     
     return redis_client
@@ -156,18 +173,23 @@ async def rate_limit_dependency(
                 client_ip = forwarded.split(",")[0].strip()
             
             key = f"{key_prefix}:{client_ip}"
+            logger.debug(f"🔍 Rate limit check for {key_prefix} - IP: {client_ip}")
         else:
             key = f"{key_prefix}:global"
+            logger.debug(f"🔍 Rate limit check for {key_prefix} - Global")
         
         is_allowed, current_count, ttl = check_rate_limit(key, limit, window_seconds, client)
         
         if not is_allowed:
             retry_after = ttl
+            logger.warning(f"🚫 Rate limit EXCEEDED for {key} - {current_count}/{limit} requests used")
             raise HTTPException(
                 status_code=429,
                 detail=f"Rate limit exceeded. Maximum {limit} requests per {window_seconds} seconds. Try again in {retry_after} seconds.",
                 headers={"Retry-After": str(retry_after)}
             )
+        
+        logger.debug(f"✅ Rate limit check passed for {key} - {current_count}/{limit} requests used")
         
         # Add rate limit headers to response (will be added by middleware if needed)
         request.state.rate_limit_remaining = limit - current_count
@@ -178,6 +200,7 @@ async def rate_limit_dependency(
         raise
     except Exception as e:
         logger.error(f"❌ Rate limiting error: {str(e)}")
+        logger.warning(f"⚠️ Allowing request due to rate limiting error (fail-open mode)")
         # Fail open - allow request if rate limiting fails
         pass
 
