@@ -35,7 +35,7 @@ class UserResponse(BaseModel):
     profile_picture_url: Optional[str]
     profile_picture_presigned: Optional[str] = None
     account_type: Optional[str]
-    plan: str = "free"
+    plan: Optional[str] = None
     onboarding_completed: bool
 
     class Config:
@@ -69,7 +69,7 @@ def create_or_update_user(data: UserCreate, db: Session = Depends(get_db)):
                 full_name=data.fullName,
                 account_type=data.accountType,
                 hear_about=data.hearAbout,
-                plan="free",  # New users start with free plan
+                plan=None,  # Users must select a paid plan after onboarding
             )
             db.add(user)
 

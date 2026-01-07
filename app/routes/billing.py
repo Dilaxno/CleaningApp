@@ -84,14 +84,14 @@ class CheckoutRequest(BaseModel):
 
 
 class UpdatePlanRequest(BaseModel):
-    plan: str  # "free", "solo", "team", "enterprise"
+    plan: str  # "solo", "team", "enterprise"
 
 
 class CancelRequest(BaseModel):
     # When true, subscription remains active until the end of the current billing period
     cancel_at_period_end: bool = True
-    # When true, immediately set user's local plan to free (app state). Dodo will still process scheduled cancel if cancel_at_period_end=True
-    set_free_now: bool = False
+    # When true, immediately revoke access (set plan to null). Dodo will still process scheduled cancel if cancel_at_period_end=True
+    revoke_access_now: bool = False
 
 
 class ChangePlanRequest(BaseModel):
@@ -104,7 +104,6 @@ class ChangePlanRequest(BaseModel):
 
 # Plan limits configuration
 PLAN_LIMITS = {
-    "free": {"clients": 2, "contracts": 2, "schedules": 2},
     "solo": {"clients": 10, "contracts": 10, "schedules": 10},
     "team": {"clients": 50, "contracts": 50, "schedules": 50},
     "enterprise": {"clients": 999999, "contracts": 999999, "schedules": 999999},  # Unlimited
@@ -149,9 +148,9 @@ async def get_usage_stats(
         Schedule.scheduled_date < month_end
     ).count()
     
-    # Get plan limits
-    plan = user.plan or "free"
-    limits = PLAN_LIMITS.get(plan, PLAN_LIMITS["free"])
+    # Get plan limits (default to solo if no plan set)
+    plan = user.plan or "solo"
+    limits = PLAN_LIMITS.get(plan, PLAN_LIMITS["solo"])
     
     # Calculate reset date (first of next month)
     if now.month == 12:
@@ -181,7 +180,7 @@ async def update_user_plan(
     Manually update user's plan. Used after successful checkout verification.
     In production, this should verify the subscription status with Dodo Payments.
     """
-    allowed_plans = {"free", "solo", "team", "enterprise"}
+    allowed_plans = {"solo", "team", "enterprise"}
     if body.plan not in allowed_plans:
         raise HTTPException(status_code=400, detail=f"Invalid plan. Must be one of: {allowed_plans}")
     
@@ -196,7 +195,7 @@ async def get_current_plan(
     user: User = Depends(get_current_user),
 ):
     """Get the current user's plan"""
-    return {"plan": user.plan or "free"}
+    return {"plan": user.plan}
 
 
 @router.post("/checkout")
@@ -270,7 +269,7 @@ async def cancel_subscription(
     db: Session = Depends(get_db),
 ):
     """
-    Schedule or request cancellation on Dodo; optionally set app plan to free immediately.
+    Schedule or request cancellation on Dodo; optionally set app plan to null immediately.
     Docs:
       - Cancel at period end via PATCH: https://docs.dodopayments.com/api-reference/subscriptions/patch-subscriptions
       - Webhook 'subscription.cancelled' will be sent when cancellation takes effect
@@ -289,15 +288,15 @@ async def cancel_subscription(
             cancel_at_next_billing_date=body.cancel_at_period_end,
         )
 
-        if body.set_free_now:
-            user.plan = "free"
+        if body.revoke_access_now:
+            user.plan = None
             db.commit()
-            logger.info(f"User {user.id} plan set to free locally on cancel request")
+            logger.info(f"User {user.id} plan revoked locally on cancel request")
 
         return {
             "status": "ok",
             "scheduled_at_period_end": body.cancel_at_period_end,
-            "local_plan_updated": body.set_free_now,
+            "access_revoked": body.revoke_access_now,
         }
     except Exception as e:
         logger.error(f"Failed to cancel subscription: {e}")
@@ -436,7 +435,7 @@ async def handle_dodopayments_webhook(
                     logger.info("No selected_plan in metadata; plan unchanged")
 
         elif event_type in ("subscription.cancelled", "subscription.canceled"):
-            # Cancelled subscription moves to 'free'
+            # Cancelled subscription moves to null
             meta = (data.get("metadata") or {})
             firebase_uid = meta.get("firebase_uid")
             email = (data.get("customer") or {}).get("email") or data.get("email")
@@ -448,7 +447,7 @@ async def handle_dodopayments_webhook(
                 user = db.query(User).filter(User.email == email).first()
 
             if user:
-                user.plan = "free"
+                user.plan = None
                 # clear stored subscription_id as it's now cancelled
                 try:
                     if subscription_id and getattr(user, "subscription_id", None) == subscription_id:
@@ -456,7 +455,7 @@ async def handle_dodopayments_webhook(
                 except Exception:
                     pass
                 db.commit()
-                logger.info(f"User {user.id} plan set to free (cancelled)")
+                logger.info(f"User {user.id} plan revoked (cancelled)")
 
         elif event_type == "invoice.paid":
             # Optional: mark last invoice paid

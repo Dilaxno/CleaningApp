@@ -6,9 +6,8 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from .models import User
 
-# Plan limits configuration
+# Plan limits configuration (no free plan - all users must have paid plans)
 PLAN_LIMITS = {
-    "free": 2,
     "solo": 10,
     "team": 50,
     "enterprise": None  # None means unlimited
@@ -16,7 +15,7 @@ PLAN_LIMITS = {
 
 def get_plan_limit(plan: str) -> Optional[int]:
     """Get the client limit for a given plan. Returns None for unlimited."""
-    return PLAN_LIMITS.get(plan.lower(), PLAN_LIMITS["free"])
+    return PLAN_LIMITS.get(plan.lower(), PLAN_LIMITS["solo"])
 
 def check_and_reset_monthly_counter(user: User, db: Session) -> None:
     """

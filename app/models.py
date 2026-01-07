@@ -18,7 +18,7 @@ class User(Base):
     profile_picture_url = Column(String(500), nullable=True)  # R2 key for profile picture
     account_type = Column(String(50), nullable=True)
     hear_about = Column(String(100), nullable=True)
-    plan = Column(String(50), default="free", nullable=False)  # free, solo, team, enterprise
+    plan = Column(String(50), nullable=True)  # solo, team, enterprise (null until user selects during trial)
     # Dodo subscription identifier for this user's active subscription; used for change/cancel flows
     subscription_id = Column(String(255), nullable=True)
     clients_this_month = Column(Integer, default=0, nullable=False)  # Counter for monthly client limit
