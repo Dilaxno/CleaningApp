@@ -361,6 +361,7 @@ def _compute_signature(secret: str, payload: bytes) -> str:
 
 
 @webhooks_router.post("/webhooks/dodopayments")
+@webhooks_router.post("/api/payments/dodo/webhook")  # Alias for Dodo's configured webhook URL
 async def handle_dodopayments_webhook(
     request: Request, 
     db: Session = Depends(get_db),
