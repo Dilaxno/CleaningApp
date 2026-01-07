@@ -43,7 +43,7 @@ async def lifespan(app: FastAPI):
     # Startup: Create tables
     logger.info("🚀 Starting up...")
     try:
-        Base.metadata.create_all(bind=engine)
+        Base.metadata.create_all(bind=engine, checkfirst=True)
         logger.info("✅ Database tables created")
     except Exception as e:
         logger.error(f"❌ Failed to create tables: {e}")
