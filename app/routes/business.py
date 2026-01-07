@@ -216,7 +216,7 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
             db.add(config)
             db.commit()
 
-        user.onboarding_completed = True
+        user.onboarding_completed = data.onboardingComplete if data.onboardingComplete is not None else user.onboarding_completed
         db.commit()
         
         logger.info(f"✅ Business config saved successfully, id={config.id}")
