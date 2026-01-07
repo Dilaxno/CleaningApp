@@ -26,6 +26,7 @@ from .routes.verification import router as verification_router
 from .routes.security import router as security_router
 from .routes.notifications import router as notifications_router
 from .routes.jobs import router as jobs_router
+from .routes.waitlist import router as waitlist_router
 
 # Configure logging
 logging.basicConfig(
@@ -79,9 +80,11 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
+        "http://localhost:5174",
         "http://localhost:3000",
         "https://cleanenroll.com",
-        "https://www.cleanenroll.com"
+        "https://www.cleanenroll.com",
+        "https://coming-soon.cleanenroll.com"
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -113,6 +116,7 @@ app.include_router(status_router)
 app.include_router(trial_router)
 app.include_router(notifications_router)
 app.include_router(jobs_router)
+app.include_router(waitlist_router)
 
 
 @app.get("/")

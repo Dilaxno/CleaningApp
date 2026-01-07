@@ -292,3 +292,16 @@ class SchedulingProposal(Base):
     responded_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class WaitlistLead(Base):
+    __tablename__ = "waitlist_leads"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(255), nullable=False, index=True)
+    business_name = Column(String(255), nullable=True)
+    clients_per_month = Column(String(50), nullable=True)  # e.g., "1-5", "6-10", "11-20", "21-50", "50+"
+    ip_address = Column(String(45), nullable=True)
+    user_agent = Column(String(500), nullable=True)
+    source = Column(String(100), default="coming-soon")  # Track where the lead came from
+    created_at = Column(DateTime, server_default=func.now())
