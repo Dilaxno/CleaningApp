@@ -999,3 +999,175 @@ async def send_schedule_change_request(
         intro=f"{provider_name} has suggested a different appointment time.",
         content_html=content
     )
+
+
+async def send_invoice_payment_link_email(
+    to: str,
+    client_name: str,
+    business_name: str,
+    invoice_number: str,
+    invoice_title: str,
+    total_amount: float,
+    currency: str = "USD",
+    due_date: Optional[str] = None,
+    payment_link: Optional[str] = None,
+    is_recurring: bool = False,
+    recurrence_pattern: Optional[str] = None
+) -> dict:
+    """Send invoice with payment link to client"""
+    
+    # Format recurring info
+    recurring_info = ""
+    if is_recurring and recurrence_pattern:
+        recurring_info = f"""
+        <div style="background: #e0f2fe; border: 1px solid #0ea5e9; border-radius: 12px; padding: 16px; margin: 20px 0;">
+            <p style="margin: 0; color: #0369a1; font-size: 14px; font-weight: 600;">
+                🔄 This is a recurring payment ({recurrence_pattern}). Your card will be charged automatically.
+            </p>
+        </div>
+        """
+    
+    content = f"""
+    <p>Hi {client_name},</p>
+    <p>Your invoice from <strong>{business_name}</strong> is ready for payment.</p>
+    
+    <div style="background: {THEME['background']}; border-radius: 12px; padding: 24px; margin: 24px 0;">
+        <div style="margin-bottom: 16px;">
+            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">Invoice Number</div>
+            <div style="font-size: 15px; color: {THEME['text_primary']}; font-weight: 600;">{invoice_number}</div>
+        </div>
+        <div style="margin-bottom: 16px;">
+            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">Service</div>
+            <div style="font-size: 15px; color: {THEME['text_primary']};">{invoice_title}</div>
+        </div>
+        <div style="margin-bottom: 16px;">
+            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">Amount Due</div>
+            <div style="font-size: 24px; color: {THEME['primary']}; font-weight: 700;">${total_amount:,.2f} {currency}</div>
+        </div>
+        {f'<div><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 6px;">Due Date</div><div style="font-size: 15px; color: {THEME["text_primary"]};">{due_date}</div></div>' if due_date else ''}
+    </div>
+    
+    {recurring_info}
+    
+    <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
+        <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
+            💳 Click the button below to pay securely online
+        </p>
+    </div>
+    
+    <p style="color: {THEME['text_muted']}; font-size: 14px;">
+        Questions about this invoice? Contact {business_name} directly.
+    </p>
+    """
+    
+    return await send_email(
+        to=to,
+        subject=f"Invoice {invoice_number} from {business_name} - Payment Ready",
+        title="Your Invoice is Ready",
+        intro=f"Please review and pay your invoice from {business_name}.",
+        content_html=content,
+        cta_url=payment_link,
+        cta_label="Pay Now"
+    )
+
+
+async def send_payment_received_notification(
+    provider_email: str,
+    provider_name: str,
+    client_name: str,
+    invoice_number: str,
+    amount: float,
+    currency: str = "USD",
+    payment_date: Optional[str] = None
+) -> dict:
+    """Notify provider when client payment is received"""
+    
+    content = f"""
+    <p>Hi {provider_name},</p>
+    <p>Great news! <strong>{client_name}</strong> has paid their invoice.</p>
+    
+    <div style="background: {THEME['background']}; border-radius: 12px; padding: 24px; margin: 24px 0;">
+        <div style="margin-bottom: 16px;">
+            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">Invoice Number</div>
+            <div style="font-size: 15px; color: {THEME['text_primary']}; font-weight: 600;">{invoice_number}</div>
+        </div>
+        <div style="margin-bottom: 16px;">
+            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">Amount Received</div>
+            <div style="font-size: 24px; color: {THEME['success']}; font-weight: 700;">${amount:,.2f} {currency}</div>
+        </div>
+        <div style="margin-bottom: 16px;">
+            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">Client</div>
+            <div style="font-size: 15px; color: {THEME['text_primary']};">{client_name}</div>
+        </div>
+        {f'<div><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 6px;">Payment Date</div><div style="font-size: 15px; color: {THEME["text_primary"]};">{payment_date}</div></div>' if payment_date else ''}
+    </div>
+    
+    <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
+        <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
+            ✅ Payment received and added to your balance
+        </p>
+    </div>
+    
+    <p style="color: {THEME['text_muted']}; font-size: 14px;">
+        View your payouts dashboard to request a withdrawal.
+    </p>
+    """
+    
+    return await send_email(
+        to=provider_email,
+        subject=f"Payment Received: ${amount:,.2f} from {client_name}",
+        title="Payment Received! 💰",
+        intro=f"{client_name} has paid invoice {invoice_number}.",
+        content_html=content,
+        cta_url=f"{FRONTEND_URL}/dashboard/payouts",
+        cta_label="View Payouts"
+    )
+
+
+async def send_payment_thank_you_email(
+    client_email: str,
+    client_name: str,
+    business_name: str,
+    invoice_number: str,
+    amount: float,
+    currency: str = "USD",
+    service_date: Optional[str] = None
+) -> dict:
+    """Send thank you email to client after successful payment"""
+    
+    content = f"""
+    <p>Hi {client_name},</p>
+    <p>Thank you for your payment to <strong>{business_name}</strong>!</p>
+    
+    <div style="background: {THEME['background']}; border-radius: 12px; padding: 24px; margin: 24px 0;">
+        <div style="margin-bottom: 16px;">
+            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">Invoice Number</div>
+            <div style="font-size: 15px; color: {THEME['text_primary']}; font-weight: 600;">{invoice_number}</div>
+        </div>
+        <div style="margin-bottom: 16px;">
+            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">Amount Paid</div>
+            <div style="font-size: 24px; color: {THEME['success']}; font-weight: 700;">${amount:,.2f} {currency}</div>
+        </div>
+        {f'<div><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 6px;">Service Date</div><div style="font-size: 15px; color: {THEME["text_primary"]};">{service_date}</div></div>' if service_date else ''}
+    </div>
+    
+    <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
+        <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
+            ✅ Your payment has been processed successfully
+        </p>
+    </div>
+    
+    <p style="color: {THEME['text_muted']}; font-size: 14px;">
+        We look forward to providing you with excellent service. If you have any questions, please contact {business_name} directly.
+    </p>
+    
+    <p style="margin-top: 24px;">Thank you for your business! ✨</p>
+    """
+    
+    return await send_email(
+        to=client_email,
+        subject=f"Payment Confirmed - Thank You! - {business_name}",
+        title="Thank You for Your Payment!",
+        intro=f"Your payment to {business_name} has been received.",
+        content_html=content
+    )

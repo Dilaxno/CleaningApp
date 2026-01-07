@@ -3,12 +3,198 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timedelta
 from ..database import get_db
-from ..models import User, Client, Schedule
+from ..models import User, Client, Schedule, Contract, BusinessConfig
+from ..models_invoice import Invoice
 from ..auth import get_current_user
 
 logger = logging.getLogger(__name__)
+
+
+async def _create_invoice_and_send_payment_link(
+    schedule: Schedule,
+    user: User,
+    client: Client,
+    db: Session
+):
+    """Auto-create invoice and send payment link when schedule is confirmed"""
+    from ..email_service import send_invoice_payment_link_email
+    from ..config import DODO_PAYMENTS_API_KEY, DODO_PAYMENTS_ENVIRONMENT, FRONTEND_URL
+    from dodopayments import AsyncDodoPayments
+    
+    logger.info(f"📄 Auto-creating invoice for schedule {schedule.id}")
+    
+    # Get business config for pricing
+    business_config = db.query(BusinessConfig).filter(
+        BusinessConfig.user_id == user.id
+    ).first()
+    
+    # Get contract for pricing info
+    contract = db.query(Contract).filter(
+        Contract.client_id == client.id,
+        Contract.user_id == user.id
+    ).order_by(Contract.created_at.desc()).first()
+    
+    # Determine base amount from schedule price, contract, or business config
+    base_amount = schedule.price or (contract.total_value if contract else 0)
+    
+    if base_amount <= 0:
+        logger.warning(f"⚠️ Cannot create invoice with zero amount for schedule {schedule.id}")
+        return None
+    
+    # Determine service type from client frequency
+    service_type = client.frequency or "one-time"
+    is_recurring = service_type in ["weekly", "bi-weekly", "monthly"]
+    
+    # Calculate frequency discount
+    frequency_discount = 0
+    if business_config:
+        if service_type == "weekly" and business_config.discount_weekly:
+            frequency_discount = base_amount * (business_config.discount_weekly / 100)
+        elif service_type == "bi-weekly" and business_config.discount_monthly:
+            frequency_discount = base_amount * (business_config.discount_monthly / 100 / 2)
+        elif service_type == "monthly" and business_config.discount_monthly:
+            frequency_discount = base_amount * (business_config.discount_monthly / 100)
+    
+    total_amount = base_amount - frequency_discount
+    
+    # Generate invoice number
+    year = datetime.now().year
+    count = db.query(Invoice).filter(
+        Invoice.user_id == user.id,
+        Invoice.created_at >= datetime(year, 1, 1)
+    ).count() + 1
+    invoice_number = f"INV-{year}-{user.id:04d}-{count:04d}"
+    
+    # Determine billing interval
+    billing_interval = None
+    billing_interval_count = 1
+    if is_recurring:
+        intervals = {
+            "weekly": ("week", 1),
+            "bi-weekly": ("week", 2),
+            "monthly": ("month", 1),
+        }
+        billing_interval, billing_interval_count = intervals.get(service_type, ("month", 1))
+    
+    # Create invoice
+    invoice = Invoice(
+        user_id=user.id,
+        client_id=client.id,
+        contract_id=contract.id if contract else None,
+        schedule_id=schedule.id,
+        invoice_number=invoice_number,
+        title=f"Cleaning Service - {schedule.title}",
+        description=f"Service scheduled for {schedule.scheduled_date.strftime('%B %d, %Y')}",
+        service_type=service_type,
+        base_amount=base_amount,
+        frequency_discount=frequency_discount,
+        addon_amount=0,
+        tax_amount=0,
+        total_amount=total_amount,
+        is_recurring=is_recurring,
+        recurrence_pattern=service_type if is_recurring else None,
+        billing_interval=billing_interval,
+        billing_interval_count=billing_interval_count,
+        status="pending",
+        due_date=datetime.utcnow() + timedelta(days=business_config.payment_due_days if business_config else 15)
+    )
+    
+    db.add(invoice)
+    db.commit()
+    db.refresh(invoice)
+    
+    logger.info(f"✅ Invoice created: {invoice_number}")
+    
+    # Generate Dodo payment link
+    if not DODO_PAYMENTS_API_KEY:
+        logger.warning("⚠️ DODO_PAYMENTS_API_KEY not configured - skipping payment link")
+        return invoice
+    
+    business_name = business_config.business_name if business_config else "Cleaning Service"
+    
+    dodo_client = AsyncDodoPayments(
+        bearer_token=DODO_PAYMENTS_API_KEY,
+        environment=DODO_PAYMENTS_ENVIRONMENT or "test_mode",
+    )
+    
+    try:
+        # Create dynamic product
+        product_data = {
+            "name": f"{invoice.title} - {invoice.invoice_number}",
+            "description": invoice.description or f"Cleaning service from {business_name}",
+            "price": {
+                "currency": invoice.currency.upper(),
+                "amount": int(invoice.total_amount * 100),
+            },
+        }
+        
+        if is_recurring and billing_interval:
+            product_data["billing"] = {
+                "type": "recurring",
+                "interval": billing_interval,
+                "interval_count": billing_interval_count,
+            }
+        else:
+            product_data["billing"] = {"type": "one_time"}
+        
+        product = await dodo_client.products.create(**product_data)
+        product_id = getattr(product, "product_id", None) or product.get("product_id")
+        
+        # Create checkout session
+        return_url = f"{FRONTEND_URL}/payment/success/{invoice.id}"
+        
+        session = await dodo_client.checkout_sessions.create(
+            product_cart=[{"product_id": product_id, "quantity": 1}],
+            customer={
+                "email": client.email or "",
+                "name": client.contact_name or client.business_name or "",
+            },
+            metadata={
+                "invoice_id": str(invoice.id),
+                "invoice_number": invoice.invoice_number,
+                "provider_user_id": str(user.id),
+                "client_id": str(client.id),
+            },
+            return_url=return_url,
+        )
+        
+        checkout_url = getattr(session, "checkout_url", None) or session.get("checkout_url")
+        
+        # Update invoice with payment info
+        invoice.dodo_product_id = product_id
+        invoice.dodo_payment_link = checkout_url
+        invoice.status = "sent"
+        db.commit()
+        
+        logger.info(f"✅ Payment link generated: {checkout_url}")
+        
+        # Send email to client with payment link
+        if client.email:
+            try:
+                await send_invoice_payment_link_email(
+                    to=client.email,
+                    client_name=client.contact_name or client.business_name,
+                    business_name=business_name,
+                    invoice_number=invoice.invoice_number,
+                    invoice_title=invoice.title,
+                    total_amount=invoice.total_amount,
+                    currency=invoice.currency,
+                    due_date=invoice.due_date.strftime("%B %d, %Y") if invoice.due_date else None,
+                    payment_link=checkout_url,
+                    is_recurring=is_recurring,
+                    recurrence_pattern=service_type if is_recurring else None
+                )
+                logger.info(f"📧 Payment link email sent to {client.email}")
+            except Exception as e:
+                logger.error(f"❌ Failed to send payment link email: {e}")
+        
+        return invoice
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to create payment link: {e}")
+        return invoice
 
 router = APIRouter(prefix="/schedules", tags=["Schedules"])
 
@@ -356,6 +542,12 @@ async def approve_schedule(
         else:
             # No Google Calendar integration, just mark as accepted
             schedule.approval_status = "accepted"
+        
+        # Auto-create invoice and send payment link after schedule is confirmed
+        try:
+            await _create_invoice_and_send_payment_link(schedule, current_user, client, db)
+        except Exception as e:
+            logger.error(f"⚠️ Failed to create invoice: {str(e)}")
         
         db.commit()
         return {"message": "Schedule accepted", "schedule_id": schedule_id}

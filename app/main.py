@@ -27,6 +27,8 @@ from .routes.security import router as security_router
 from .routes.notifications import router as notifications_router
 from .routes.jobs import router as jobs_router
 from .routes.waitlist import router as waitlist_router
+from .routes.invoices import router as invoices_router
+from .routes.payouts import router as payouts_router
 
 # Configure logging
 logging.basicConfig(
@@ -117,6 +119,8 @@ app.include_router(trial_router)
 app.include_router(notifications_router)
 app.include_router(jobs_router)
 app.include_router(waitlist_router)
+app.include_router(invoices_router)
+app.include_router(payouts_router)
 
 
 @app.get("/")

@@ -461,6 +461,10 @@ async def handle_dodopayments_webhook(
             # Optional: mark last invoice paid
             logger.info("Invoice paid event processed")
 
+        elif event_type == "payment.succeeded":
+            # Handle client invoice payment
+            await _handle_client_invoice_payment(data, db)
+
         elif event_type == "invoice.payment_failed":
             logger.info("Invoice payment failed")
 
@@ -471,3 +475,83 @@ async def handle_dodopayments_webhook(
     except Exception as e:
         logger.error(f"Error processing webhook: {e}")
         raise HTTPException(status_code=500, detail="Webhook processing failed")
+
+
+
+async def _handle_client_invoice_payment(data: Dict, db: Session):
+    """Handle payment webhook for client invoices"""
+    from ..models_invoice import Invoice
+    from ..models import Client, BusinessConfig
+    from ..email_service import send_payment_received_notification, send_payment_thank_you_email
+    from datetime import datetime
+    
+    meta = data.get("metadata") or {}
+    invoice_id = meta.get("invoice_id")
+    
+    if not invoice_id:
+        logger.info("Payment webhook without invoice_id in metadata - likely a subscription payment")
+        return
+    
+    logger.info(f"💰 Processing client invoice payment for invoice {invoice_id}")
+    
+    try:
+        invoice = db.query(Invoice).filter(Invoice.id == int(invoice_id)).first()
+        if not invoice:
+            logger.warning(f"Invoice {invoice_id} not found for payment webhook")
+            return
+        
+        if invoice.status == "paid":
+            logger.info(f"Invoice {invoice_id} already marked as paid")
+            return
+        
+        # Update invoice status
+        invoice.status = "paid"
+        invoice.paid_at = datetime.utcnow()
+        invoice.dodo_payment_id = data.get("payment_id") or data.get("id")
+        
+        db.commit()
+        logger.info(f"✅ Invoice {invoice_id} marked as paid")
+        
+        # Get related entities for notifications
+        client = db.query(Client).filter(Client.id == invoice.client_id).first()
+        user = db.query(User).filter(User.id == invoice.user_id).first()
+        business_config = db.query(BusinessConfig).filter(
+            BusinessConfig.user_id == invoice.user_id
+        ).first()
+        
+        business_name = business_config.business_name if business_config else "Cleaning Service"
+        
+        # Send notification to provider
+        if user and user.email and user.notify_payment_received:
+            try:
+                await send_payment_received_notification(
+                    provider_email=user.email,
+                    provider_name=user.full_name or "Provider",
+                    client_name=client.business_name if client else "Client",
+                    invoice_number=invoice.invoice_number,
+                    amount=invoice.total_amount,
+                    currency=invoice.currency,
+                    payment_date=datetime.utcnow().strftime("%B %d, %Y")
+                )
+                logger.info(f"📧 Payment notification sent to provider {user.email}")
+            except Exception as e:
+                logger.error(f"Failed to send provider notification: {e}")
+        
+        # Send thank you email to client
+        if client and client.email:
+            try:
+                await send_payment_thank_you_email(
+                    client_email=client.email,
+                    client_name=client.contact_name or client.business_name,
+                    business_name=business_name,
+                    invoice_number=invoice.invoice_number,
+                    amount=invoice.total_amount,
+                    currency=invoice.currency
+                )
+                logger.info(f"📧 Thank you email sent to client {client.email}")
+            except Exception as e:
+                logger.error(f"Failed to send client thank you email: {e}")
+                
+    except Exception as e:
+        logger.error(f"Error processing invoice payment: {e}")
+        db.rollback()
