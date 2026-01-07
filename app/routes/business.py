@@ -146,36 +146,67 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
         existing = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
         if existing:
             logger.info(f"📝 Updating existing config for user_id: {user.id}")
-            existing.business_name = data.businessName
-            existing.logo_url = data.logoUrl
-            existing.signature_url = data.signatureUrl
-            existing.onboarding_complete = data.onboardingComplete
-            existing.pricing_model = data.pricingModel
-            existing.meetings_required = data.meetingsRequired
-            existing.working_days = data.workingDays
-            existing.working_hours = data.workingHours
-            existing.break_times = data.breakTimes
-            existing.rate_per_sqft = to_float(data.ratePerSqft)
-            existing.rate_per_room = to_float(data.ratePerRoom)
-            existing.hourly_rate = to_float(data.hourlyRate)
-            existing.flat_rate = to_float(data.flatRate)
-            existing.minimum_charge = to_float(data.minimumCharge)
-            existing.cleaning_time_per_sqft = to_int(data.cleaningTimePerSqft)
-            existing.cleaners_small_job = to_int(data.cleanersSmallJob) or 1
-            existing.cleaners_large_job = to_int(data.cleanersLargeJob) or 2
-            existing.buffer_time = to_int(data.bufferTime) or 30
-            existing.premium_evening_weekend = to_float(data.premiumEveningWeekend)
-            existing.premium_deep_clean = to_float(data.premiumDeepClean)
-            existing.discount_weekly = to_float(data.discountWeekly)
-            existing.discount_monthly = to_float(data.discountMonthly)
-            existing.discount_long_term = to_float(data.discountLongTerm)
-            existing.addon_windows = to_float(data.addonWindows)
-            existing.addon_carpets = to_float(data.addonCarpets)
-            existing.payment_due_days = to_int(data.paymentDueDays) or 15
-            existing.late_fee_percent = to_float(data.lateFeePercent) or 1.5
-            existing.standard_inclusions = data.standardInclusions
-            existing.standard_exclusions = data.standardExclusions
-            existing.preferred_units = data.preferredUnits
+            # Only update fields that are explicitly provided (not None)
+            if data.businessName is not None:
+                existing.business_name = data.businessName
+            if data.logoUrl is not None:
+                existing.logo_url = data.logoUrl
+            if data.signatureUrl is not None:
+                existing.signature_url = data.signatureUrl
+            if data.onboardingComplete is not None:
+                existing.onboarding_complete = data.onboardingComplete
+            if data.pricingModel is not None:
+                existing.pricing_model = data.pricingModel
+            if data.meetingsRequired is not None:
+                existing.meetings_required = data.meetingsRequired
+            if data.workingDays is not None:
+                existing.working_days = data.workingDays
+            if data.workingHours is not None:
+                existing.working_hours = data.workingHours
+            if data.breakTimes is not None:
+                existing.break_times = data.breakTimes
+            if data.ratePerSqft is not None:
+                existing.rate_per_sqft = to_float(data.ratePerSqft)
+            if data.ratePerRoom is not None:
+                existing.rate_per_room = to_float(data.ratePerRoom)
+            if data.hourlyRate is not None:
+                existing.hourly_rate = to_float(data.hourlyRate)
+            if data.flatRate is not None:
+                existing.flat_rate = to_float(data.flatRate)
+            if data.minimumCharge is not None:
+                existing.minimum_charge = to_float(data.minimumCharge)
+            if data.cleaningTimePerSqft is not None:
+                existing.cleaning_time_per_sqft = to_int(data.cleaningTimePerSqft)
+            if data.cleanersSmallJob is not None:
+                existing.cleaners_small_job = to_int(data.cleanersSmallJob) or 1
+            if data.cleanersLargeJob is not None:
+                existing.cleaners_large_job = to_int(data.cleanersLargeJob) or 2
+            if data.bufferTime is not None:
+                existing.buffer_time = to_int(data.bufferTime) or 30
+            if data.premiumEveningWeekend is not None:
+                existing.premium_evening_weekend = to_float(data.premiumEveningWeekend)
+            if data.premiumDeepClean is not None:
+                existing.premium_deep_clean = to_float(data.premiumDeepClean)
+            if data.discountWeekly is not None:
+                existing.discount_weekly = to_float(data.discountWeekly)
+            if data.discountMonthly is not None:
+                existing.discount_monthly = to_float(data.discountMonthly)
+            if data.discountLongTerm is not None:
+                existing.discount_long_term = to_float(data.discountLongTerm)
+            if data.addonWindows is not None:
+                existing.addon_windows = to_float(data.addonWindows)
+            if data.addonCarpets is not None:
+                existing.addon_carpets = to_float(data.addonCarpets)
+            if data.paymentDueDays is not None:
+                existing.payment_due_days = to_int(data.paymentDueDays) or 15
+            if data.lateFeePercent is not None:
+                existing.late_fee_percent = to_float(data.lateFeePercent) or 1.5
+            if data.standardInclusions is not None:
+                existing.standard_inclusions = data.standardInclusions
+            if data.standardExclusions is not None:
+                existing.standard_exclusions = data.standardExclusions
+            if data.preferredUnits is not None:
+                existing.preferred_units = data.preferredUnits
             db.commit()
             config = existing
         else:
