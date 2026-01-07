@@ -89,6 +89,15 @@ class BusinessConfig(Base):
     standard_inclusions = Column(JSON, default=list)
     standard_exclusions = Column(JSON, default=list)
     preferred_units = Column(String(20), default="sqft")
+    
+    # Custom SMTP domain settings
+    smtp_email = Column(String(255), nullable=True)  # e.g., bookings@preclean.com
+    smtp_domain = Column(String(255), nullable=True)  # e.g., preclean.com
+    resend_domain_id = Column(String(255), nullable=True)  # Resend domain ID
+    smtp_status = Column(String(50), nullable=True)  # pending, verified, failed
+    smtp_dns_records = Column(JSON, nullable=True)  # Store DNS records for user to configure
+    smtp_verified_records = Column(Integer, default=0)  # Count of verified DNS records (0-3)
+    
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 

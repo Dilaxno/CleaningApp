@@ -14,6 +14,26 @@ logger = logging.getLogger(__name__)
 # Initialize Resend
 resend.api_key = RESEND_API_KEY
 
+
+def get_sender_email(business_config=None, business_name: str = "CleanEnroll") -> str:
+    """
+    Get the appropriate sender email address.
+    Uses custom SMTP domain if verified, otherwise falls back to CleanEnroll default.
+    
+    Args:
+        business_config: BusinessConfig object with smtp settings
+        business_name: Business name for the sender display name
+    
+    Returns:
+        Formatted sender email string
+    """
+    # Check if custom SMTP is configured and verified
+    if business_config and business_config.smtp_status == "verified" and business_config.smtp_email:
+        return f"{business_name} <{business_config.smtp_email}>"
+    
+    # Fallback to default CleanEnroll address
+    return EMAIL_FROM_ADDRESS
+
 # App theme colors
 THEME = {
     "primary": "#00C4B4",      # Teal - primary brand color
