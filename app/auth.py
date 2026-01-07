@@ -110,6 +110,7 @@ async def get_current_user(
                 firebase_uid=firebase_uid,
                 email=email or "",
                 full_name=name,
+                plan="free",  # Default plan for new users
             )
             db.add(user)
             db.commit()
