@@ -63,8 +63,8 @@ TURNSTILE_SECRET_KEY=0x4AAAAAAA...
 ## Step 4: Deploy ARQ Worker Service
 
 ```bash
-# Copy service file
-sudo cp ~/CleaningApp/backend/arq-worker.service /etc/systemd/system/
+# Copy service file from project root (not in git for security)
+sudo cp ~/CleaningApp/arq-worker.service /etc/systemd/system/
 
 # Reload systemd
 sudo systemctl daemon-reload
