@@ -108,13 +108,8 @@ async def generate_contract_pdf_task(ctx, client_id: int, owner_uid: str, form_d
             client_id=client.id,
             title=f"Cleaning Contract - {client.business_name or client.contact_name}",
             pdf_key=pdf_key,
-            quote_amount=quote.get("total", 0),
-            status="pending_signature" if not signature else "signed",
-            metadata={
-                "quote": quote,
-                "form_data": form_data,
-                "generated_at": datetime.now().isoformat()
-            }
+            total_value=quote.get("final_price", quote.get("total", 0)),
+            status="new" if not signature else "signed",
         )
         
         if signature:
