@@ -395,7 +395,7 @@ class PublicClientCreate(BaseModel):
 
 
 class PublicSubmitResponse(BaseModel):
-    client: ClientResponse
+    client: Optional[ClientResponse] = None
     contractPdfUrl: Optional[str] = None
     jobId: Optional[str] = None
     message: str
