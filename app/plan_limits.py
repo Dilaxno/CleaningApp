@@ -13,8 +13,10 @@ PLAN_LIMITS = {
     "enterprise": None  # None means unlimited
 }
 
-def get_plan_limit(plan: str) -> Optional[int]:
-    """Get the client limit for a given plan. Returns None for unlimited."""
+def get_plan_limit(plan: Optional[str]) -> Optional[int]:
+    """Get the client limit for a given plan. Returns None for unlimited, 0 for no plan."""
+    if not plan:
+        return 0  # No plan = no clients allowed
     return PLAN_LIMITS.get(plan.lower(), PLAN_LIMITS["solo"])
 
 def check_and_reset_monthly_counter(user: User, db: Session) -> None:
@@ -54,6 +56,10 @@ def can_add_client(user: User, db: Session) -> tuple:
     Check if user can add another client this month.
     Returns (can_add, error_message).
     """
+    # Check if user has a plan
+    if not user.plan:
+        return (False, "Please select a plan to start adding clients.")
+    
     # Reset counter if needed
     check_and_reset_monthly_counter(user, db)
     

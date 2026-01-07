@@ -109,6 +109,9 @@ PLAN_LIMITS = {
     "enterprise": {"clients": 999999, "contracts": 999999, "schedules": 999999},  # Unlimited
 }
 
+# Default limits for users without a plan (should not happen after onboarding)
+NO_PLAN_LIMITS = {"clients": 0, "contracts": 0, "schedules": 0}
+
 
 @router.get("/usage-stats")
 async def get_usage_stats(
@@ -148,9 +151,12 @@ async def get_usage_stats(
         Schedule.scheduled_date < month_end
     ).count()
     
-    # Get plan limits (default to solo if no plan set)
-    plan = user.plan or "solo"
-    limits = PLAN_LIMITS.get(plan, PLAN_LIMITS["solo"])
+    # Get plan limits (no plan = no access until they select one)
+    plan = user.plan
+    if plan:
+        limits = PLAN_LIMITS.get(plan, PLAN_LIMITS["solo"])
+    else:
+        limits = NO_PLAN_LIMITS
     
     # Calculate reset date (first of next month)
     if now.month == 12:
