@@ -188,7 +188,7 @@ async def schedule_appointment(
             "success": True,
             "message": "Appointment request submitted - awaiting provider approval",
             "schedule_id": schedule.id,
-            "event_link": event.get("htmlLink"),
+            "event_link": None,  # No event link yet - pending provider approval
             "start_time": request.start_time.isoformat(),
             "end_time": request.end_time.isoformat()
         }
