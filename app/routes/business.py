@@ -32,9 +32,9 @@ class BusinessConfigCreate(BaseModel):
     flatRate: Optional[str] = None
     minimumCharge: Optional[str] = None
     cleaningTimePerSqft: Optional[str] = None
-    cleanersSmallJob: Optional[str] = "1"
-    cleanersLargeJob: Optional[str] = "2"
-    bufferTime: Optional[str] = "30"
+    cleanersSmallJob: Optional[str] = None
+    cleanersLargeJob: Optional[str] = None
+    bufferTime: Optional[str] = None
     premiumEveningWeekend: Optional[str] = None
     premiumDeepClean: Optional[str] = None
     discountWeekly: Optional[str] = None
@@ -42,11 +42,11 @@ class BusinessConfigCreate(BaseModel):
     discountLongTerm: Optional[str] = None
     addonWindows: Optional[str] = None
     addonCarpets: Optional[str] = None
-    paymentDueDays: Optional[str] = "15"
-    lateFeePercent: Optional[str] = "1.5"
-    standardInclusions: Optional[List[str]] = []
-    standardExclusions: Optional[List[str]] = []
-    preferredUnits: Optional[str] = "sqft"
+    paymentDueDays: Optional[str] = None
+    lateFeePercent: Optional[str] = None
+    standardInclusions: Optional[List[str]] = None
+    standardExclusions: Optional[List[str]] = None
+    preferredUnits: Optional[str] = None
 
 
 def to_float(val: Optional[str]) -> Optional[float]:
@@ -154,10 +154,12 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
             if data.signatureUrl is not None:
                 existing.signature_url = data.signatureUrl
             if data.onboardingComplete is not None:
+                logger.info(f"📝 Setting onboarding_complete to: {data.onboardingComplete}")
                 existing.onboarding_complete = data.onboardingComplete
             if data.pricingModel is not None:
                 existing.pricing_model = data.pricingModel
             if data.meetingsRequired is not None:
+                logger.info(f"📝 Setting meetings_required to: {data.meetingsRequired}")
                 existing.meetings_required = data.meetingsRequired
             if data.workingDays is not None:
                 existing.working_days = data.workingDays
