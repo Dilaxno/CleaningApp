@@ -12,6 +12,7 @@ from ..schemas import UserResponse, UserUpdate, MessageResponse
 from ..auth import get_current_user
 from ..email_service import send_email
 from ..rate_limiter import create_rate_limiter
+from ..turnstile import verify_turnstile
 
 # Firebase Admin SDK for password updates
 import firebase_admin
@@ -43,6 +44,7 @@ otp_storage: dict = {}
 
 class RequestOTPRequest(BaseModel):
     email: str
+    turnstileToken: Optional[str] = None
 
 
 class VerifyOTPRequest(BaseModel):
@@ -73,10 +75,21 @@ rate_limit_password_reset = create_rate_limiter(
 @router.post("/request-otp")
 async def request_password_reset_otp(
     data: RequestOTPRequest,
+    request: Request,
     db: Session = Depends(get_db),
     _: None = Depends(rate_limit_password_reset)
 ):
-    """Request OTP for password reset - Rate limited to 5 requests per hour per IP"""
+    """Request OTP for password reset - Rate limited to 5 requests per hour per IP with Turnstile CAPTCHA"""
+    # Verify Turnstile token
+    if data.turnstileToken:
+        client_ip = request.client.host if request.client else None
+        is_valid = await verify_turnstile(data.turnstileToken, client_ip)
+        if not is_valid:
+            raise HTTPException(status_code=400, detail="CAPTCHA verification failed")
+        logger.info(f"✅ Turnstile verified for password reset request from IP: {client_ip}")
+    else:
+        logger.warning("⚠️ No Turnstile token provided for password reset request")
+    
     # Check if user exists
     user = db.query(User).filter(User.email == data.email).first()
     if not user:

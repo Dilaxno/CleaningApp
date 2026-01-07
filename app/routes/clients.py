@@ -13,6 +13,7 @@ from ..models import User, Client, BusinessConfig
 from ..auth import get_current_user
 from ..rate_limiter import create_rate_limiter, rate_limit_dependency, get_redis_client
 from ..turnstile import verify_turnstile
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -464,6 +465,57 @@ async def submit_public_form(
     
     logger.info(f"📊 Submission count for IP {client_ip}: {submission_count + 1}")
     
+    # Strict input validation
+    validation_errors = []
+    
+    # Validate business name (required)
+    if not data.businessName or len(data.businessName.strip()) < 2:
+        validation_errors.append("Business name must be at least 2 characters")
+    elif len(data.businessName) > 200:
+        validation_errors.append("Business name must be less than 200 characters")
+    
+    # Validate email format if provided
+    if data.email:
+        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(email_pattern, data.email):
+            validation_errors.append("Invalid email format")
+        elif len(data.email) > 255:
+            validation_errors.append("Email must be less than 255 characters")
+    
+    # Validate phone format if provided
+    if data.phone:
+        # Remove all non-digit characters for validation
+        phone_digits = re.sub(r'\D', '', data.phone)
+        if len(phone_digits) < 10 or len(phone_digits) > 15:
+            validation_errors.append("Phone number must be between 10-15 digits")
+    
+    # Validate contact name if provided
+    if data.contactName and len(data.contactName) > 200:
+        validation_errors.append("Contact name must be less than 200 characters")
+    
+    # Validate property size if provided
+    if data.propertySize and (data.propertySize < 0 or data.propertySize > 1000000):
+        validation_errors.append("Property size must be between 0 and 1,000,000 sq ft")
+    
+    # Validate notes length if provided
+    if data.notes and len(data.notes) > 5000:
+        validation_errors.append("Notes must be less than 5000 characters")
+    
+    # Validate formData size (prevent DOS attacks)
+    if data.formData:
+        import json
+        form_data_str = json.dumps(data.formData)
+        if len(form_data_str) > 50000:  # 50KB limit
+            validation_errors.append("Form data is too large (max 50KB)")
+    
+    # Return validation errors if any
+    if validation_errors:
+        logger.warning(f"❌ Validation failed for IP {client_ip}: {validation_errors}")
+        raise HTTPException(
+            status_code=422,
+            detail={"message": "Validation failed", "errors": validation_errors}
+        )
+    
     # Find the user by Firebase UID
     user = db.query(User).filter(User.firebase_uid == data.ownerUid).first()
     if not user:
@@ -519,35 +571,22 @@ async def submit_public_form(
             logger.error(f"❌ Failed to queue contract generation: {queue_err}")
             # Continue without queuing - form submission still succeeds
     
-    # Send email notifications (async, don't block response)
+    # Queue email notifications as background job (don't block response)
     try:
-        # Get business config for business name
-        config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
-        business_name = config.business_name if config else "Your Business"
+        redis_settings = get_redis_settings()
+        pool = await create_pool(redis_settings)
         
-        # Notify business owner of new submission
-        if user.email:
-            await send_new_client_notification(
-                to=user.email,
-                business_name=business_name,
-                client_name=data.contactName or data.businessName,
-                client_email=data.email or "Not provided",
-                property_type=data.propertyType or "Not specified",
-            )
-            logger.info(f"📧 Notification email sent to business owner: {user.email}")
-        
-        # Send confirmation to client
-        if data.email:
-            await send_form_submission_confirmation(
-                to=data.email,
-                client_name=data.contactName or data.businessName,
-                business_name=business_name,
-                property_type=data.propertyType or "Property",
-            )
-            logger.info(f"📧 Confirmation email sent to client: {data.email}")
+        # Queue email notification job
+        await pool.enqueue_job(
+            'send_form_notification_emails_task',
+            client.id,
+            user.id,
+            data.ownerUid
+        )
+        logger.info(f"📧 Email notification job queued for client {client.id}")
             
     except Exception as email_err:
-        logger.warning(f"⚠️ Failed to send email notifications: {email_err}")
+        logger.warning(f"⚠️ Failed to queue email notifications: {email_err}")
         # Continue - email failure shouldn't fail the submission
     
     return PublicSubmitResponse(

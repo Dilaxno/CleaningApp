@@ -141,10 +141,71 @@ async def generate_contract_pdf_task(ctx, client_id: int, owner_uid: str, form_d
         db.close()
 
 
+async def send_form_notification_emails_task(ctx, client_id: int, user_id: int, owner_uid: str):
+    """
+    Background task to send email notifications for form submissions
+    
+    Args:
+        ctx: ARQ context
+        client_id: Client ID
+        user_id: User ID
+        owner_uid: Business owner Firebase UID
+    """
+    from .database import SessionLocal
+    from .models import User, Client, BusinessConfig
+    from .email_service import send_new_client_notification, send_form_submission_confirmation
+    
+    logger.info(f"📧 Starting email notifications for client {client_id}")
+    
+    db = SessionLocal()
+    try:
+        # Get user and client
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise Exception(f"User not found: {user_id}")
+        
+        client = db.query(Client).filter(Client.id == client_id).first()
+        if not client:
+            raise Exception(f"Client not found: {client_id}")
+        
+        # Get business config
+        config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
+        business_name = config.business_name if config else "Your Business"
+        
+        # Send notification to business owner
+        if user.email:
+            await send_new_client_notification(
+                to=user.email,
+                business_name=business_name,
+                client_name=client.contact_name or client.business_name,
+                client_email=client.email or "Not provided",
+                property_type=client.property_type or "Not specified",
+            )
+            logger.info(f"✅ Notification email sent to business owner: {user.email}")
+        
+        # Send confirmation to client
+        if client.email:
+            await send_form_submission_confirmation(
+                to=client.email,
+                client_name=client.contact_name or client.business_name,
+                business_name=business_name,
+                property_type=client.property_type or "Property",
+            )
+            logger.info(f"✅ Confirmation email sent to client: {client.email}")
+        
+        return {"status": "completed", "emails_sent": 2 if user.email and client.email else 1 if user.email or client.email else 0}
+        
+    except Exception as e:
+        logger.error(f"❌ Email notification failed: {str(e)}")
+        raise
+    finally:
+        db.close()
+
+
 class WorkerSettings:
     """ARQ Worker Settings"""
-    functions = [generate_contract_pdf_task]
+    functions = [generate_contract_pdf_task, send_form_notification_emails_task]
     redis_settings = get_redis_settings()
-    max_jobs = 5  # Concurrency limit: max 5 PDF generations at once
+    max_jobs = 10  # Concurrency limit: max 10 jobs at once (5 PDF + 5 emails)
     job_timeout = 300  # 5 minutes timeout per job
     keep_result = 3600  # Keep job results for 1 hour
