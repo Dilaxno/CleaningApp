@@ -51,9 +51,9 @@ class ContractUpdate(BaseModel):
 
 class ContractResponse(BaseModel):
     id: int
-    public_id: str  # UUID for public access
+    public_id: Optional[str] = None  # UUID for public access (nullable for existing records)
     clientId: int
-    clientPublicId: str  # Client's UUID for public access
+    clientPublicId: Optional[str] = None  # Client's UUID for public access (nullable for existing records)
     clientName: str
     clientEmail: Optional[str]
     title: str
@@ -117,7 +117,7 @@ async def get_contracts(
             id=c.id,
             public_id=c.public_id,
             clientId=c.client_id,
-            clientPublicId=client.public_id if client else "",
+            clientPublicId=client.public_id if client else None,
             clientName=client.business_name if client else "Unknown",
             clientEmail=client.email if client else None,
             title=c.title,
@@ -241,7 +241,7 @@ async def update_contract(
         id=contract.id,
         public_id=contract.public_id,
         clientId=contract.client_id,
-        clientPublicId=client.public_id if client else "",
+        clientPublicId=client.public_id if client else None,
         clientName=client.business_name if client else "Unknown",
         clientEmail=client.email if client else None,
         title=contract.title,
