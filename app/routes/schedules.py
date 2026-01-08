@@ -120,7 +120,7 @@ async def _create_invoice_and_send_payment_link(
     )
     
     try:
-        # Create dynamic product
+        # Create dynamic product (one-time only - recurring handled separately)
         product_data = {
             "name": f"{invoice.title} - {invoice.invoice_number}",
             "description": invoice.description or f"Cleaning service from {business_name}",
@@ -129,15 +129,6 @@ async def _create_invoice_and_send_payment_link(
                 "amount": int(invoice.total_amount * 100),
             },
         }
-        
-        if is_recurring and billing_interval:
-            product_data["billing"] = {
-                "type": "recurring",
-                "interval": billing_interval,
-                "interval_count": billing_interval_count,
-            }
-        else:
-            product_data["billing"] = {"type": "one_time"}
         
         product = await dodo_client.products.create(**product_data)
         product_id = getattr(product, "product_id", None) or product.get("product_id")
