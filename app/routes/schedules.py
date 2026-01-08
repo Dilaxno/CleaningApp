@@ -287,6 +287,10 @@ async def get_schedules(
             endTime=s.end_time,
             durationMinutes=s.duration_minutes,
             status=s.status,
+            approvalStatus=s.approval_status or "accepted",
+            proposedDate=s.proposed_date,
+            proposedStartTime=s.proposed_start_time,
+            proposedEndTime=s.proposed_end_time,
             notes=s.notes,
             address=s.address,
             assignedTo=s.assigned_to,
@@ -296,6 +300,7 @@ async def get_schedules(
             calendlyEventUri=s.calendly_event_uri,
             calendlyEventId=s.calendly_event_id,
             calendlyBookingMethod=s.calendly_booking_method,
+            googleCalendarEventId=s.google_calendar_event_id,
             createdAt=s.created_at
         ))
     return result

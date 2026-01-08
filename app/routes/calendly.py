@@ -244,7 +244,7 @@ async def get_upcoming_events(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get upcoming scheduled events from Calendly"""
+    """Get upcoming scheduled events from Calendly with invitee details"""
     integration = db.query(CalendlyIntegration).filter(
         CalendlyIntegration.user_id == current_user.id
     ).first()
@@ -262,7 +262,30 @@ async def get_upcoming_events(
         min_start_time=datetime.utcnow()
     )
     
-    return events_data
+    # Enrich events with invitee information
+    enriched_events = []
+    for event in events_data.get("collection", []):
+        # Extract event UUID from URI
+        event_uuid = event.get("uri", "").split("/")[-1]
+        
+        try:
+            # Get invitees for this event
+            invitees_data = await calendly_service.get_event_invitees(access_token, event_uuid)
+            invitees = invitees_data.get("collection", [])
+            
+            if invitees:
+                # Add first invitee info to event
+                first_invitee = invitees[0]
+                event["invitee"] = {
+                    "name": first_invitee.get("name"),
+                    "email": first_invitee.get("email"),
+                }
+        except Exception as e:
+            logger.warning(f"Failed to get invitees for event {event_uuid}: {e}")
+        
+        enriched_events.append(event)
+    
+    return {"collection": enriched_events}
 
 
 @router.get("/scheduling-link/{client_id}")
