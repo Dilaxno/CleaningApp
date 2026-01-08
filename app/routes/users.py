@@ -24,6 +24,8 @@ class UserUpdate(BaseModel):
     fullName: Optional[str] = None
     email: Optional[str] = None
     profilePictureUrl: Optional[str] = None
+    accountType: Optional[str] = None
+    hearAbout: Optional[str] = None
 
 
 class UserResponse(BaseModel):
@@ -150,6 +152,10 @@ def update_user(firebase_uid: str, data: UserUpdate, db: Session = Depends(get_d
             user.email = data.email
         if data.profilePictureUrl is not None:
             user.profile_picture_url = data.profilePictureUrl
+        if data.accountType is not None:
+            user.account_type = data.accountType
+        if data.hearAbout is not None:
+            user.hear_about = data.hearAbout
         
         db.commit()
         db.refresh(user)
@@ -180,3 +186,9 @@ def update_user(firebase_uid: str, data: UserUpdate, db: Session = Depends(get_d
         logger.error(f"❌ Error updating user: {str(e)}")
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/{firebase_uid}")
+def patch_user(firebase_uid: str, data: UserUpdate, db: Session = Depends(get_db)):
+    """Partially update user settings (same as PUT but more RESTful for partial updates)"""
+    return update_user(firebase_uid, data, db)
