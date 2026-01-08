@@ -66,6 +66,10 @@ async def upload_logo(
     """Upload business logo to R2 (private)."""
     logger.info(f"📤 Uploading logo for firebase_uid: {firebase_uid}")
 
+    # Validate firebase_uid format to prevent path traversal
+    if not firebase_uid or len(firebase_uid) > 128 or not firebase_uid.replace('-', '').replace('_', '').isalnum():
+        raise HTTPException(status_code=400, detail="Invalid user identifier")
+
     user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -86,6 +90,13 @@ async def upload_logo(
             status_code=400,
             detail="Invalid file type. Only PNG, JPEG, WebP, GIF, and SVG images are allowed."
         )
+
+    # Validate filename to prevent path traversal
+    if file.filename:
+        import os
+        safe_filename = os.path.basename(file.filename)
+        if safe_filename != file.filename or '..' in file.filename:
+            raise HTTPException(status_code=400, detail="Invalid filename")
 
     # Read file contents
     contents = await file.read()
@@ -138,6 +149,10 @@ async def upload_signature(
     """Upload signature image to R2 (private)."""
     logger.info(f"📤 Uploading signature for firebase_uid: {firebase_uid}")
 
+    # Validate firebase_uid format to prevent path traversal
+    if not firebase_uid or len(firebase_uid) > 128 or not firebase_uid.replace('-', '').replace('_', '').isalnum():
+        raise HTTPException(status_code=400, detail="Invalid user identifier")
+
     user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -145,6 +160,13 @@ async def upload_signature(
     # Validate file type
     if file.content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(status_code=400, detail="Invalid file type. Please upload an image file.")
+
+    # Validate filename to prevent path traversal
+    if file.filename:
+        import os
+        safe_filename = os.path.basename(file.filename)
+        if safe_filename != file.filename or '..' in file.filename:
+            raise HTTPException(status_code=400, detail="Invalid filename")
 
     # Generate unique filename (store the key, not the URL)
     ext = file.filename.split(".")[-1] if file.filename else "png"
@@ -185,6 +207,15 @@ async def get_presigned_url_endpoint(
     db: Session = Depends(get_db),
 ):
     """Get a presigned URL for an existing file (logo, signature, or profile-picture)."""
+    # Validate firebase_uid format to prevent path traversal
+    if not firebase_uid or len(firebase_uid) > 128 or not firebase_uid.replace('-', '').replace('_', '').isalnum():
+        raise HTTPException(status_code=400, detail="Invalid user identifier")
+    
+    # Validate file_type to prevent injection
+    allowed_file_types = ["logo", "signature", "profile-picture"]
+    if file_type not in allowed_file_types:
+        raise HTTPException(status_code=400, detail=f"Invalid file type. Use one of: {', '.join(allowed_file_types)}")
+    
     user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -223,6 +254,10 @@ async def upload_profile_picture(
     """Upload user profile picture to R2 (private)."""
     logger.info(f"📤 Uploading profile picture for firebase_uid: {firebase_uid}")
 
+    # Validate firebase_uid format to prevent path traversal
+    if not firebase_uid or len(firebase_uid) > 128 or not firebase_uid.replace('-', '').replace('_', '').isalnum():
+        raise HTTPException(status_code=400, detail="Invalid user identifier")
+
     user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -242,6 +277,13 @@ async def upload_profile_picture(
             status_code=400, 
             detail="Invalid file type. Only PNG, JPEG, WebP, and GIF images are allowed."
         )
+
+    # Validate filename to prevent path traversal
+    if file.filename:
+        import os
+        safe_filename = os.path.basename(file.filename)
+        if safe_filename != file.filename or '..' in file.filename:
+            raise HTTPException(status_code=400, detail="Invalid filename")
 
     # Read file contents
     contents = await file.read()

@@ -11,7 +11,7 @@ from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 from typing import Optional, Union, List
 from jinja2 import Template
-from .config import RESEND_API_KEY, EMAIL_FROM_ADDRESS, SMTP_ENCRYPTION_KEY
+from .config import RESEND_API_KEY, EMAIL_FROM_ADDRESS, SMTP_ENCRYPTION_KEY, FRONTEND_URL
 
 logger = logging.getLogger(__name__)
 
@@ -1088,11 +1088,22 @@ async def send_schedule_change_request(
     proposed_time: datetime,
     proposed_start: str,
     proposed_end: str,
-    schedule_id: int
+    schedule_id: int,
+    client_id: int = None
 ) -> dict:
     """Notify client when provider requests alternative time"""
+    import hashlib
+    
     original_formatted = original_time.strftime("%A, %B %d, %Y at %I:%M %p")
     proposed_formatted = proposed_time.strftime("%A, %B %d, %Y")
+    
+    # Generate secure token for the response link
+    token = ""
+    response_url = ""
+    if client_id:
+        data = f"{schedule_id}:{client_id}:cleanenroll_schedule_secret"
+        token = hashlib.sha256(data.encode()).hexdigest()[:32]
+        response_url = f"{FRONTEND_URL}/schedule-response/{schedule_id}?token={token}"
     
     content = f"""
     <p>Hi {client_name},</p>
@@ -1114,18 +1125,147 @@ async def send_schedule_change_request(
             ⏳ Response Needed: Please confirm or suggest another time
         </p>
     </div>
-    
-    <p style="color: {THEME['text_muted']}; font-size: 14px;">
-        Please reply to this email to confirm the proposed time or suggest an alternative that works better for you.
-    </p>
     """
+    
+    # Add CTA button if we have a response URL
+    cta_url = response_url if response_url else None
+    cta_label = "Respond to Proposal" if response_url else None
     
     return await send_email(
         to=client_email,
         subject=f"Alternative Time Proposed by {provider_name}",
         title="Alternative Time Proposed",
         intro=f"{provider_name} has suggested a different appointment time.",
+        content_html=content,
+        cta_url=cta_url,
+        cta_label=cta_label
+    )
+
+
+async def send_client_accepted_proposal(
+    provider_email: str,
+    provider_name: str,
+    client_name: str,
+    accepted_date: datetime,
+    accepted_start_time: str,
+    accepted_end_time: str,
+    schedule_id: int
+) -> dict:
+    """Notify provider when client accepts their proposed alternative time"""
+    date_formatted = accepted_date.strftime("%A, %B %d, %Y")
+    
+    content = f"""
+    <p>Hi {provider_name},</p>
+    <p>Great news! <strong>{client_name}</strong> has accepted your proposed appointment time.</p>
+    
+    <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 24px; margin: 24px 0;">
+        <div style="color: #166534; font-size: 13px; margin-bottom: 6px;">✅ Confirmed Appointment</div>
+        <div style="font-size: 18px; color: #166534; font-weight: 600;">{date_formatted}</div>
+        <div style="font-size: 15px; color: #166534; margin-top: 4px;">{accepted_start_time} - {accepted_end_time}</div>
+    </div>
+    
+    <p style="color: {THEME['text_muted']}; font-size: 14px;">
+        The appointment has been confirmed and added to your schedule. You can view the details in your dashboard.
+    </p>
+    """
+    
+    return await send_email(
+        to=provider_email,
+        subject=f"✅ {client_name} Accepted Your Proposed Time",
+        title="Appointment Confirmed!",
+        intro=f"{client_name} has confirmed the appointment.",
+        content_html=content,
+        cta_url=f"{FRONTEND_URL}/dashboard/schedule",
+        cta_label="View Schedule",
+        is_user_email=True
+    )
+
+
+async def send_appointment_confirmed_to_client(
+    client_email: str,
+    client_name: str,
+    provider_name: str,
+    confirmed_date: datetime,
+    confirmed_start_time: str,
+    confirmed_end_time: str
+) -> dict:
+    """Send confirmation email to client after they accept a proposed time"""
+    date_formatted = confirmed_date.strftime("%A, %B %d, %Y")
+    
+    content = f"""
+    <p>Hi {client_name},</p>
+    <p>Your appointment with <strong>{provider_name}</strong> has been confirmed!</p>
+    
+    <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 24px; margin: 24px 0;">
+        <div style="color: #166534; font-size: 13px; margin-bottom: 6px;">✅ Confirmed Appointment</div>
+        <div style="font-size: 18px; color: #166534; font-weight: 600;">{date_formatted}</div>
+        <div style="font-size: 15px; color: #166534; margin-top: 4px;">{confirmed_start_time} - {confirmed_end_time}</div>
+    </div>
+    
+    <p style="color: {THEME['text_muted']}; font-size: 14px;">
+        {provider_name} will arrive at the scheduled time. If you need to make any changes, please contact them directly.
+    </p>
+    """
+    
+    return await send_email(
+        to=client_email,
+        subject=f"✅ Appointment Confirmed with {provider_name}",
+        title="Appointment Confirmed!",
+        intro=f"Your appointment has been scheduled.",
         content_html=content
+    )
+
+
+async def send_client_counter_proposal(
+    provider_email: str,
+    provider_name: str,
+    client_name: str,
+    original_proposed_date: datetime,
+    client_preferred_date: datetime,
+    client_preferred_start: str,
+    client_preferred_end: str,
+    client_reason: str,
+    schedule_id: int
+) -> dict:
+    """Notify provider when client suggests an alternative time"""
+    original_formatted = original_proposed_date.strftime("%A, %B %d, %Y")
+    preferred_formatted = client_preferred_date.strftime("%A, %B %d, %Y")
+    
+    content = f"""
+    <p>Hi {provider_name},</p>
+    <p><strong>{client_name}</strong> has reviewed your proposed time and would like to suggest an alternative.</p>
+    
+    <div style="background: {THEME['background']}; border-radius: 12px; padding: 24px; margin: 24px 0;">
+        <div style="margin-bottom: 20px;">
+            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">📅 Your Proposed Time</div>
+            <div style="font-size: 15px; color: {THEME['text_muted']}; text-decoration: line-through;">{original_formatted}</div>
+        </div>
+        <div>
+            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">✨ Client's Preferred Time</div>
+            <div style="font-size: 16px; color: {THEME['text_primary']}; font-weight: 600;">{preferred_formatted}</div>
+            <div style="font-size: 14px; color: {THEME['text_primary']}; margin-top: 4px;">{client_preferred_start} - {client_preferred_end}</div>
+        </div>
+    </div>
+    
+    <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;">
+        <p style="margin: 0 0 8px 0; color: #92400e; font-size: 13px; font-weight: 600;">💬 Client's Reason:</p>
+        <p style="margin: 0; color: #92400e; font-size: 14px; font-style: italic;">"{client_reason}"</p>
+    </div>
+    
+    <p style="color: {THEME['text_muted']}; font-size: 14px;">
+        Please review the client's suggestion and respond through your dashboard.
+    </p>
+    """
+    
+    return await send_email(
+        to=provider_email,
+        subject=f"📅 {client_name} Suggested an Alternative Time",
+        title="Alternative Time Suggested",
+        intro=f"{client_name} has suggested a different appointment time.",
+        content_html=content,
+        cta_url=f"{FRONTEND_URL}/dashboard/schedule",
+        cta_label="Review in Dashboard",
+        is_user_email=True
     )
 
 

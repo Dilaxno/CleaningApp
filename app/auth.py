@@ -32,58 +32,132 @@ async def get_google_public_keys():
 
 
 async def verify_firebase_token(token: str) -> dict:
-    """Verify Firebase ID token using Google's tokeninfo endpoint"""
+    """
+    Verify Firebase ID token with FULL cryptographic signature verification.
+    Uses Google's public keys to verify the JWT signature.
+    """
     import json
     import base64
+    import time
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.backends import default_backend
+    from cryptography.x509 import load_pem_x509_certificate
+    from cryptography.hazmat.primitives.asymmetric import padding
+    from cryptography.hazmat.primitives import hashes
     
     if not FIREBASE_PROJECT_ID:
         logger.error("❌ FIREBASE_PROJECT_ID not configured")
         raise HTTPException(status_code=500, detail="Firebase not configured")
     
     try:
-        # Decode the token payload without verification first to get claims
-        # Then verify with Google's endpoint
+        # Split token into parts
         parts = token.split('.')
         if len(parts) != 3:
             raise HTTPException(status_code=401, detail="Invalid token format")
         
-        # Decode payload (middle part)
-        payload = parts[1]
-        # Add padding if needed
-        padding = 4 - len(payload) % 4
-        if padding != 4:
-            payload += '=' * padding
+        header_b64, payload_b64, signature_b64 = parts
         
-        decoded_payload = json.loads(base64.urlsafe_b64decode(payload))
+        # Decode header to get key ID (kid)
+        header_padding = 4 - len(header_b64) % 4
+        if header_padding != 4:
+            header_b64_padded = header_b64 + '=' * header_padding
+        else:
+            header_b64_padded = header_b64
         
-        # Verify the token claims
+        header = json.loads(base64.urlsafe_b64decode(header_b64_padded))
+        kid = header.get('kid')
+        alg = header.get('alg')
+        
+        if alg != 'RS256':
+            raise HTTPException(status_code=401, detail="Invalid token algorithm")
+        
+        if not kid:
+            raise HTTPException(status_code=401, detail="Token missing key ID")
+        
+        # Fetch Google's public keys
+        public_keys = await get_google_public_keys()
+        if not public_keys or kid not in public_keys:
+            # Invalidate cache and retry
+            global _cached_keys
+            _cached_keys = None
+            public_keys = await get_google_public_keys()
+            if not public_keys or kid not in public_keys:
+                raise HTTPException(status_code=401, detail="Unable to verify token signature")
+        
+        # Get the certificate for this key ID
+        cert_pem = public_keys[kid]
+        cert = load_pem_x509_certificate(cert_pem.encode(), default_backend())
+        public_key = cert.public_key()
+        
+        # Decode signature
+        sig_padding = 4 - len(signature_b64) % 4
+        if sig_padding != 4:
+            signature_b64_padded = signature_b64 + '=' * sig_padding
+        else:
+            signature_b64_padded = signature_b64
+        
+        signature = base64.urlsafe_b64decode(signature_b64_padded)
+        
+        # Verify signature (header.payload signed with private key)
+        message = f"{header_b64}.{payload_b64}".encode()
+        
+        try:
+            public_key.verify(
+                signature,
+                message,
+                padding.PKCS1v15(),
+                hashes.SHA256()
+            )
+        except Exception:
+            logger.error("❌ Token signature verification failed")
+            raise HTTPException(status_code=401, detail="Invalid token signature")
+        
+        # Decode payload
+        payload_padding = 4 - len(payload_b64) % 4
+        if payload_padding != 4:
+            payload_b64_padded = payload_b64 + '=' * payload_padding
+        else:
+            payload_b64_padded = payload_b64
+        
+        decoded_payload = json.loads(base64.urlsafe_b64decode(payload_b64_padded))
+        
+        # Verify claims
         aud = decoded_payload.get('aud')
         iss = decoded_payload.get('iss')
         
         if aud != FIREBASE_PROJECT_ID:
-            logger.error(f"❌ Token audience mismatch: {aud} != {FIREBASE_PROJECT_ID}")
+            logger.error(f"❌ Token audience mismatch")
             raise HTTPException(status_code=401, detail="Invalid token audience")
         
         expected_issuer = f"https://securetoken.google.com/{FIREBASE_PROJECT_ID}"
         if iss != expected_issuer:
-            logger.error(f"❌ Token issuer mismatch: {iss} != {expected_issuer}")
+            logger.error(f"❌ Token issuer mismatch")
             raise HTTPException(status_code=401, detail="Invalid token issuer")
         
         # Check expiration
-        import time
         exp = decoded_payload.get('exp', 0)
         if exp < time.time():
             logger.warning("⚠️ Token has expired")
             raise HTTPException(status_code=401, detail="Token has expired")
         
-        logger.info(f"✅ Token verified for user: {decoded_payload.get('email')}")
+        # Check issued at time (iat) - token should not be from the future
+        iat = decoded_payload.get('iat', 0)
+        if iat > time.time() + 60:  # Allow 60 seconds clock skew
+            logger.warning("⚠️ Token issued in the future")
+            raise HTTPException(status_code=401, detail="Invalid token")
+        
+        # Check auth_time exists
+        if 'auth_time' not in decoded_payload:
+            raise HTTPException(status_code=401, detail="Invalid token claims")
+        
+        logger.info(f"✅ Token cryptographically verified for user: {decoded_payload.get('email')}")
         return decoded_payload
         
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"❌ Token verification failed: {str(e)}")
-        raise HTTPException(status_code=401, detail=f"Token verification failed: {str(e)}")
+        raise HTTPException(status_code=401, detail="Token verification failed")
 
 
 async def get_current_user(

@@ -245,7 +245,7 @@ class ScheduleResponse(BaseModel):
     endTime: Optional[str]
     durationMinutes: Optional[int]
     status: str
-    approvalStatus: Optional[str] = "accepted"  # pending, accepted, change_requested
+    approvalStatus: Optional[str] = "accepted"  # pending, accepted, change_requested, client_counter
     proposedDate: Optional[datetime] = None
     proposedStartTime: Optional[str] = None
     proposedEndTime: Optional[str] = None
@@ -476,6 +476,16 @@ async def approve_schedule(
         raise HTTPException(status_code=404, detail="Schedule not found")
     
     if request.action == "accept":
+        # If this is a client counter-proposal, use the client's proposed time
+        if schedule.approval_status == "client_counter" and schedule.proposed_date:
+            schedule.scheduled_date = schedule.proposed_date
+            schedule.start_time = schedule.proposed_start_time
+            schedule.end_time = schedule.proposed_end_time
+            # Clear the proposal fields
+            schedule.proposed_date = None
+            schedule.proposed_start_time = None
+            schedule.proposed_end_time = None
+        
         # Accept the appointment and add to Google Calendar
         integration = db.query(GoogleCalendarIntegration).filter(
             GoogleCalendarIntegration.user_id == current_user.id
@@ -584,7 +594,8 @@ async def approve_schedule(
                     proposed_time=request.proposedDate,
                     proposed_start=request.proposedStartTime,
                     proposed_end=request.proposedEndTime,
-                    schedule_id=schedule_id
+                    schedule_id=schedule_id,
+                    client_id=client.id
                 )
                 logger.info(f"✅ Sent change request email to client {client.email}")
             except Exception as e:
@@ -600,3 +611,228 @@ async def approve_schedule(
     
     else:
         raise HTTPException(status_code=400, detail="Invalid action")
+
+
+# ============================================
+# PUBLIC ENDPOINTS - Client Schedule Response
+# ============================================
+
+import secrets
+import hashlib
+
+def generate_schedule_token(schedule_id: int, client_id: int) -> str:
+    """Generate a secure token for schedule response links"""
+    # Create a deterministic but secure token based on schedule and client IDs
+    data = f"{schedule_id}:{client_id}:cleanenroll_schedule_secret"
+    return hashlib.sha256(data.encode()).hexdigest()[:32]
+
+
+def verify_schedule_token(schedule_id: int, client_id: int, token: str) -> bool:
+    """Verify the schedule response token"""
+    expected_token = generate_schedule_token(schedule_id, client_id)
+    return secrets.compare_digest(expected_token, token)
+
+
+class PublicScheduleProposalResponse(BaseModel):
+    id: int
+    clientName: str
+    providerName: str
+    originalDate: str
+    originalStartTime: str
+    originalEndTime: str
+    proposedDate: str
+    proposedStartTime: str
+    proposedEndTime: str
+    status: str
+
+
+class ClientAcceptRequest(BaseModel):
+    token: str
+
+
+class ClientCounterRequest(BaseModel):
+    token: str
+    preferred_date: str
+    preferred_start_time: str
+    preferred_end_time: str
+    reason: str
+
+
+@router.get("/public/proposal/{schedule_id}")
+async def get_public_schedule_proposal(
+    schedule_id: int,
+    token: str,
+    db: Session = Depends(get_db)
+):
+    """Get schedule proposal details for client response page (public endpoint)"""
+    schedule = db.query(Schedule).filter(Schedule.id == schedule_id).first()
+    
+    if not schedule:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    
+    # Verify token
+    if not verify_schedule_token(schedule_id, schedule.client_id, token):
+        raise HTTPException(status_code=403, detail="Invalid or expired link")
+    
+    # Only show if there's a pending proposal
+    if schedule.approval_status != "change_requested" or not schedule.proposed_date:
+        raise HTTPException(status_code=400, detail="No pending proposal for this schedule")
+    
+    # Get client and provider info
+    client = db.query(Client).filter(Client.id == schedule.client_id).first()
+    user = db.query(User).filter(User.id == schedule.user_id).first()
+    
+    return PublicScheduleProposalResponse(
+        id=schedule.id,
+        clientName=client.business_name or client.contact_name if client else "Client",
+        providerName=user.full_name or user.email if user else "Service Provider",
+        originalDate=schedule.scheduled_date.isoformat() if schedule.scheduled_date else "",
+        originalStartTime=schedule.start_time or "",
+        originalEndTime=schedule.end_time or "",
+        proposedDate=schedule.proposed_date.isoformat() if schedule.proposed_date else "",
+        proposedStartTime=schedule.proposed_start_time or "",
+        proposedEndTime=schedule.proposed_end_time or "",
+        status=schedule.approval_status or "pending"
+    )
+
+
+@router.post("/public/proposal/{schedule_id}/accept")
+async def client_accept_proposal(
+    schedule_id: int,
+    request: ClientAcceptRequest,
+    db: Session = Depends(get_db)
+):
+    """Client accepts the provider's proposed alternative time (public endpoint)"""
+    from .. import email_service
+    
+    schedule = db.query(Schedule).filter(Schedule.id == schedule_id).first()
+    
+    if not schedule:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    
+    # Verify token
+    if not verify_schedule_token(schedule_id, schedule.client_id, request.token):
+        raise HTTPException(status_code=403, detail="Invalid or expired link")
+    
+    # Check if there's a pending proposal
+    if schedule.approval_status != "change_requested" or not schedule.proposed_date:
+        raise HTTPException(status_code=400, detail="No pending proposal to accept")
+    
+    # Update schedule with the proposed time
+    schedule.scheduled_date = schedule.proposed_date
+    schedule.start_time = schedule.proposed_start_time
+    schedule.end_time = schedule.proposed_end_time
+    schedule.approval_status = "accepted"
+    
+    # Clear the proposal fields
+    schedule.proposed_date = None
+    schedule.proposed_start_time = None
+    schedule.proposed_end_time = None
+    
+    db.commit()
+    
+    # Get client and provider info for email
+    client = db.query(Client).filter(Client.id == schedule.client_id).first()
+    user = db.query(User).filter(User.id == schedule.user_id).first()
+    
+    # Send confirmation email to provider
+    if user and user.email:
+        try:
+            await email_service.send_client_accepted_proposal(
+                provider_email=user.email,
+                provider_name=user.full_name or "Service Provider",
+                client_name=client.business_name or client.contact_name if client else "Client",
+                accepted_date=schedule.scheduled_date,
+                accepted_start_time=schedule.start_time,
+                accepted_end_time=schedule.end_time,
+                schedule_id=schedule_id
+            )
+            logger.info(f"✅ Sent acceptance notification to provider {user.email}")
+        except Exception as e:
+            logger.error(f"⚠️ Failed to send acceptance email: {str(e)}")
+    
+    # Send confirmation email to client
+    if client and client.email:
+        try:
+            await email_service.send_appointment_confirmed_to_client(
+                client_email=client.email,
+                client_name=client.business_name or client.contact_name,
+                provider_name=user.full_name or user.email if user else "Service Provider",
+                confirmed_date=schedule.scheduled_date,
+                confirmed_start_time=schedule.start_time,
+                confirmed_end_time=schedule.end_time
+            )
+            logger.info(f"✅ Sent confirmation email to client {client.email}")
+        except Exception as e:
+            logger.error(f"⚠️ Failed to send client confirmation email: {str(e)}")
+    
+    return {"message": "Proposal accepted", "schedule_id": schedule_id}
+
+
+@router.post("/public/proposal/{schedule_id}/counter")
+async def client_counter_proposal(
+    schedule_id: int,
+    request: ClientCounterRequest,
+    db: Session = Depends(get_db)
+):
+    """Client suggests an alternative time with reason (public endpoint)"""
+    from .. import email_service
+    
+    schedule = db.query(Schedule).filter(Schedule.id == schedule_id).first()
+    
+    if not schedule:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    
+    # Verify token
+    if not verify_schedule_token(schedule_id, schedule.client_id, request.token):
+        raise HTTPException(status_code=403, detail="Invalid or expired link")
+    
+    # Parse the client's preferred date
+    try:
+        from datetime import datetime as dt
+        preferred_date = dt.fromisoformat(request.preferred_date)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format")
+    
+    # Update schedule with client's counter-proposal
+    # Store in proposed fields (now representing client's suggestion)
+    schedule.proposed_date = preferred_date
+    schedule.proposed_start_time = request.preferred_start_time
+    schedule.proposed_end_time = request.preferred_end_time
+    schedule.approval_status = "client_counter"  # New status for client counter-proposal
+    
+    # Store the reason in notes (append to existing notes)
+    counter_note = f"\n\n--- Client Counter-Proposal ---\nReason: {request.reason}"
+    schedule.notes = (schedule.notes or "") + counter_note
+    
+    db.commit()
+    
+    # Get client and provider info for email
+    client = db.query(Client).filter(Client.id == schedule.client_id).first()
+    user = db.query(User).filter(User.id == schedule.user_id).first()
+    
+    # Send notification email to provider
+    if user and user.email:
+        try:
+            await email_service.send_client_counter_proposal(
+                provider_email=user.email,
+                provider_name=user.full_name or "Service Provider",
+                client_name=client.business_name or client.contact_name if client else "Client",
+                original_proposed_date=schedule.scheduled_date,
+                client_preferred_date=preferred_date,
+                client_preferred_start=request.preferred_start_time,
+                client_preferred_end=request.preferred_end_time,
+                client_reason=request.reason,
+                schedule_id=schedule_id
+            )
+            logger.info(f"✅ Sent counter-proposal notification to provider {user.email}")
+        except Exception as e:
+            logger.error(f"⚠️ Failed to send counter-proposal email: {str(e)}")
+    
+    return {
+        "message": "Counter-proposal sent to provider",
+        "schedule_id": schedule_id,
+        "preferred_date": request.preferred_date,
+        "preferred_start_time": request.preferred_start_time,
+        "preferred_end_time": request.preferred_end_time
+    }

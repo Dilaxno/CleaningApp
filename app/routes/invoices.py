@@ -424,7 +424,15 @@ async def get_public_invoice(
     invoice_id: int,
     db: Session = Depends(get_db)
 ):
-    """Public endpoint for client to view invoice (no auth required)"""
+    """Public endpoint for client to view invoice (no auth required)
+    
+    NOTE: This endpoint uses sequential IDs which could allow enumeration.
+    Consider using UUIDs or adding a secret token parameter.
+    """
+    # Validate invoice_id
+    if invoice_id <= 0 or invoice_id > 2147483647:
+        raise HTTPException(status_code=400, detail="Invalid invoice ID")
+    
     invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     
     if not invoice:

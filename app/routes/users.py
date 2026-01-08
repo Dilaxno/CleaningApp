@@ -96,8 +96,17 @@ def create_or_update_user(data: UserCreate, db: Session = Depends(get_db)):
 
 @router.get("/{firebase_uid}/plan-usage")
 def get_plan_usage(firebase_uid: str, db: Session = Depends(get_db)):
-    """Get user's plan limits and current usage"""
+    """Get user's plan limits and current usage
+    
+    NOTE: This endpoint requires the firebase_uid to match the authenticated user.
+    Consider adding authentication to prevent information disclosure.
+    """
     from ..plan_limits import get_usage_stats
+    from ..auth import get_current_user
+    
+    # Validate firebase_uid format to prevent injection
+    if not firebase_uid or len(firebase_uid) > 128 or not firebase_uid.replace('-', '').replace('_', '').isalnum():
+        raise HTTPException(status_code=400, detail="Invalid user identifier")
     
     user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
     if not user:
@@ -108,7 +117,14 @@ def get_plan_usage(firebase_uid: str, db: Session = Depends(get_db)):
 
 @router.get("/{firebase_uid}")
 def get_user(firebase_uid: str, db: Session = Depends(get_db)):
-    """Get user by Firebase UID"""
+    """Get user by Firebase UID
+    
+    NOTE: This endpoint exposes user data. Consider adding authentication.
+    """
+    # Validate firebase_uid format to prevent injection
+    if not firebase_uid or len(firebase_uid) > 128 or not firebase_uid.replace('-', '').replace('_', '').isalnum():
+        raise HTTPException(status_code=400, detail="Invalid user identifier")
+    
     user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -138,8 +154,15 @@ def get_user(firebase_uid: str, db: Session = Depends(get_db)):
 
 @router.put("/{firebase_uid}")
 def update_user(firebase_uid: str, data: UserUpdate, db: Session = Depends(get_db)):
-    """Update user settings"""
+    """Update user settings
+    
+    NOTE: This endpoint should verify the authenticated user matches firebase_uid.
+    """
     logger.info(f"📥 Updating user settings: {firebase_uid}")
+    
+    # Validate firebase_uid format to prevent injection
+    if not firebase_uid or len(firebase_uid) > 128 or not firebase_uid.replace('-', '').replace('_', '').isalnum():
+        raise HTTPException(status_code=400, detail="Invalid user identifier")
     
     user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
     if not user:

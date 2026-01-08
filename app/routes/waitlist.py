@@ -11,6 +11,7 @@ from sqlalchemy import text
 from pydantic import BaseModel, EmailStr
 from ..database import get_db
 from ..email_service import send_email, THEME
+from ..rate_limiter import create_rate_limiter
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,14 @@ router = APIRouter(prefix="/waitlist", tags=["Waitlist"])
 
 # Admin email to receive notifications
 ADMIN_EMAIL = "uni.esstafasoufiane@gmail.com"
+
+# Rate limiter for waitlist signups - 5 per minute per IP
+rate_limit_waitlist = create_rate_limiter(
+    limit=5,
+    window_seconds=60,
+    key_prefix="waitlist_signup",
+    use_ip=True
+)
 
 
 class WaitlistSignupRequest(BaseModel):
@@ -46,10 +55,11 @@ def get_client_ip(request: Request) -> str:
 async def signup_waitlist(
     data: WaitlistSignupRequest,
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: None = Depends(rate_limit_waitlist)
 ):
     """
-    Add a new lead to the waitlist
+    Add a new lead to the waitlist - Rate limited to 5 per minute per IP
     Stores in database and sends notification email
     """
     try:

@@ -14,10 +14,19 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from pydantic import BaseModel, EmailStr
 from ..database import get_db
+from ..rate_limiter import create_rate_limiter
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/trial", tags=["Trial"])
+
+# Rate limiter for trial contract generation - 3 per hour per IP
+rate_limit_trial = create_rate_limiter(
+    limit=3,
+    window_seconds=3600,
+    key_prefix="trial_contract",
+    use_ip=True
+)
 
 
 class TrialFormData(BaseModel):
@@ -98,10 +107,11 @@ async def check_trial_eligibility(
 async def generate_trial_contract(
     data: TrialFormData,
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: None = Depends(rate_limit_trial)
 ):
     """
-    Generate a free trial contract
+    Generate a free trial contract - Rate limited to 3 per hour per IP
     Limited to 1 per session + IP combination
     """
     try:

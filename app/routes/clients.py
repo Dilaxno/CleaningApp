@@ -614,15 +614,26 @@ class SignContractRequest(BaseModel):
     signature: str
 
 
+# Rate limiter for contract signing - 10 per hour per IP
+rate_limit_sign_contract = create_rate_limiter(
+    limit=10,
+    window_seconds=3600,
+    key_prefix="sign_contract",
+    use_ip=True
+)
+
+
 @router.post("/public/sign-contract")
 async def sign_contract(
     data: SignContractRequest,
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: None = Depends(rate_limit_sign_contract)
 ):
     """
     Public endpoint for clients to sign their contract after reviewing the PDF.
     Updates the contract with the client's signature and audit trail.
+    Rate limited to 10 per hour per IP.
     """
     import hashlib
     from datetime import datetime
@@ -630,6 +641,14 @@ async def sign_contract(
     from .contracts_pdf import generate_contract_html, html_to_pdf
     from .upload import get_r2_client, generate_presigned_url, R2_BUCKET_NAME
     from ..email_service import send_contract_signed_notification
+    
+    # Validate clientId
+    if data.clientId <= 0 or data.clientId > 2147483647:
+        raise HTTPException(status_code=400, detail="Invalid client ID")
+    
+    # Validate signature size (prevent DOS with huge base64 strings)
+    if len(data.signature) > 500000:  # ~375KB decoded
+        raise HTTPException(status_code=400, detail="Signature data too large")
     
     # Capture signature audit data
     client_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "unknown")

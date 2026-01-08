@@ -267,6 +267,10 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
 def get_business_config(firebase_uid: str, db: Session = Depends(get_db)):
     logger.info(f"📥 Getting business config for firebase_uid: {firebase_uid}")
     
+    # Validate firebase_uid format to prevent injection
+    if not firebase_uid or len(firebase_uid) > 128 or not firebase_uid.replace('-', '').replace('_', '').isalnum():
+        raise HTTPException(status_code=400, detail="Invalid user identifier")
+    
     user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
     if not user:
         logger.error(f"❌ User not found for firebase_uid: {firebase_uid}")
@@ -332,6 +336,10 @@ def get_public_branding(firebase_uid: str, db: Session = Depends(get_db)):
     No authentication required - accessed via shareable form links.
     """
     logger.info(f"📥 Getting public branding for firebase_uid: {firebase_uid}")
+    
+    # Validate firebase_uid format to prevent injection
+    if not firebase_uid or len(firebase_uid) > 128 or not firebase_uid.replace('-', '').replace('_', '').isalnum():
+        raise HTTPException(status_code=400, detail="Invalid business identifier")
     
     user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
     if not user:
