@@ -104,6 +104,7 @@ class ClientUpdate(BaseModel):
 
 class ClientResponse(BaseModel):
     id: int
+    public_id: Optional[str] = None  # UUID for secure public access
     businessName: str
     contactName: Optional[str]
     email: Optional[str]
@@ -602,6 +603,7 @@ async def submit_public_form(
     return PublicSubmitResponse(
         client=ClientResponse(
             id=client.id,
+            public_id=client.public_id,
             businessName=client.business_name,
             contactName=client.contact_name,
             email=client.email,
@@ -621,6 +623,7 @@ async def submit_public_form(
 
 class SignContractRequest(BaseModel):
     clientPublicId: str  # UUID for secure public access
+    contractPublicId: Optional[str] = None  # UUID for specific contract (optional for backwards compatibility)
     signature: str
 
 
@@ -677,12 +680,21 @@ async def sign_contract(
         raise HTTPException(status_code=404, detail="Client not found")
 
     # Find the contract for this client
-    contract = (
-        db.query(Contract)
-        .filter(Contract.client_id == client.id)
-        .order_by(Contract.created_at.desc())
-        .first()
-    )
+    if data.contractPublicId:
+        # Find specific contract by public_id
+        contract = (
+            db.query(Contract)
+            .filter(Contract.client_id == client.id, Contract.public_id == data.contractPublicId)
+            .first()
+        )
+    else:
+        # Fallback: get most recent contract for backwards compatibility
+        contract = (
+            db.query(Contract)
+            .filter(Contract.client_id == client.id)
+            .order_by(Contract.created_at.desc())
+            .first()
+        )
     if not contract:
         raise HTTPException(status_code=404, detail="Contract not found")
     
