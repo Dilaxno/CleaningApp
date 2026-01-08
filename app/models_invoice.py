@@ -19,7 +19,9 @@ class Invoice(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     # Public UUID for secure public access (prevents enumeration)
-    public_id = Column(String(36), unique=True, nullable=False, index=True, default=generate_public_id)
+    # nullable=True initially to support existing records without UUIDs
+    # Run add_invoice_public_id.py migration to populate existing records
+    public_id = Column(String(36), unique=True, nullable=True, index=True, default=generate_public_id)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # Service provider
     client_id = Column(Integer, ForeignKey("clients.id"), nullable=False)
     contract_id = Column(Integer, ForeignKey("contracts.id"), nullable=True)
@@ -64,6 +66,9 @@ class Invoice(Base):
     # Audit
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    client = relationship("Client", back_populates="invoices")
 
 
 class Payout(Base):

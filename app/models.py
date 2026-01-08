@@ -120,8 +120,10 @@ class Client(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     # Public UUID for secure public access (prevents enumeration)
+    # nullable=True initially to support existing records without UUIDs
+    # Run add_contract_client_public_ids.py migration to populate existing records
     public_id = Column(
-        String(36), unique=True, nullable=False, index=True, default=generate_public_id
+        String(36), unique=True, nullable=True, index=True, default=generate_public_id
     )
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     business_name = Column(String(255), nullable=False)
@@ -138,8 +140,10 @@ class Client(Base):
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     user = relationship("User", back_populates="clients")
-    contracts = relationship("Contract", back_populates="client")
-    schedules = relationship("Schedule", back_populates="client")
+    contracts = relationship("Contract", back_populates="client", cascade="all, delete-orphan")
+    schedules = relationship("Schedule", back_populates="client", cascade="all, delete-orphan")
+    invoices = relationship("Invoice", back_populates="client", cascade="all, delete-orphan")
+    scheduling_proposals = relationship("SchedulingProposal", back_populates="client", cascade="all, delete-orphan")
 
 
 class Contract(Base):
@@ -147,8 +151,10 @@ class Contract(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     # Public UUID for secure public access (prevents enumeration)
+    # nullable=True initially to support existing records without UUIDs
+    # Run add_contract_client_public_ids.py migration to populate existing records
     public_id = Column(
-        String(36), unique=True, nullable=False, index=True, default=generate_public_id
+        String(36), unique=True, nullable=True, index=True, default=generate_public_id
     )
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     client_id = Column(Integer, ForeignKey("clients.id"), nullable=False)
@@ -320,6 +326,9 @@ class SchedulingProposal(Base):
     responded_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    client = relationship("Client", back_populates="scheduling_proposals")
 
 
 class WaitlistLead(Base):
