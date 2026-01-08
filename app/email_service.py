@@ -309,8 +309,10 @@ BASE_TEMPLATE = """
         © {{ year }} CleanEnroll • 
         <a href="https://cleanenroll.com/legal#privacy-policy" style="color:{{ theme.primary }}; text-decoration:none;">Privacy</a> • 
         <a href="https://cleanenroll.com/legal#terms-of-service" style="color:{{ theme.primary }}; text-decoration:none;">Terms</a>
+        {% if is_user_email %}
         <br/>
         <span style="color:#94a3b8; font-size:11px;">You're receiving this because you have an account with CleanEnroll.</span>
+        {% endif %}
       </p>
     </div>
   </body>
@@ -325,6 +327,7 @@ def render_email(
     intro: Optional[str] = None,
     cta_url: Optional[str] = None,
     cta_label: Optional[str] = None,
+    is_user_email: bool = False,
 ) -> str:
     """Render the email template with provided content"""
     template = Template(BASE_TEMPLATE)
@@ -338,6 +341,7 @@ def render_email(
         theme=THEME,
         logo_url=LOGO_URL,
         year=datetime.now().year,
+        is_user_email=is_user_email,
     )
 
 
@@ -351,6 +355,7 @@ async def send_email(
     cta_label: Optional[str] = None,
     from_address: Optional[str] = None,
     business_config=None,
+    is_user_email: bool = False,
 ) -> dict:
     """
     Send an email using custom SMTP (if configured) or Resend (fallback)
@@ -365,6 +370,7 @@ async def send_email(
         cta_label: Optional call-to-action button text
         from_address: Optional custom from address
         business_config: Optional BusinessConfig for custom SMTP
+        is_user_email: Whether this email is to a CleanEnroll user (not a client)
     
     Returns:
         Send response dict
@@ -376,6 +382,7 @@ async def send_email(
         intro=intro,
         cta_url=cta_url,
         cta_label=cta_label,
+        is_user_email=is_user_email,
     )
     
     # Ensure 'to' is a list
@@ -443,6 +450,7 @@ async def send_welcome_email(to: str, user_name: str) -> dict:
         content_html=content,
         cta_url="https://cleanenroll.com/dashboard",
         cta_label="Go to Dashboard",
+        is_user_email=True,
     )
 
 
@@ -480,6 +488,7 @@ async def send_new_client_notification(
         subject=f"New {property_type} Property Intake: {client_name} Ready to Review 📋",
         title="New Client Property Intake Submission",
         content_html=content,
+        is_user_email=True,
     )
 
 
@@ -546,6 +555,7 @@ async def send_payment_confirmation(
         content_html=content,
         cta_url="https://cleanenroll.com/billing",
         cta_label="View Billing",
+        is_user_email=True,
     )
 
 
@@ -565,6 +575,7 @@ async def send_password_reset_email(to: str, reset_link: str) -> dict:
         content_html=content,
         cta_url=reset_link,
         cta_label="Reset Password",
+        is_user_email=True,
     )
 
 
@@ -593,6 +604,7 @@ async def send_subscription_expiring_email(
         content_html=content,
         cta_url="https://cleanenroll.com/billing",
         cta_label="Renew Subscription",
+        is_user_email=True,
     )
 
 
@@ -674,6 +686,7 @@ async def send_contract_signed_notification(
         content_html=content,
         cta_url="https://cleanenroll.com/contracts",
         cta_label="Review & Sign Contract",
+        is_user_email=True,
     )
 
 
@@ -802,6 +815,7 @@ async def send_provider_contract_signed_confirmation(
         content_html=content,
         cta_url=contract_pdf_url,
         cta_label="View Signed Contract" if contract_pdf_url else None,
+        is_user_email=True,
     )
 
 
@@ -897,7 +911,8 @@ async def send_scheduling_accepted_email(
         subject=f"Time Slot Accepted for Contract {contract_id}",
         title="Scheduling Confirmed",
         intro=f"{client_name} has accepted your proposed time.",
-        content_html=content
+        content_html=content,
+        is_user_email=True,
     )
 
 
@@ -933,7 +948,8 @@ async def send_scheduling_counter_proposal_email(
         subject=f"Alternative Times Proposed for Contract {contract_id}",
         title="Scheduling Counter-Proposal",
         intro=f"{client_name} has suggested different times.",
-        content_html=content
+        content_html=content,
+        is_user_email=True,
     )
 
 
@@ -967,6 +983,7 @@ async def send_email_verification_otp(to: str, user_name: str, otp: str) -> dict
         title="Verify Your Email Address",
         intro="Please confirm your email to secure your account.",
         content_html=content,
+        is_user_email=True,
     )
 
 
@@ -1013,7 +1030,8 @@ async def send_appointment_notification(
         subject=f"Pending Appointment Request: {client_name} - {appointment_time.strftime('%b %d, %Y')}",
         title="New Appointment Request",
         intro=f"{client_name} has requested a cleaning appointment.",
-        content_html=content
+        content_html=content,
+        is_user_email=True,
     )
 
 
@@ -1230,7 +1248,8 @@ async def send_payment_received_notification(
         intro=f"{client_name} has paid invoice {invoice_number}.",
         content_html=content,
         cta_url=f"{FRONTEND_URL}/dashboard/payouts",
-        cta_label="View Payouts"
+        cta_label="View Payouts",
+        is_user_email=True,
     )
 
 
