@@ -378,7 +378,7 @@ async def _create_invoice_for_schedule(
         product_data = {
             "name": f"{invoice.title} - {invoice.invoice_number}",
             "description": invoice.description or f"Cleaning service from {business_name}",
-            "price": {"currency": invoice.currency.upper(), "amount": int(invoice.total_amount * 100)},
+            "price": {"currency": invoice.currency.upper(), "price": int(invoice.total_amount * 100),\n                "type": "one_time_price"},
             "tax_category": DODO_DEFAULT_TAX_CATEGORY,
         }
         

@@ -126,7 +126,8 @@ async def _create_invoice_and_send_payment_link(
             "description": invoice.description or f"Cleaning service from {business_name}",
             "price": {
                 "currency": invoice.currency.upper(),
-                "amount": int(invoice.total_amount * 100),
+                "price": int(invoice.total_amount * 100),
+                "type": "one_time_price",
             },
             "tax_category": DODO_DEFAULT_TAX_CATEGORY,
         }
