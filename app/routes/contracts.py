@@ -282,8 +282,11 @@ async def sign_contract_as_provider(
     if not contract:
         raise HTTPException(status_code=404, detail="Contract not found")
     
-    # Verify contract has client signature
-    if not contract.client_signature:
+    # Log contract signature status for debugging
+    logger.info(f"📋 Contract {contract_id} signature status: client_signature={bool(contract.client_signature)}, client_signature_timestamp={contract.client_signature_timestamp}")
+    
+    # Verify contract has client signature (check both signature and timestamp)
+    if not contract.client_signature and not contract.client_signature_timestamp:
         raise HTTPException(status_code=400, detail="Contract must be signed by client first")
     
     # Check if contract is already signed by provider
