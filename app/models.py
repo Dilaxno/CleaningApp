@@ -21,8 +21,9 @@ class User(Base):
     plan = Column(String(50), nullable=True)  # solo, team, enterprise - null until user selects
     # Dodo subscription identifier for this user's active subscription; used for change/cancel flows
     subscription_id = Column(String(255), nullable=True)
+    subscription_start_date = Column(DateTime, nullable=True)  # When subscription started (for billing cycle)
     clients_this_month = Column(Integer, default=0, nullable=False)  # Counter for monthly client limit
-    month_reset_date = Column(DateTime, nullable=True)  # Track when to reset the counter
+    month_reset_date = Column(DateTime, nullable=True)  # Track when to reset the counter (30 days from subscription date)
     onboarding_completed = Column(Boolean, default=False)
     # Two-Factor Authentication fields
     totp_secret = Column(String(100), nullable=True)  # TOTP secret for authenticator app
@@ -90,13 +91,17 @@ class BusinessConfig(Base):
     standard_exclusions = Column(JSON, default=list)
     preferred_units = Column(String(20), default="sqft")
     
-    # Custom SMTP domain settings
+    # Custom SMTP settings (standard SMTP, not Resend)
     smtp_email = Column(String(255), nullable=True)  # e.g., bookings@preclean.com
-    smtp_domain = Column(String(255), nullable=True)  # e.g., preclean.com
-    resend_domain_id = Column(String(255), nullable=True)  # Resend domain ID
-    smtp_status = Column(String(50), nullable=True)  # pending, verified, failed
-    smtp_dns_records = Column(JSON, nullable=True)  # Store DNS records for user to configure
-    smtp_verified_records = Column(Integer, default=0)  # Count of verified DNS records (0-3)
+    smtp_host = Column(String(255), nullable=True)  # e.g., smtp.gmail.com
+    smtp_port = Column(Integer, default=587)  # 587 for TLS, 465 for SSL
+    smtp_username = Column(String(255), nullable=True)
+    smtp_password = Column(String(500), nullable=True)  # Encrypted
+    smtp_use_tls = Column(Boolean, default=True)
+    smtp_status = Column(String(50), nullable=True)  # live, testing, failed
+    smtp_last_test_at = Column(DateTime, nullable=True)
+    smtp_last_test_success = Column(Boolean, nullable=True)
+    smtp_error_message = Column(String(500), nullable=True)
     
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

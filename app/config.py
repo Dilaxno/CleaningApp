@@ -29,9 +29,12 @@ SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
 # Frontend base URL for redirects
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
-# Resend Email Configuration
+# Resend Email Configuration (fallback)
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 EMAIL_FROM_ADDRESS = os.getenv("EMAIL_FROM_ADDRESS", "CleanEnroll <noreply@cleanenroll.com>")
+
+# Custom SMTP Encryption Key (generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+SMTP_ENCRYPTION_KEY = os.getenv("SMTP_ENCRYPTION_KEY")
 
 # Google Calendar OAuth Configuration
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")

@@ -118,37 +118,42 @@ async def get_usage_stats(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Get usage statistics for the current billing period (current month)"""
-    from datetime import datetime
+    """Get usage statistics for the current billing period (30 days from subscription date)"""
+    from datetime import datetime, timedelta
     from ..models import Client, Contract, Schedule
     
-    # Get current month's start and end
-    now = datetime.now()
-    month_start = datetime(now.year, now.month, 1)
-    if now.month == 12:
-        month_end = datetime(now.year + 1, 1, 1)
-    else:
-        month_end = datetime(now.year, now.month + 1, 1)
+    now = datetime.utcnow()
     
-    # Count clients created this month
+    # Use subscription_start_date if available, otherwise fall back to created_at
+    subscription_start = user.subscription_start_date or user.created_at or now
+    
+    # Calculate billing period based on subscription date (30-day cycles)
+    days_since_start = (now - subscription_start).days
+    cycles_passed = days_since_start // 30
+    
+    # Current billing period start and end
+    period_start = subscription_start + timedelta(days=cycles_passed * 30)
+    period_end = subscription_start + timedelta(days=(cycles_passed + 1) * 30)
+    
+    # Count clients created this billing period
     clients_count = db.query(Client).filter(
         Client.user_id == user.id,
-        Client.created_at >= month_start,
-        Client.created_at < month_end
+        Client.created_at >= period_start,
+        Client.created_at < period_end
     ).count()
     
-    # Count contracts created this month
+    # Count contracts created this billing period
     contracts_count = db.query(Contract).filter(
         Contract.user_id == user.id,
-        Contract.created_at >= month_start,
-        Contract.created_at < month_end
+        Contract.created_at >= period_start,
+        Contract.created_at < period_end
     ).count()
     
-    # Count schedules this month
+    # Count schedules this billing period
     schedules_count = db.query(Schedule).filter(
         Schedule.user_id == user.id,
-        Schedule.scheduled_date >= month_start,
-        Schedule.scheduled_date < month_end
+        Schedule.scheduled_date >= period_start,
+        Schedule.scheduled_date < period_end
     ).count()
     
     # Get plan limits (no plan = no access until they select one)
@@ -158,11 +163,8 @@ async def get_usage_stats(
     else:
         limits = NO_PLAN_LIMITS
     
-    # Calculate reset date (first of next month)
-    if now.month == 12:
-        reset_date = datetime(now.year + 1, 1, 1)
-    else:
-        reset_date = datetime(now.year, now.month + 1, 1)
+    # Reset date is the end of current billing period (30 days from subscription anniversary)
+    reset_date = period_end
     
     return {
         "plan": plan,
@@ -200,8 +202,21 @@ async def update_user_plan(
 async def get_current_plan(
     user: User = Depends(get_current_user),
 ):
-    """Get the current user's plan"""
-    return {"plan": user.plan}
+    """Get the current user's plan and billing info"""
+    from datetime import datetime, timedelta
+    
+    # Calculate next billing date based on subscription start (30-day cycles)
+    subscription_start = user.subscription_start_date or user.created_at or datetime.utcnow()
+    now = datetime.utcnow()
+    days_since_start = (now - subscription_start).days
+    cycles_passed = days_since_start // 30
+    next_billing_date = subscription_start + timedelta(days=(cycles_passed + 1) * 30)
+    
+    return {
+        "plan": user.plan,
+        "subscription_start_date": subscription_start.isoformat() if subscription_start else None,
+        "next_billing_date": next_billing_date.isoformat(),
+    }
 
 
 @router.post("/checkout")
@@ -433,6 +448,17 @@ async def handle_dodopayments_webhook(
                     except Exception as e:
                         db.rollback()
                         logger.warning(f"Failed to persist subscription_id for user {user.id}: {e}")
+
+                # Set subscription_start_date for new subscriptions (used for billing cycle reset)
+                if event_type in ("subscription.active", "checkout.session.completed"):
+                    from datetime import datetime, timedelta
+                    if not user.subscription_start_date:
+                        user.subscription_start_date = datetime.utcnow()
+                        # Reset usage counter and set next reset date (30 days from now)
+                        user.clients_this_month = 0
+                        user.month_reset_date = datetime.utcnow() + timedelta(days=30)
+                        db.commit()
+                        logger.info(f"Set subscription_start_date for user {user.id}")
 
                 if selected_plan and selected_plan != "unknown":
                     user.plan = selected_plan

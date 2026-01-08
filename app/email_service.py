@@ -1,24 +1,45 @@
 """
-Unified Email Service using Resend
+Unified Email Service using Resend (fallback) or Custom SMTP
 Provides a consistent email template for all automated emails
 """
 import resend
+import smtplib
+import ssl
 import logging
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 from typing import Optional, Union, List
 from jinja2 import Template
-from .config import RESEND_API_KEY, EMAIL_FROM_ADDRESS
+from .config import RESEND_API_KEY, EMAIL_FROM_ADDRESS, SMTP_ENCRYPTION_KEY
 
 logger = logging.getLogger(__name__)
 
-# Initialize Resend
+# Initialize Resend as fallback
 resend.api_key = RESEND_API_KEY
+
+# Initialize encryption for SMTP passwords
+try:
+    from cryptography.fernet import Fernet
+    fernet = Fernet(SMTP_ENCRYPTION_KEY) if SMTP_ENCRYPTION_KEY else None
+except Exception:
+    fernet = None
+
+
+def decrypt_password(encrypted: str) -> str:
+    """Decrypt SMTP password"""
+    if not fernet or not encrypted:
+        return encrypted or ""
+    try:
+        return fernet.decrypt(encrypted.encode()).decode()
+    except Exception:
+        return encrypted
 
 
 def get_sender_email(business_config=None, business_name: str = "CleanEnroll") -> str:
     """
     Get the appropriate sender email address.
-    Uses custom SMTP domain if verified, otherwise falls back to CleanEnroll default.
+    Uses custom SMTP email if configured and live, otherwise falls back to CleanEnroll default.
     
     Args:
         business_config: BusinessConfig object with smtp settings
@@ -27,12 +48,61 @@ def get_sender_email(business_config=None, business_name: str = "CleanEnroll") -
     Returns:
         Formatted sender email string
     """
-    # Check if custom SMTP is configured and verified
-    if business_config and business_config.smtp_status == "verified" and business_config.smtp_email:
+    # Check if custom SMTP is configured and live
+    if business_config and business_config.smtp_status == "live" and business_config.smtp_email:
         return f"{business_name} <{business_config.smtp_email}>"
     
     # Fallback to default CleanEnroll address
     return EMAIL_FROM_ADDRESS
+
+
+def send_via_custom_smtp(
+    business_config,
+    to: Union[str, List[str]],
+    subject: str,
+    html_content: str,
+    from_address: str
+) -> dict:
+    """
+    Send email via user's custom SMTP server.
+    Returns dict with success status.
+    """
+    try:
+        host = business_config.smtp_host
+        port = business_config.smtp_port or 587
+        username = business_config.smtp_username
+        password = decrypt_password(business_config.smtp_password)
+        use_tls = business_config.smtp_use_tls if business_config.smtp_use_tls is not None else True
+        
+        # Create message
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = from_address
+        msg["To"] = to if isinstance(to, str) else ", ".join(to)
+        msg.attach(MIMEText(html_content, "html"))
+        
+        recipients = [to] if isinstance(to, str) else to
+        
+        # Connect and send
+        if port == 465:
+            context = ssl.create_default_context()
+            server = smtplib.SMTP_SSL(host, port, context=context, timeout=30)
+        else:
+            server = smtplib.SMTP(host, port, timeout=30)
+            if use_tls:
+                context = ssl.create_default_context()
+                server.starttls(context=context)
+        
+        server.login(username, password)
+        server.sendmail(from_address.split("<")[-1].rstrip(">"), recipients, msg.as_string())
+        server.quit()
+        
+        logger.info(f"✅ Email sent via custom SMTP to {recipients}")
+        return {"id": f"smtp-{datetime.utcnow().timestamp()}", "success": True}
+        
+    except Exception as e:
+        logger.error(f"❌ Custom SMTP send failed: {e}")
+        raise Exception(f"Custom SMTP failed: {str(e)}")
 
 # App theme colors
 THEME = {
@@ -280,9 +350,10 @@ async def send_email(
     cta_url: Optional[str] = None,
     cta_label: Optional[str] = None,
     from_address: Optional[str] = None,
+    business_config=None,
 ) -> dict:
     """
-    Send an email using Resend with the unified template
+    Send an email using custom SMTP (if configured) or Resend (fallback)
     
     Args:
         to: Recipient email(s)
@@ -293,14 +364,11 @@ async def send_email(
         cta_url: Optional call-to-action button URL
         cta_label: Optional call-to-action button text
         from_address: Optional custom from address
+        business_config: Optional BusinessConfig for custom SMTP
     
     Returns:
-        Resend API response
+        Send response dict
     """
-    if not RESEND_API_KEY:
-        logger.error("❌ RESEND_API_KEY not configured - emails cannot be sent!")
-        raise Exception("Email service not configured - RESEND_API_KEY missing")
-    
     html_content = render_email(
         subject=subject,
         title=title,
@@ -312,11 +380,33 @@ async def send_email(
     
     # Ensure 'to' is a list
     recipients = [to] if isinstance(to, str) else to
+    sender = from_address or EMAIL_FROM_ADDRESS
+    
+    # Try custom SMTP first if configured and live
+    if business_config and business_config.smtp_status == "live" and business_config.smtp_host:
+        try:
+            logger.info(f"📧 Sending email via custom SMTP to {recipients} - Subject: {subject}")
+            response = send_via_custom_smtp(
+                business_config=business_config,
+                to=recipients,
+                subject=subject,
+                html_content=html_content,
+                from_address=sender
+            )
+            return response
+        except Exception as e:
+            logger.warning(f"⚠️ Custom SMTP failed, falling back to Resend: {e}")
+            # Fall through to Resend
+    
+    # Fallback to Resend
+    if not RESEND_API_KEY:
+        logger.error("❌ No email service configured - RESEND_API_KEY missing and no custom SMTP")
+        raise Exception("Email service not configured")
     
     try:
-        logger.info(f"📧 Sending email to {recipients} - Subject: {subject}")
+        logger.info(f"📧 Sending email via Resend to {recipients} - Subject: {subject}")
         response = resend.Emails.send({
-            "from": from_address or EMAIL_FROM_ADDRESS,
+            "from": sender,
             "to": recipients,
             "subject": subject,
             "html": html_content,

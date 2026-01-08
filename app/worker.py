@@ -197,10 +197,87 @@ async def send_form_notification_emails_task(ctx, client_id: int, user_id: int, 
         db.close()
 
 
+async def smtp_health_check_task(ctx):
+    """
+    Daily cron job to verify all custom SMTP connections.
+    Updates status to 'failed' if connection fails, allowing fallback to CleanEnroll.
+    """
+    from .database import SessionLocal
+    from .models import BusinessConfig
+    from .routes.smtp import test_smtp_connection, decrypt_password
+    from datetime import datetime
+    
+    logger.info("🔍 Starting daily SMTP health check")
+    
+    db = SessionLocal()
+    try:
+        # Get all configs with custom SMTP configured
+        configs = db.query(BusinessConfig).filter(
+            BusinessConfig.smtp_host.isnot(None),
+            BusinessConfig.smtp_email.isnot(None)
+        ).all()
+        
+        logger.info(f"📧 Checking {len(configs)} SMTP configurations")
+        
+        checked = 0
+        failed = 0
+        
+        for config in configs:
+            try:
+                success, message = test_smtp_connection(
+                    host=config.smtp_host,
+                    port=config.smtp_port or 587,
+                    username=config.smtp_username,
+                    password=decrypt_password(config.smtp_password),
+                    from_email=config.smtp_email,
+                    use_tls=config.smtp_use_tls if config.smtp_use_tls is not None else True
+                )
+                
+                config.smtp_last_test_at = datetime.utcnow()
+                config.smtp_last_test_success = success
+                
+                if success:
+                    config.smtp_status = "live"
+                    config.smtp_error_message = None
+                else:
+                    config.smtp_status = "failed"
+                    config.smtp_error_message = message
+                    failed += 1
+                    logger.warning(f"⚠️ SMTP check failed for user {config.user_id}: {message}")
+                
+                checked += 1
+                
+            except Exception as e:
+                config.smtp_status = "failed"
+                config.smtp_error_message = str(e)
+                config.smtp_last_test_at = datetime.utcnow()
+                config.smtp_last_test_success = False
+                failed += 1
+                logger.error(f"❌ SMTP check error for user {config.user_id}: {e}")
+        
+        db.commit()
+        logger.info(f"✅ SMTP health check complete: {checked} checked, {failed} failed")
+        
+        return {"checked": checked, "failed": failed}
+        
+    except Exception as e:
+        logger.error(f"❌ SMTP health check failed: {str(e)}")
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
 class WorkerSettings:
     """ARQ Worker Settings"""
-    functions = [generate_contract_pdf_task, send_form_notification_emails_task]
+    functions = [generate_contract_pdf_task, send_form_notification_emails_task, smtp_health_check_task]
     redis_settings = get_redis_settings()
     max_jobs = 10  # Concurrency limit: max 10 jobs at once (5 PDF + 5 emails)
     job_timeout = 300  # 5 minutes timeout per job
     keep_result = 3600  # Keep job results for 1 hour
+    
+    # Cron jobs - run daily at 6 AM UTC
+    from arq.cron import cron
+    cron_jobs = [
+        cron(smtp_health_check_task, hour=6, minute=0)
+    ]

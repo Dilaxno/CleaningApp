@@ -19,21 +19,34 @@ def get_plan_limit(plan: Optional[str]) -> Optional[int]:
         return 0  # No plan = no clients allowed
     return PLAN_LIMITS.get(plan.lower(), PLAN_LIMITS["solo"])
 
+
+def _calculate_next_reset_date(subscription_start: datetime, current_time: datetime) -> datetime:
+    """
+    Calculate the next reset date based on subscription start date.
+    Reset happens every 30 days from the subscription start date.
+    """
+    days_since_start = (current_time - subscription_start).days
+    # How many complete 30-day cycles have passed
+    cycles_passed = days_since_start // 30
+    # Next reset is at the start of the next cycle
+    next_reset = subscription_start + timedelta(days=(cycles_passed + 1) * 30)
+    return next_reset
+
+
 def check_and_reset_monthly_counter(user: User, db: Session) -> None:
     """
-    Check if the month has rolled over and reset the counter if needed.
-    Sets the month_reset_date to the first day of next month.
+    Check if the billing period has rolled over and reset the counter if needed.
+    Reset happens 30 days after the subscription start date, not on the first of the month.
     """
     now = datetime.utcnow()
     
-    # If no reset date set, initialize it to next month
+    # Use subscription_start_date if available, otherwise fall back to created_at
+    subscription_start = user.subscription_start_date or user.created_at or now
+    
+    # If no reset date set, initialize it based on subscription start
     if user.month_reset_date is None:
-        # Set to first day of next month
-        if now.month == 12:
-            next_month = datetime(now.year + 1, 1, 1)
-        else:
-            next_month = datetime(now.year, now.month + 1, 1)
-        user.month_reset_date = next_month
+        next_reset = _calculate_next_reset_date(subscription_start, now)
+        user.month_reset_date = next_reset
         user.clients_this_month = 0
         db.commit()
         return
@@ -43,12 +56,9 @@ def check_and_reset_monthly_counter(user: User, db: Session) -> None:
         # Reset counter
         user.clients_this_month = 0
         
-        # Set next reset date to first day of next month
-        if now.month == 12:
-            next_month = datetime(now.year + 1, 1, 1)
-        else:
-            next_month = datetime(now.year, now.month + 1, 1)
-        user.month_reset_date = next_month
+        # Calculate next reset date (30 days from subscription anniversary)
+        next_reset = _calculate_next_reset_date(subscription_start, now)
+        user.month_reset_date = next_reset
         db.commit()
 
 def can_add_client(user: User, db: Session) -> tuple:
