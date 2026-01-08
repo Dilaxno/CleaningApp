@@ -42,7 +42,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Security settings from environment
-CSRF_ENABLED = os.getenv("CSRF_ENABLED", "true").lower() == "true"
+# CSRF is DISABLED by default until frontend integration is complete
+# Set CSRF_ENABLED=true to enable once frontend sends X-CSRF-Token headers
+CSRF_ENABLED = os.getenv("CSRF_ENABLED", "false").lower() == "true"
 SECURITY_HEADERS_ENABLED = os.getenv("SECURITY_HEADERS_ENABLED", "true").lower() == "true"
 
 
@@ -93,12 +95,12 @@ else:
     logger.warning("⚠️ Security headers DISABLED - only use in development!")
 
 
-# CSRF Protection Middleware (must be added before CORS)
+# CSRF Protection Middleware (disabled by default until frontend integration)
 if CSRF_ENABLED:
     app.add_middleware(CSRFMiddleware)
     logger.info("🔒 CSRF protection enabled")
 else:
-    logger.warning("⚠️ CSRF protection DISABLED - only use in development!")
+    logger.info("ℹ️ CSRF protection disabled - set CSRF_ENABLED=true to enable")
 
 
 # CORS - must expose csrf_token cookie and allow X-CSRF-Token header

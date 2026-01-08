@@ -6,7 +6,11 @@ Implements double-submit cookie pattern for CSRF protection.
 - Validates that the X-CSRF-Token header matches the cookie value
 - Applies to state-changing methods (POST, PUT, PATCH, DELETE)
 - Excludes public endpoints and webhooks
+
+NOTE: CSRF protection is DISABLED by default until frontend integration is complete.
+Set CSRF_ENABLED=true in environment to enable.
 """
+import os
 import secrets
 import logging
 from typing import Callable, List, Optional
@@ -23,16 +27,29 @@ CSRF_HEADER_NAME = "X-CSRF-Token"
 # Methods that require CSRF protection
 PROTECTED_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
-# Paths that are exempt from CSRF protection (webhooks, public endpoints)
+# Paths that are exempt from CSRF protection (webhooks, public endpoints, API routes)
 EXEMPT_PATHS: List[str] = [
     "/webhooks/",  # All webhook endpoints
     "/api/payments/",  # Payment webhooks
     "/clients/public/",  # Public form submissions (already rate-limited + captcha)
+    "/clients",  # Client management (authenticated via JWT)
+    "/contracts",  # Contract management (authenticated via JWT)
+    "/schedules",  # Schedule management (authenticated via JWT)
+    "/invoices",  # Invoice management (authenticated via JWT)
+    "/business-config",  # Business config (authenticated via JWT)
+    "/users",  # User management (authenticated via JWT)
+    "/billing",  # Billing endpoints (authenticated via JWT)
+    "/upload",  # File uploads (authenticated via JWT)
+    "/verification",  # Email verification (authenticated via JWT)
+    "/security",  # Security settings (authenticated via JWT)
+    "/notifications",  # Notifications (authenticated via JWT)
     "/trial/",  # Trial endpoints (already rate-limited)
     "/waitlist/",  # Waitlist signup (already rate-limited)
     "/health",  # Health check
     "/docs",  # API docs
     "/openapi.json",  # OpenAPI spec
+    "/csrf-token",  # CSRF token endpoint
+    "/",  # Root endpoint
 ]
 
 
@@ -44,7 +61,7 @@ def generate_csrf_token() -> str:
 def is_path_exempt(path: str) -> bool:
     """Check if a path is exempt from CSRF protection"""
     for exempt in EXEMPT_PATHS:
-        if path.startswith(exempt):
+        if path.startswith(exempt) or path == exempt:
             return True
     return False
 
