@@ -704,6 +704,7 @@ async def client_accept_proposal(
 ):
     """Client accepts the provider's proposed alternative time (public endpoint)"""
     from .. import email_service
+    from ..config import FRONTEND_URL
     
     schedule = db.query(Schedule).filter(Schedule.id == schedule_id).first()
     
@@ -731,9 +732,19 @@ async def client_accept_proposal(
     
     db.commit()
     
-    # Get client and provider info for email
+    # Get client and provider info
     client = db.query(Client).filter(Client.id == schedule.client_id).first()
     user = db.query(User).filter(User.id == schedule.user_id).first()
+    
+    # Create invoice and get payment link
+    payment_url = None
+    try:
+        invoice = await _create_invoice_and_send_payment_link(schedule, user, client, db)
+        if invoice and invoice.dodo_payment_link:
+            payment_url = invoice.dodo_payment_link
+            logger.info(f"✅ Invoice created with payment link for schedule {schedule_id}")
+    except Exception as e:
+        logger.error(f"⚠️ Failed to create invoice: {str(e)}")
     
     # Send confirmation email to provider
     if user and user.email:
@@ -751,22 +762,11 @@ async def client_accept_proposal(
         except Exception as e:
             logger.error(f"⚠️ Failed to send acceptance email: {str(e)}")
     
-    # Send confirmation email to client
-    if client and client.email:
-        try:
-            await email_service.send_appointment_confirmed_to_client(
-                client_email=client.email,
-                client_name=client.business_name or client.contact_name,
-                provider_name=user.full_name or user.email if user else "Service Provider",
-                confirmed_date=schedule.scheduled_date,
-                confirmed_start_time=schedule.start_time,
-                confirmed_end_time=schedule.end_time
-            )
-            logger.info(f"✅ Sent confirmation email to client {client.email}")
-        except Exception as e:
-            logger.error(f"⚠️ Failed to send client confirmation email: {str(e)}")
-    
-    return {"message": "Proposal accepted", "schedule_id": schedule_id}
+    return {
+        "message": "Proposal accepted", 
+        "schedule_id": schedule_id,
+        "payment_url": payment_url
+    }
 
 
 @router.post("/public/proposal/{schedule_id}/counter")
