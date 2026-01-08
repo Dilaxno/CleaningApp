@@ -64,10 +64,20 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
         # Estimate time: cleaning_time_per_sqft is minutes per 1000 sqft
         if config.cleaning_time_per_sqft:
             estimated_hours = (property_size / 1000) * (config.cleaning_time_per_sqft / 60)
+        elif property_size > 0:
+            # Default: ~2 hours per 1000 sqft
+            estimated_hours = max(1, property_size / 500)
     elif pricing_model == "room" and config.rate_per_room:
         base_price = num_rooms * config.rate_per_room
-        # Estimate ~30 min per room
-        estimated_hours = num_rooms * 0.5
+        # Estimate ~30 min per room, or estimate from property size if no rooms specified
+        if num_rooms > 0:
+            estimated_hours = num_rooms * 0.5
+        elif property_size > 0:
+            # Fallback: estimate rooms from size (~200 sqft per room) then calculate hours
+            estimated_rooms = max(1, property_size / 200)
+            estimated_hours = estimated_rooms * 0.5
+        else:
+            estimated_hours = 2  # Default minimum
     elif pricing_model == "hourly" and config.hourly_rate:
         # Estimate hours based on size
         if config.cleaning_time_per_sqft and property_size:
@@ -440,9 +450,12 @@ async def generate_contract_html(
             margin-top: 40px;
             padding-top: 30px;
             border-top: 2px solid #E2E8F0;
+            page-break-inside: avoid;
         }}
         .signature-box {{
             text-align: center;
+            page-break-inside: avoid;
+        }}
         }}
         .signature-box h4 {{
             font-size: 10pt;
@@ -458,11 +471,13 @@ async def generate_contract_html(
             justify-content: center;
             margin-bottom: 10px;
             background: #FAFAFA;
+            overflow: hidden;
         }}
         .signature-line img {{
             max-height: 70px;
-            max-width: 200px;
+            max-width: 180px;
             object-fit: contain;
+            display: block;
         }}
         .signature-name {{
             font-size: 10pt;
@@ -624,7 +639,7 @@ async def generate_contract_html(
         <div class="signature-box">
             <h4>Service Provider</h4>
             <div class="signature-line">
-                {"<img src='" + signature_url + "' alt='Provider Signature'>" if signature_url else "<span style='color: #94A3B8; font-size: 9pt;'>Signature pending</span>"}
+                {"<img src='" + signature_url + "' alt='Provider Signature' style='max-height: 70px; max-width: 180px; object-fit: contain;'>" if signature_url else "<span style='color: #94A3B8; font-size: 9pt;'>Signature pending</span>"}
             </div>
             <div class="signature-name">{business_name}</div>
             <div class="signature-role">Authorized Representative</div>
@@ -632,7 +647,7 @@ async def generate_contract_html(
         <div class="signature-box">
             <h4>Client</h4>
             <div class="signature-line">
-                {"<img src='" + client_signature + "' alt='Client Signature' style='max-width: 200px; max-height: 80px;'>" if client_signature else "<span style='color: #94A3B8; font-size: 9pt;'>Awaiting signature</span>"}
+                {"<img src='" + client_signature + "' alt='Client Signature' style='max-height: 70px; max-width: 180px; object-fit: contain;'>" if client_signature else "<span style='color: #94A3B8; font-size: 9pt;'>Awaiting signature</span>"}
             </div>
             <div class="signature-name">{client_name}</div>
             <div class="signature-role">Client Representative</div>

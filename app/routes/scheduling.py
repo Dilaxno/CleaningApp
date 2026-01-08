@@ -285,7 +285,7 @@ async def _create_invoice_for_schedule(
     from ..models import BusinessConfig
     from ..models_invoice import Invoice
     from ..email_service import send_invoice_payment_link_email
-    from ..config import DODO_PAYMENTS_API_KEY, DODO_PAYMENTS_ENVIRONMENT, FRONTEND_URL
+    from ..config import DODO_PAYMENTS_API_KEY, DODO_PAYMENTS_ENVIRONMENT, FRONTEND_URL, DODO_DEFAULT_TAX_CATEGORY
     from dodopayments import AsyncDodoPayments
     
     logger.info(f"📄 Creating invoice for schedule {schedule.id}")
@@ -379,6 +379,7 @@ async def _create_invoice_for_schedule(
             "name": f"{invoice.title} - {invoice.invoice_number}",
             "description": invoice.description or f"Cleaning service from {business_name}",
             "price": {"currency": invoice.currency.upper(), "amount": int(invoice.total_amount * 100)},
+            "tax_category": DODO_DEFAULT_TAX_CATEGORY,
         }
         
         if is_recurring and billing_interval:

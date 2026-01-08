@@ -14,7 +14,7 @@ from ..database import get_db
 from ..models import User, Client, Contract, Schedule, BusinessConfig
 from ..models_invoice import Invoice, Payout
 from ..auth import get_current_user
-from ..config import DODO_PAYMENTS_API_KEY, DODO_PAYMENTS_ENVIRONMENT, FRONTEND_URL
+from ..config import DODO_PAYMENTS_API_KEY, DODO_PAYMENTS_ENVIRONMENT, FRONTEND_URL, DODO_DEFAULT_TAX_CATEGORY
 
 logger = logging.getLogger(__name__)
 
@@ -309,6 +309,7 @@ async def generate_payment_link(
                 "currency": invoice.currency.upper(),
                 "amount": int(invoice.total_amount * 100),  # Convert to cents
             },
+            "tax_category": DODO_DEFAULT_TAX_CATEGORY,
         }
         
         # Add recurring billing if applicable

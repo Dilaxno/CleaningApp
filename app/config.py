@@ -22,6 +22,8 @@ DODO_PAYMENTS_API_KEY = os.getenv("DODO_PAYMENTS_API_KEY")
 DODO_PAYMENTS_WEBHOOK_SECRET = os.getenv("DODO_PAYMENTS_WEBHOOK_SECRET")
 # "test_mode" or "live_mode" - default to test for safety
 DODO_PAYMENTS_ENVIRONMENT = os.getenv("DODO_PAYMENTS_ENVIRONMENT", "test_mode")
+# Default tax category used when creating products with the API (configure per business)
+DODO_DEFAULT_TAX_CATEGORY = os.getenv("DODO_DEFAULT_TAX_CATEGORY", "digital_products")
  
 # Security - CRITICAL: No default secret key in production
 SECRET_KEY = os.getenv("SECRET_KEY")

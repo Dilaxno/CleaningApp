@@ -20,7 +20,7 @@ async def _create_invoice_and_send_payment_link(
 ):
     """Auto-create invoice and send payment link when schedule is confirmed"""
     from ..email_service import send_invoice_payment_link_email
-    from ..config import DODO_PAYMENTS_API_KEY, DODO_PAYMENTS_ENVIRONMENT, FRONTEND_URL
+    from ..config import DODO_PAYMENTS_API_KEY, DODO_PAYMENTS_ENVIRONMENT, FRONTEND_URL, DODO_DEFAULT_TAX_CATEGORY
     from dodopayments import AsyncDodoPayments
     
     logger.info(f"📄 Auto-creating invoice for schedule {schedule.id}")
@@ -128,6 +128,7 @@ async def _create_invoice_and_send_payment_link(
                 "currency": invoice.currency.upper(),
                 "amount": int(invoice.total_amount * 100),
             },
+            "tax_category": DODO_DEFAULT_TAX_CATEGORY,
         }
         
         product = await dodo_client.products.create(**product_data)
