@@ -1,6 +1,7 @@
 import logging
 import re
 import csv
+import uuid
 from io import StringIO
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Request, Query
@@ -13,11 +14,20 @@ from ..models import User, Client, BusinessConfig
 from ..auth import get_current_user
 from ..rate_limiter import create_rate_limiter, rate_limit_dependency, get_redis_client
 from ..turnstile import verify_turnstile
-import re
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/clients", tags=["Clients"])
+
+
+def validate_uuid(value: str) -> bool:
+    """Validate UUID format"""
+    try:
+        uuid.UUID(value)
+        return True
+    except (ValueError, AttributeError):
+        return False
+
 
 # Rate limiters for public form submissions
 rate_limit_form_per_ip = create_rate_limiter(
@@ -610,7 +620,7 @@ async def submit_public_form(
 
 
 class SignContractRequest(BaseModel):
-    clientId: int
+    clientPublicId: str  # UUID for secure public access
     signature: str
 
 
@@ -634,6 +644,7 @@ async def sign_contract(
     Public endpoint for clients to sign their contract after reviewing the PDF.
     Updates the contract with the client's signature and audit trail.
     Rate limited to 10 per hour per IP.
+    Uses UUID for secure access (prevents enumeration).
     """
     import hashlib
     from datetime import datetime
@@ -641,30 +652,37 @@ async def sign_contract(
     from .contracts_pdf import generate_contract_html, html_to_pdf
     from .upload import get_r2_client, generate_presigned_url, R2_BUCKET_NAME
     from ..email_service import send_contract_signed_notification
-    
-    # Validate clientId
-    if data.clientId <= 0 or data.clientId > 2147483647:
-        raise HTTPException(status_code=400, detail="Invalid client ID")
-    
+
+    # Validate UUID format
+    if not validate_uuid(data.clientPublicId):
+        raise HTTPException(status_code=400, detail="Invalid client identifier")
+
     # Validate signature size (prevent DOS with huge base64 strings)
     if len(data.signature) > 500000:  # ~375KB decoded
         raise HTTPException(status_code=400, detail="Signature data too large")
-    
+
     # Capture signature audit data
-    client_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "unknown")
+    client_ip = request.headers.get(
+        "X-Forwarded-For", request.client.host if request.client else "unknown"
+    )
     if client_ip and "," in client_ip:
         client_ip = client_ip.split(",")[0].strip()
     user_agent = request.headers.get("User-Agent", "unknown")
-    
-    logger.info(f"📝 Contract signing request for client_id: {data.clientId}")
-    
-    # Find the client
-    client = db.query(Client).filter(Client.id == data.clientId).first()
+
+    logger.info(f"📝 Contract signing request for client public_id: {data.clientPublicId}")
+
+    # Find the client by public_id
+    client = db.query(Client).filter(Client.public_id == data.clientPublicId).first()
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
-    
+
     # Find the contract for this client
-    contract = db.query(Contract).filter(Contract.client_id == data.clientId).order_by(Contract.created_at.desc()).first()
+    contract = (
+        db.query(Contract)
+        .filter(Contract.client_id == client.id)
+        .order_by(Contract.created_at.desc())
+        .first()
+    )
     if not contract:
         raise HTTPException(status_code=404, detail="Contract not found")
     

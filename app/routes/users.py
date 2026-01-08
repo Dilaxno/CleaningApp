@@ -5,11 +5,30 @@ from pydantic import BaseModel
 from typing import Optional
 from ..database import get_db
 from ..models import User
+from ..auth import get_current_user
 from .upload import generate_presigned_url
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/users", tags=["Users"])
+
+
+def validate_firebase_uid(firebase_uid: str) -> bool:
+    """Validate firebase_uid format to prevent injection"""
+    if not firebase_uid or len(firebase_uid) > 128:
+        return False
+    return firebase_uid.replace("-", "").replace("_", "").isalnum()
+
+
+def verify_user_access(firebase_uid: str, current_user: User) -> None:
+    """Verify the authenticated user has access to the requested resource"""
+    if current_user.firebase_uid != firebase_uid:
+        logger.warning(
+            f"🚫 Access denied: User {current_user.firebase_uid} tried to access {firebase_uid}"
+        )
+        raise HTTPException(
+            status_code=403, detail="You can only access your own user data"
+        )
 
 
 class UserCreate(BaseModel):
@@ -95,116 +114,121 @@ def create_or_update_user(data: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/{firebase_uid}/plan-usage")
-def get_plan_usage(firebase_uid: str, db: Session = Depends(get_db)):
-    """Get user's plan limits and current usage
-    
-    NOTE: This endpoint requires the firebase_uid to match the authenticated user.
-    Consider adding authentication to prevent information disclosure.
-    """
+def get_plan_usage(
+    firebase_uid: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get user's plan limits and current usage (authenticated)"""
     from ..plan_limits import get_usage_stats
-    from ..auth import get_current_user
-    
-    # Validate firebase_uid format to prevent injection
-    if not firebase_uid or len(firebase_uid) > 128 or not firebase_uid.replace('-', '').replace('_', '').isalnum():
+
+    # Validate firebase_uid format
+    if not validate_firebase_uid(firebase_uid):
         raise HTTPException(status_code=400, detail="Invalid user identifier")
-    
-    user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    return get_usage_stats(user, db)
+
+    # Verify the authenticated user is accessing their own data
+    verify_user_access(firebase_uid, current_user)
+
+    return get_usage_stats(current_user, db)
 
 
 @router.get("/{firebase_uid}")
-def get_user(firebase_uid: str, db: Session = Depends(get_db)):
-    """Get user by Firebase UID
-    
-    NOTE: This endpoint exposes user data. Consider adding authentication.
-    """
-    # Validate firebase_uid format to prevent injection
-    if not firebase_uid or len(firebase_uid) > 128 or not firebase_uid.replace('-', '').replace('_', '').isalnum():
+def get_user(
+    firebase_uid: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get user by Firebase UID (authenticated - users can only access their own data)"""
+    # Validate firebase_uid format
+    if not validate_firebase_uid(firebase_uid):
         raise HTTPException(status_code=400, detail="Invalid user identifier")
-    
-    user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
+
+    # Verify the authenticated user is accessing their own data
+    verify_user_access(firebase_uid, current_user)
+
     # Generate presigned URL for profile picture if exists
     profile_picture_presigned = None
-    if user.profile_picture_url:
+    if current_user.profile_picture_url:
         try:
-            profile_picture_presigned = generate_presigned_url(user.profile_picture_url)
+            profile_picture_presigned = generate_presigned_url(
+                current_user.profile_picture_url
+            )
         except Exception as e:
-            logger.warning(f"⚠️ Failed to generate presigned URL for profile picture: {e}")
-    
+            logger.warning(
+                f"⚠️ Failed to generate presigned URL for profile picture: {e}"
+            )
+
     return {
-        "id": user.id,
-        "firebase_uid": user.firebase_uid,
-        "email": user.email,
-        "email_verified": user.email_verified,
-        "full_name": user.full_name,
-        "profile_picture_key": user.profile_picture_url,
+        "id": current_user.id,
+        "firebase_uid": current_user.firebase_uid,
+        "email": current_user.email,
+        "email_verified": current_user.email_verified,
+        "full_name": current_user.full_name,
+        "profile_picture_key": current_user.profile_picture_url,
         "profile_picture_url": profile_picture_presigned,
-        "account_type": user.account_type,
-        "plan": user.plan,
-        "hear_about": user.hear_about,
-        "onboarding_completed": user.onboarding_completed,
+        "account_type": current_user.account_type,
+        "plan": current_user.plan,
+        "hear_about": current_user.hear_about,
+        "onboarding_completed": current_user.onboarding_completed,
     }
 
 
 @router.put("/{firebase_uid}")
-def update_user(firebase_uid: str, data: UserUpdate, db: Session = Depends(get_db)):
-    """Update user settings
-    
-    NOTE: This endpoint should verify the authenticated user matches firebase_uid.
-    """
+def update_user(
+    firebase_uid: str,
+    data: UserUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Update user settings (authenticated - users can only update their own data)"""
     logger.info(f"📥 Updating user settings: {firebase_uid}")
-    
-    # Validate firebase_uid format to prevent injection
-    if not firebase_uid or len(firebase_uid) > 128 or not firebase_uid.replace('-', '').replace('_', '').isalnum():
+
+    # Validate firebase_uid format
+    if not validate_firebase_uid(firebase_uid):
         raise HTTPException(status_code=400, detail="Invalid user identifier")
-    
-    user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
+
+    # Verify the authenticated user is updating their own data
+    verify_user_access(firebase_uid, current_user)
+
     try:
         if data.fullName is not None:
-            user.full_name = data.fullName
+            current_user.full_name = data.fullName
         if data.email is not None:
-            user.email = data.email
+            current_user.email = data.email
         if data.profilePictureUrl is not None:
-            user.profile_picture_url = data.profilePictureUrl
+            current_user.profile_picture_url = data.profilePictureUrl
         if data.accountType is not None:
-            user.account_type = data.accountType
+            current_user.account_type = data.accountType
         if data.hearAbout is not None:
-            user.hear_about = data.hearAbout
-        
+            current_user.hear_about = data.hearAbout
+
         db.commit()
-        db.refresh(user)
-        
+        db.refresh(current_user)
+
         # Generate presigned URL for profile picture if exists
         profile_picture_presigned = None
-        if user.profile_picture_url:
+        if current_user.profile_picture_url:
             try:
-                profile_picture_presigned = generate_presigned_url(user.profile_picture_url)
+                profile_picture_presigned = generate_presigned_url(
+                    current_user.profile_picture_url
+                )
             except Exception:
                 pass
-        
-        logger.info(f"✅ User updated: id={user.id}")
+
+        logger.info(f"✅ User updated: id={current_user.id}")
         return {
-            "id": user.id,
-            "firebase_uid": user.firebase_uid,
-            "email": user.email,
-            "full_name": user.full_name,
-            "profile_picture_key": user.profile_picture_url,
+            "id": current_user.id,
+            "firebase_uid": current_user.firebase_uid,
+            "email": current_user.email,
+            "full_name": current_user.full_name,
+            "profile_picture_key": current_user.profile_picture_url,
             "profile_picture_url": profile_picture_presigned,
-            "account_type": user.account_type,
-            "plan": user.plan,
-            "hear_about": user.hear_about,
-            "onboarding_completed": user.onboarding_completed,
+            "account_type": current_user.account_type,
+            "plan": current_user.plan,
+            "hear_about": current_user.hear_about,
+            "onboarding_completed": current_user.onboarding_completed,
         }
-    
+
     except Exception as e:
         logger.error(f"❌ Error updating user: {str(e)}")
         db.rollback()
@@ -212,6 +236,11 @@ def update_user(firebase_uid: str, data: UserUpdate, db: Session = Depends(get_d
 
 
 @router.patch("/{firebase_uid}")
-def patch_user(firebase_uid: str, data: UserUpdate, db: Session = Depends(get_db)):
-    """Partially update user settings (same as PUT but more RESTful for partial updates)"""
-    return update_user(firebase_uid, data, db)
+def patch_user(
+    firebase_uid: str,
+    data: UserUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Partially update user settings (authenticated - same as PUT)"""
+    return update_user(firebase_uid, data, current_user, db)

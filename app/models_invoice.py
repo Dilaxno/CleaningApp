@@ -1,10 +1,16 @@
 """
 Invoice and Payment Models for Client Invoicing System
 """
+import uuid
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, ForeignKey, JSON, Text
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from .database import Base
+
+
+def generate_public_id():
+    """Generate a unique public ID for secure public access"""
+    return str(uuid.uuid4())
 
 
 class Invoice(Base):
@@ -12,6 +18,8 @@ class Invoice(Base):
     __tablename__ = "invoices"
 
     id = Column(Integer, primary_key=True, index=True)
+    # Public UUID for secure public access (prevents enumeration)
+    public_id = Column(String(36), unique=True, nullable=False, index=True, default=generate_public_id)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # Service provider
     client_id = Column(Integer, ForeignKey("clients.id"), nullable=False)
     contract_id = Column(Integer, ForeignKey("contracts.id"), nullable=True)

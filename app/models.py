@@ -1,7 +1,13 @@
+import uuid
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, ForeignKey, JSON, Text
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from .database import Base
+
+
+def generate_public_id():
+    """Generate a unique public ID for secure public access"""
+    return str(uuid.uuid4())
 
 
 class User(Base):
@@ -113,6 +119,10 @@ class Client(Base):
     __tablename__ = "clients"
 
     id = Column(Integer, primary_key=True, index=True)
+    # Public UUID for secure public access (prevents enumeration)
+    public_id = Column(
+        String(36), unique=True, nullable=False, index=True, default=generate_public_id
+    )
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     business_name = Column(String(255), nullable=False)
     contact_name = Column(String(255), nullable=True)
@@ -136,6 +146,10 @@ class Contract(Base):
     __tablename__ = "contracts"
 
     id = Column(Integer, primary_key=True, index=True)
+    # Public UUID for secure public access (prevents enumeration)
+    public_id = Column(
+        String(36), unique=True, nullable=False, index=True, default=generate_public_id
+    )
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     client_id = Column(Integer, ForeignKey("clients.id"), nullable=False)
     title = Column(String(255), nullable=False)

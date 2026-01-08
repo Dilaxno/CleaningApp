@@ -1,4 +1,5 @@
 import logging
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -13,6 +14,15 @@ from ..email_service import send_contract_fully_executed_email, send_provider_co
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/contracts", tags=["Contracts"])
+
+
+def validate_uuid(value: str) -> bool:
+    """Validate UUID format"""
+    try:
+        uuid.UUID(value)
+        return True
+    except (ValueError, AttributeError):
+        return False
 
 
 class ContractCreate(BaseModel):
@@ -41,7 +51,9 @@ class ContractUpdate(BaseModel):
 
 class ContractResponse(BaseModel):
     id: int
+    public_id: str  # UUID for public access
     clientId: int
+    clientPublicId: str  # Client's UUID for public access
     clientName: str
     clientEmail: Optional[str]
     title: str
@@ -59,6 +71,7 @@ class ContractResponse(BaseModel):
     signedAt: Optional[datetime]
     clientSignatureTimestamp: Optional[datetime]
     createdAt: datetime
+    defaultSignatureUrl: Optional[str] = None  # Provider's default signature from onboarding
 
     class Config:
         from_attributes = True
@@ -66,6 +79,7 @@ class ContractResponse(BaseModel):
 
 class ProviderSignatureRequest(BaseModel):
     signature_data: str  # Base64 signature image
+    use_default_signature: bool = False  # If true, use provider's default signature from onboarding
 
 
 def get_pdf_url(pdf_key: Optional[str]) -> Optional[str]:
@@ -85,13 +99,25 @@ async def get_contracts(
 ):
     """Get all contracts for the current user"""
     contracts = db.query(Contract).filter(Contract.user_id == current_user.id).order_by(Contract.created_at.desc()).all()
+    
+    # Get provider's default signature from business config
+    business_config = db.query(BusinessConfig).filter(BusinessConfig.user_id == current_user.id).first()
+    default_signature_url = None
+    if business_config and business_config.signature_url:
+        try:
+            default_signature_url = generate_presigned_url(business_config.signature_url)
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to generate presigned URL for default signature: {e}")
+    
     result = []
     for c in contracts:
         client = db.query(Client).filter(Client.id == c.client_id).first()
         pdf_url = get_pdf_url(c.pdf_key)
         result.append(ContractResponse(
             id=c.id,
+            public_id=c.public_id,
             clientId=c.client_id,
+            clientPublicId=client.public_id if client else "",
             clientName=client.business_name if client else "Unknown",
             clientEmail=client.email if client else None,
             title=c.title,
@@ -108,7 +134,8 @@ async def get_contracts(
             providerSignature=c.provider_signature,
             signedAt=c.signed_at,
             clientSignatureTimestamp=c.client_signature_timestamp,
-            createdAt=c.created_at
+            createdAt=c.created_at,
+            defaultSignatureUrl=default_signature_url
         ))
     return result
 
@@ -147,7 +174,9 @@ async def create_contract(
     logger.info(f"✅ Contract created: id={contract.id}")
     return ContractResponse(
         id=contract.id,
+        public_id=contract.public_id,
         clientId=contract.client_id,
+        clientPublicId=client.public_id,
         clientName=client.business_name,
         clientEmail=client.email,
         title=contract.title,
@@ -210,7 +239,9 @@ async def update_contract(
     pdf_url = get_pdf_url(contract.pdf_key)
     return ContractResponse(
         id=contract.id,
+        public_id=contract.public_id,
         clientId=contract.client_id,
+        clientPublicId=client.public_id if client else "",
         clientName=client.business_name if client else "Unknown",
         clientEmail=client.email if client else None,
         title=contract.title,
@@ -268,8 +299,27 @@ async def sign_contract_as_provider(
     business_config = db.query(BusinessConfig).filter(BusinessConfig.user_id == current_user.id).first()
     business_name = business_config.business_name if business_config else "Cleaning Service"
     
+    # Determine which signature to use
+    signature_to_use = data.signature_data
+    if data.use_default_signature and business_config and business_config.signature_url:
+        # Use the default signature from onboarding - fetch it as base64
+        try:
+            default_sig_url = generate_presigned_url(business_config.signature_url)
+            # Download and convert to base64
+            import httpx
+            async with httpx.AsyncClient() as http_client:
+                response = await http_client.get(default_sig_url)
+                if response.status_code == 200:
+                    import base64
+                    signature_to_use = f"data:image/png;base64,{base64.b64encode(response.content).decode()}"
+                    logger.info("✅ Using default signature from onboarding")
+                else:
+                    logger.warning(f"⚠️ Failed to fetch default signature, using provided signature")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to fetch default signature: {e}, using provided signature")
+    
     # Update contract with provider signature
-    contract.provider_signature = data.signature_data  # Store the signature image
+    contract.provider_signature = signature_to_use  # Store the signature image
     contract.signed_at = datetime.utcnow()
     contract.signature_timestamp = datetime.utcnow()
     contract.signature_ip = request.client.host if request.client else None
@@ -297,7 +347,7 @@ async def sign_contract_as_provider(
             form_data,
             quote,
             client_signature=contract.client_signature,
-            provider_signature=data.signature_data
+            provider_signature=signature_to_use
         )
         
         # Convert to PDF
@@ -368,7 +418,9 @@ async def sign_contract_as_provider(
     pdf_url = get_pdf_url(contract.pdf_key)
     return ContractResponse(
         id=contract.id,
+        public_id=contract.public_id,
         clientId=contract.client_id,
+        clientPublicId=client.public_id,
         clientName=client.business_name,
         clientEmail=client.email,
         title=contract.title,

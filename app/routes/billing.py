@@ -1,6 +1,4 @@
 import logging
-import hmac
-import hashlib
 import json
 from typing import Optional, Dict
 
@@ -12,6 +10,7 @@ from ..auth import get_current_user
 from ..database import get_db
 from ..models import User
 from ..rate_limiter import create_rate_limiter
+from ..webhook_security import verify_dodo_webhook
 from ..config import (
     DODO_PAYMENTS_API_KEY,
     DODO_PAYMENTS_ENVIRONMENT,
@@ -364,45 +363,40 @@ async def change_subscription_plan(
         raise HTTPException(status_code=400, detail="Failed to change subscription plan")
 
 
-def _constant_time_compare(a: str, b: str) -> bool:
-    return hmac.compare_digest(a, b)
-
-
-def _compute_signature(secret: str, payload: bytes) -> str:
-    return hmac.new(secret.encode("utf-8"), payload, hashlib.sha256).hexdigest()
-
-
 # No product-to-plan mapping on backend; plan is derived from metadata set at checkout creation.
 
 
 @webhooks_router.post("/webhooks/dodopayments")
 @webhooks_router.post("/api/payments/dodo/webhook")  # Alias for Dodo's configured webhook URL
 async def handle_dodopayments_webhook(
-    request: Request, 
+    request: Request,
     db: Session = Depends(get_db),
-    _: None = Depends(rate_limit_billing_webhook)
+    _: None = Depends(rate_limit_billing_webhook),
 ):
     """
     Verify signature and process subscription lifecycle events - Rate limited to 100 requests per minute.
-    Security per docs:
-      - Header: 'webhook-signature' (HMAC-SHA256 of raw body with your webhook secret)
-      - Optional headers: 'webhook-id', 'webhook-timestamp' for idempotency/logging
-    Docs:
-      - https://github.com/dodopayments/dodo-docs/blob/main/developer-resources/fastapi-boilerplate.mdx
-      - https://github.com/dodopayments/dodo-docs/blob/main/miscellaneous/faq.mdx
+    
+    Security:
+      - HMAC-SHA256 signature verification with constant-time comparison
+      - Timestamp validation to prevent replay attacks
+      - Rate limiting to prevent abuse
+    
+    Headers:
+      - 'webhook-signature': HMAC-SHA256 hex digest
+      - 'webhook-id': Unique webhook ID for idempotency
+      - 'webhook-timestamp': Unix timestamp for replay protection
     """
-    raw_body = await request.body()
-    signature_header = request.headers.get("webhook-signature", "")
-    webhook_id = request.headers.get("webhook-id", "")
-    webhook_timestamp = request.headers.get("webhook-timestamp", "")
-
     if not DODO_PAYMENTS_WEBHOOK_SECRET:
+        logger.error("❌ DODO_PAYMENTS_WEBHOOK_SECRET not configured")
         raise HTTPException(status_code=500, detail="Webhook not configured")
 
-    computed = _compute_signature(DODO_PAYMENTS_WEBHOOK_SECRET, raw_body)
-    if not signature_header or not _constant_time_compare(computed, signature_header):
-        logger.warning("Invalid webhook signature")
-        raise HTTPException(status_code=401, detail="Invalid signature")
+    # Verify webhook signature using centralized security module
+    is_valid, raw_body = await verify_dodo_webhook(
+        request, DODO_PAYMENTS_WEBHOOK_SECRET, raise_on_failure=True
+    )
+
+    webhook_id = request.headers.get("webhook-id", "unknown")
+    webhook_timestamp = request.headers.get("webhook-timestamp", "")
 
     try:
         event = json.loads(raw_body.decode("utf-8"))
@@ -411,7 +405,9 @@ async def handle_dodopayments_webhook(
 
     event_type = event.get("type")
     data = event.get("data") or {}
-    logger.info(f"Webhook received id={webhook_id} ts={webhook_timestamp} type={event_type}")
+    logger.info(
+        f"Webhook received id={webhook_id} ts={webhook_timestamp} type={event_type}"
+    )
 
     try:
         # Python 3.9 compatible if/elif instead of match

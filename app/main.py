@@ -1,8 +1,11 @@
 import logging
+import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from .database import engine, Base
+from .csrf import CSRFMiddleware, get_csrf_token_endpoint, CSRF_COOKIE_NAME, generate_csrf_token
+from .security_headers import SecurityHeadersMiddleware
 from .routes import auth_router
 from .routes.business import router as business_router
 from .routes.users import router as users_router
@@ -37,6 +40,10 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+# Security settings from environment
+CSRF_ENABLED = os.getenv("CSRF_ENABLED", "true").lower() == "true"
+SECURITY_HEADERS_ENABLED = os.getenv("SECURITY_HEADERS_ENABLED", "true").lower() == "true"
 
 
 @asynccontextmanager
@@ -78,7 +85,23 @@ async def log_requests(request: Request, call_next):
         raise
 
 
-# CORS
+# Security Headers Middleware (adds X-Frame-Options, CSP, etc.)
+if SECURITY_HEADERS_ENABLED:
+    app.add_middleware(SecurityHeadersMiddleware, exclude_paths=["/health", "/docs", "/openapi.json"])
+    logger.info("🔒 Security headers enabled")
+else:
+    logger.warning("⚠️ Security headers DISABLED - only use in development!")
+
+
+# CSRF Protection Middleware (must be added before CORS)
+if CSRF_ENABLED:
+    app.add_middleware(CSRFMiddleware)
+    logger.info("🔒 CSRF protection enabled")
+else:
+    logger.warning("⚠️ CSRF protection DISABLED - only use in development!")
+
+
+# CORS - must expose csrf_token cookie and allow X-CSRF-Token header
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -91,7 +114,8 @@ app.add_middleware(
     ],
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*", "X-CSRF-Token"],
+    expose_headers=["X-CSRF-Token"],
 )
 
 # Routes
@@ -133,3 +157,28 @@ def root():
 @app.get("/health")
 def health():
     return {"status": "healthy"}
+
+
+@app.get("/csrf-token")
+async def get_csrf_token(request: Request, response: Response):
+    """
+    Get a CSRF token for the frontend.
+    The token is also set as a cookie.
+    Frontend should include this token in X-CSRF-Token header for state-changing requests.
+    """
+    existing_token = request.cookies.get(CSRF_COOKIE_NAME)
+    
+    if existing_token:
+        return {"csrf_token": existing_token}
+    
+    new_token = generate_csrf_token()
+    response.set_cookie(
+        key=CSRF_COOKIE_NAME,
+        value=new_token,
+        httponly=False,  # Must be readable by JavaScript
+        secure=True,  # Only send over HTTPS (set to False for local dev)
+        samesite="strict",
+        max_age=86400,  # 24 hours
+        path="/",
+    )
+    return {"csrf_token": new_token}

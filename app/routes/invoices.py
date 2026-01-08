@@ -3,6 +3,7 @@ Invoice Routes for Client Invoicing and Payment System
 """
 import logging
 import hashlib
+import uuid
 from datetime import datetime, timedelta
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException
@@ -18,6 +19,15 @@ from ..config import DODO_PAYMENTS_API_KEY, DODO_PAYMENTS_ENVIRONMENT, FRONTEND_
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/invoices", tags=["Invoices"])
+
+
+def validate_uuid(value: str) -> bool:
+    """Validate UUID format"""
+    try:
+        uuid.UUID(value)
+        return True
+    except (ValueError, AttributeError):
+        return False
 
 
 class InvoiceCreate(BaseModel):
@@ -37,6 +47,7 @@ class InvoiceCreate(BaseModel):
 
 class InvoiceResponse(BaseModel):
     id: int
+    public_id: str  # UUID for public access
     invoice_number: str
     client_id: int
     client_name: str
@@ -117,6 +128,7 @@ async def get_invoices(
         client = db.query(Client).filter(Client.id == inv.client_id).first()
         result.append(InvoiceResponse(
             id=inv.id,
+            public_id=inv.public_id,
             invoice_number=inv.invoice_number,
             client_id=inv.client_id,
             client_name=client.business_name if client else "Unknown",
@@ -220,6 +232,7 @@ async def create_invoice(
     
     return InvoiceResponse(
         id=invoice.id,
+        public_id=invoice.public_id,
         invoice_number=invoice.invoice_number,
         client_id=invoice.client_id,
         client_name=client.business_name,
@@ -419,21 +432,17 @@ async def send_invoice_to_client(
         raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
 
 
-@router.get("/public/{invoice_id}")
+@router.get("/public/{public_id}")
 async def get_public_invoice(
-    invoice_id: int,
+    public_id: str,
     db: Session = Depends(get_db)
 ):
-    """Public endpoint for client to view invoice (no auth required)
+    """Public endpoint for client to view invoice using secure UUID (no auth required)"""
+    # Validate UUID format to prevent injection
+    if not validate_uuid(public_id):
+        raise HTTPException(status_code=400, detail="Invalid invoice identifier")
     
-    NOTE: This endpoint uses sequential IDs which could allow enumeration.
-    Consider using UUIDs or adding a secret token parameter.
-    """
-    # Validate invoice_id
-    if invoice_id <= 0 or invoice_id > 2147483647:
-        raise HTTPException(status_code=400, detail="Invalid invoice ID")
-    
-    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    invoice = db.query(Invoice).filter(Invoice.public_id == public_id).first()
     
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
@@ -446,6 +455,7 @@ async def get_public_invoice(
     
     return {
         "id": invoice.id,
+        "public_id": invoice.public_id,
         "invoice_number": invoice.invoice_number,
         "title": invoice.title,
         "description": invoice.description,

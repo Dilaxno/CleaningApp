@@ -3,14 +3,14 @@ Calendly Webhook Routes
 Handles incoming webhooks from Calendly for event synchronization
 """
 import logging
+import json
 from fastapi import APIRouter, Request, HTTPException, Depends
 from sqlalchemy.orm import Session
 from datetime import datetime
 from ..database import get_db
 from ..models import Schedule, CalendlyIntegration, Client
 from ..rate_limiter import create_rate_limiter
-import hmac
-import hashlib
+from ..webhook_security import verify_calendly_webhook
 import os
 
 logger = logging.getLogger(__name__)
@@ -28,21 +28,6 @@ rate_limit_webhook = create_rate_limiter(
 CALENDLY_WEBHOOK_SECRET = os.getenv("CALENDLY_WEBHOOK_SECRET")
 
 
-def verify_webhook_signature(payload: bytes, signature: str) -> bool:
-    """Verify Calendly webhook signature"""
-    if not CALENDLY_WEBHOOK_SECRET:
-        logger.warning("⚠️ CALENDLY_WEBHOOK_SECRET not configured - skipping signature verification")
-        return True
-    
-    expected_signature = hmac.new(
-        CALENDLY_WEBHOOK_SECRET.encode(),
-        payload,
-        hashlib.sha256
-    ).hexdigest()
-    
-    return hmac.compare_digest(f"sha256={expected_signature}", signature)
-
-
 @router.post("/events")
 async def handle_calendly_webhook(
     request: Request,
@@ -52,19 +37,24 @@ async def handle_calendly_webhook(
     """
     Handle Calendly webhook events - Rate limited to 100 requests per minute
     Supported events: invitee.created, invitee.canceled
+    
+    Security:
+    - Signature verification using HMAC-SHA256
+    - Rate limiting to prevent abuse
     """
     try:
-        # Get raw body for signature verification
-        body = await request.body()
-        signature = request.headers.get("Calendly-Webhook-Signature", "")
-        
-        # Verify signature
-        if not verify_webhook_signature(body, signature):
-            logger.error("❌ Invalid webhook signature")
-            raise HTTPException(status_code=401, detail="Invalid signature")
+        # Verify webhook signature
+        if not CALENDLY_WEBHOOK_SECRET:
+            logger.warning("⚠️ CALENDLY_WEBHOOK_SECRET not configured - signature verification skipped")
+            body = await request.body()
+        else:
+            is_valid, body = await verify_calendly_webhook(
+                request, 
+                CALENDLY_WEBHOOK_SECRET,
+                raise_on_failure=True
+            )
         
         # Parse JSON payload
-        import json
         payload = json.loads(body.decode())
         
         event_type = payload.get("event")
@@ -82,6 +72,8 @@ async def handle_calendly_webhook(
         
         return {"status": "ok"}
     
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ Webhook processing error: {str(e)}")
         logger.exception("Full webhook error traceback:")
