@@ -323,3 +323,70 @@ async def upload_profile_picture(
     except Exception as e:
         logger.error(f"❌ Upload failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
+
+@router.post("/integration-logo")
+async def upload_integration_logo(
+    file: UploadFile = File(...),
+):
+    """Upload integration request logo to R2 (public access for display)."""
+    logger.info(f"📤 Uploading integration logo: {file.filename}")
+
+    # Allowed image types for integration logos
+    LOGO_IMAGE_TYPES = [
+        "image/png",
+        "image/jpeg",
+        "image/jpg",
+        "image/webp",
+        "image/gif",
+        "image/svg+xml",
+    ]
+
+    # Validate file type
+    if file.content_type not in LOGO_IMAGE_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid file type. Only PNG, JPEG, WebP, GIF, and SVG images are allowed."
+        )
+
+    # Validate filename to prevent path traversal
+    if file.filename:
+        import os
+        safe_filename = os.path.basename(file.filename)
+        if safe_filename != file.filename or '..' in file.filename:
+            raise HTTPException(status_code=400, detail="Invalid filename")
+
+    # Read file contents
+    contents = await file.read()
+    
+    # Validate file size (2MB limit for integration logos)
+    MAX_FILE_SIZE = 2 * 1024 * 1024  # 2MB
+    if len(contents) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File size exceeds 2MB limit. Your file is {len(contents) / (1024 * 1024):.2f}MB."
+        )
+
+    # Generate unique filename
+    ext = file.filename.split(".")[-1] if file.filename else "png"
+    key = f"integration-logos/{uuid.uuid4()}.{ext}"
+
+    try:
+        r2 = get_r2_client()
+
+        r2.put_object(
+            Bucket=R2_BUCKET_NAME,
+            Key=key,
+            Body=contents,
+            ContentType=file.content_type,
+        )
+
+        # Return presigned URL for display and key for storage
+        presigned_url = generate_presigned_url(key, expiration=86400 * 7)  # 7 days
+
+        logger.info(f"✅ Integration logo uploaded: {key}")
+        return {"url": presigned_url, "key": key}
+
+    except Exception as e:
+        logger.error(f"❌ Upload failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
