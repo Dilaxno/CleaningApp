@@ -350,7 +350,7 @@ class IntegrationRequest(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # Who submitted the request
     name = Column(String(255), nullable=False)  # Integration name (e.g., "QuickBooks")
-    logo_url = Column(String(500), nullable=False)  # URL or R2 key for the logo
+    logo_url = Column(String(2000), nullable=False)  # URL or R2 key for the logo (increased for long URLs)
     integration_type = Column(String(100), nullable=False)  # accounting, crm, payment, scheduling, etc.
     use_case = Column(Text, nullable=False)  # Description of how it would be used
     upvotes = Column(Integer, default=1)  # Start with 1 (submitter's implicit vote)

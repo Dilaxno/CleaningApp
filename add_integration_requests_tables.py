@@ -18,7 +18,7 @@ def run_migration():
                 id SERIAL PRIMARY KEY,
                 user_id INTEGER NOT NULL REFERENCES users(id),
                 name VARCHAR(255) NOT NULL,
-                logo_url VARCHAR(500) NOT NULL,
+                logo_url VARCHAR(2000) NOT NULL,
                 integration_type VARCHAR(100) NOT NULL,
                 use_case TEXT NOT NULL,
                 upvotes INTEGER DEFAULT 1,
@@ -28,6 +28,16 @@ def run_migration():
             )
         """))
         print("✅ Created integration_requests table")
+        
+        # Alter logo_url column if table already exists with smaller size
+        try:
+            conn.execute(text("""
+                ALTER TABLE integration_requests 
+                ALTER COLUMN logo_url TYPE VARCHAR(2000)
+            """))
+            print("✅ Updated logo_url column size to 2000")
+        except Exception as e:
+            print(f"ℹ️ logo_url column already correct size or table just created: {e}")
         
         # Create integration_request_votes table
         conn.execute(text("""

@@ -24,6 +24,12 @@ class IntegrationRequestCreate(BaseModel):
     logo_url: str
     integration_type: str  # accounting, crm, payment, scheduling, communication, other
     use_case: str
+    
+    @classmethod
+    def validate_logo_url(cls, v):
+        if len(v) > 2000:
+            raise ValueError("Logo URL is too long (max 2000 characters). Please use a direct image URL.")
+        return v
 
 
 class IntegrationRequestResponse(BaseModel):
@@ -118,6 +124,13 @@ async def create_integration_request(
 ):
     """Submit a new integration request (limited to 1 per user per month)"""
     logger.info(f"📥 New integration request from user {current_user.id}: {data.name}")
+    
+    # Validate logo URL length
+    if len(data.logo_url) > 2000:
+        raise HTTPException(
+            status_code=400,
+            detail="Logo URL is too long (max 2000 characters). Please use a direct image URL, not a search result page."
+        )
     
     # Check if user has already submitted a request this month
     one_month_ago = datetime.utcnow() - relativedelta(months=1)
