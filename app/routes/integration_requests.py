@@ -170,6 +170,7 @@ async def create_integration_request(
         status="pending"
     )
     db.add(request)
+    db.flush()  # Flush to get the request.id before adding vote
     
     # Add submitter's vote
     vote = IntegrationRequestVote(
