@@ -342,3 +342,34 @@ class WaitlistLead(Base):
     user_agent = Column(String(500), nullable=True)
     source = Column(String(100), default="coming-soon")  # Track where the lead came from
     created_at = Column(DateTime, server_default=func.now())
+
+
+class IntegrationRequest(Base):
+    __tablename__ = "integration_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # Who submitted the request
+    name = Column(String(255), nullable=False)  # Integration name (e.g., "QuickBooks")
+    logo_url = Column(String(500), nullable=False)  # URL or R2 key for the logo
+    integration_type = Column(String(100), nullable=False)  # accounting, crm, payment, scheduling, etc.
+    use_case = Column(Text, nullable=False)  # Description of how it would be used
+    upvotes = Column(Integer, default=1)  # Start with 1 (submitter's implicit vote)
+    status = Column(String(50), default="pending")  # pending, approved, in_progress, completed, rejected
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    user = relationship("User")
+
+
+class IntegrationRequestVote(Base):
+    __tablename__ = "integration_request_votes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    integration_request_id = Column(Integer, ForeignKey("integration_requests.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+
+    # Unique constraint to prevent duplicate votes
+    __table_args__ = (
+        {'sqlite_autoincrement': True},
+    )

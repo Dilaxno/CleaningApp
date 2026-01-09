@@ -268,16 +268,41 @@ async def smtp_health_check_task(ctx):
         db.close()
 
 
+async def status_automation_task(ctx):
+    """
+    Daily cron job to update contract and client statuses based on dates.
+    - Contracts: scheduled → active (when start date arrives)
+    - Contracts: active → completed (when end date passes)
+    - Clients: scheduled → active (when first accepted schedule date arrives)
+    """
+    from .database import SessionLocal
+    from .services.status_automation import update_contract_statuses
+    
+    logger.info("🔄 Starting daily status automation")
+    
+    db = SessionLocal()
+    try:
+        summary = update_contract_statuses(db)
+        logger.info(f"✅ Status automation complete: {summary}")
+        return summary
+    except Exception as e:
+        logger.error(f"❌ Status automation failed: {str(e)}")
+        raise
+    finally:
+        db.close()
+
+
 class WorkerSettings:
     """ARQ Worker Settings"""
-    functions = [generate_contract_pdf_task, send_form_notification_emails_task, smtp_health_check_task]
+    functions = [generate_contract_pdf_task, send_form_notification_emails_task, smtp_health_check_task, status_automation_task]
     redis_settings = get_redis_settings()
     max_jobs = 10  # Concurrency limit: max 10 jobs at once (5 PDF + 5 emails)
     job_timeout = 300  # 5 minutes timeout per job
     keep_result = 3600  # Keep job results for 1 hour
     
-    # Cron jobs - run daily at 6 AM UTC
+    # Cron jobs - run daily
     from arq.cron import cron
     cron_jobs = [
-        cron(smtp_health_check_task, hour=6, minute=0)
+        cron(smtp_health_check_task, hour=6, minute=0),  # 6 AM UTC
+        cron(status_automation_task, hour=0, minute=5),  # 12:05 AM UTC - update statuses at start of day
     ]

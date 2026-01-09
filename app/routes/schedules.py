@@ -384,6 +384,21 @@ async def approve_schedule(
             # No Google Calendar integration, just mark as accepted
             schedule.approval_status = "accepted"
         
+        # Update client status to 'scheduled'
+        client = db.query(Client).filter(Client.id == schedule.client_id).first()
+        if client:
+            client.status = "scheduled"
+            logger.info(f"✅ Updated client {client.id} status to 'scheduled'")
+        
+        # Update contract status to 'scheduled' if there's an associated contract
+        contract = db.query(Contract).filter(
+            Contract.client_id == schedule.client_id,
+            Contract.user_id == current_user.id
+        ).order_by(Contract.created_at.desc()).first()
+        if contract and contract.status not in ["cancelled", "completed"]:
+            contract.status = "scheduled"
+            logger.info(f"✅ Updated contract {contract.id} status to 'scheduled'")
+        
         db.commit()
         return {"message": "Schedule accepted", "schedule_id": schedule_id}
     
@@ -549,11 +564,25 @@ async def client_accept_proposal(
     schedule.proposed_start_time = None
     schedule.proposed_end_time = None
     
-    db.commit()
-    
     # Get client and provider info
     client = db.query(Client).filter(Client.id == schedule.client_id).first()
     user = db.query(User).filter(User.id == schedule.user_id).first()
+    
+    # Update client status to 'scheduled'
+    if client:
+        client.status = "scheduled"
+        logger.info(f"✅ Updated client {client.id} status to 'scheduled'")
+    
+    # Update contract status to 'scheduled' if there's an associated contract
+    contract = db.query(Contract).filter(
+        Contract.client_id == schedule.client_id,
+        Contract.user_id == schedule.user_id
+    ).order_by(Contract.created_at.desc()).first()
+    if contract and contract.status not in ["cancelled", "completed"]:
+        contract.status = "scheduled"
+        logger.info(f"✅ Updated contract {contract.id} status to 'scheduled'")
+    
+    db.commit()
     
     # Send confirmation email to provider
     if user and user.email:

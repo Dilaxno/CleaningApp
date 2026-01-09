@@ -19,14 +19,18 @@ def update_contract_statuses(db: Session) -> dict:
     Returns:
         dict: Summary of status changes made
     """
+    from ..models import Client, Schedule
+    
     summary = {
         "scheduled_to_active": 0,
         "active_to_completed": 0,
+        "clients_to_active": 0,
         "total_updated": 0
     }
     
     try:
         now = datetime.utcnow()
+        today = now.date()
         
         # 1. Update SCHEDULED → ACTIVE (start date has arrived)
         scheduled_contracts = db.query(Contract).filter(
@@ -51,13 +55,32 @@ def update_contract_statuses(db: Session) -> dict:
             summary["active_to_completed"] += 1
             logger.info(f"✅ Contract {contract.id} transitioned: active → completed")
         
+        # 3. Update Client status to 'active' when first accepted schedule date arrives
+        scheduled_clients = db.query(Client).filter(
+            Client.status == "scheduled"
+        ).all()
+        
+        for client in scheduled_clients:
+            # Check if there's an accepted schedule for today or earlier
+            first_schedule = db.query(Schedule).filter(
+                Schedule.client_id == client.id,
+                Schedule.approval_status == "accepted",
+                Schedule.scheduled_date <= today
+            ).order_by(Schedule.scheduled_date.asc()).first()
+            
+            if first_schedule:
+                client.status = "active"
+                summary["clients_to_active"] += 1
+                logger.info(f"✅ Client {client.id} transitioned: scheduled → active (schedule {first_schedule.id} date arrived)")
+        
         # Commit all changes
-        if summary["scheduled_to_active"] > 0 or summary["active_to_completed"] > 0:
+        total = summary["scheduled_to_active"] + summary["active_to_completed"] + summary["clients_to_active"]
+        if total > 0:
             db.commit()
-            summary["total_updated"] = summary["scheduled_to_active"] + summary["active_to_completed"]
+            summary["total_updated"] = total
             logger.info(f"📊 Status automation summary: {summary}")
         else:
-            logger.debug("ℹ️ No contract status updates needed")
+            logger.debug("ℹ️ No contract/client status updates needed")
         
         return summary
     

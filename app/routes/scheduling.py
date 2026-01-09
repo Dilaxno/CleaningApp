@@ -381,6 +381,10 @@ async def client_accept_slot(
     client.status = "scheduled"
     logger.info(f"✅ Updated client {client.id} status to 'scheduled'")
     
+    # Update contract status to 'scheduled'
+    contract.status = "scheduled"
+    logger.info(f"✅ Updated contract {contract.id} status to 'scheduled'")
+    
     # Create calendar event (Schedule)
     schedule = Schedule(
         user_id=proposal.user_id,

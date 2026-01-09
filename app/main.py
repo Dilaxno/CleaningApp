@@ -33,6 +33,7 @@ from .routes.waitlist import router as waitlist_router
 from .routes.invoices import router as invoices_router
 from .routes.payouts import router as payouts_router
 from .routes.smtp import router as smtp_router
+from .routes.integration_requests import router as integration_requests_router
 
 # Configure logging
 logging.basicConfig(
@@ -149,6 +150,7 @@ app.include_router(waitlist_router)
 app.include_router(invoices_router)
 app.include_router(payouts_router)
 app.include_router(smtp_router)
+app.include_router(integration_requests_router)
 
 
 @app.get("/")

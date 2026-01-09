@@ -328,6 +328,7 @@ async def sign_contract_as_provider(
     contract.signature_ip = request.client.host if request.client else None
     contract.signature_user_agent = request.headers.get("user-agent")
     contract.status = "signed"  # Fully signed by both parties
+    contract.start_date = datetime.utcnow()  # Set start date to signing date
     
     db.commit()
     db.refresh(contract)
