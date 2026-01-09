@@ -1462,3 +1462,58 @@ async def send_payment_thank_you_email(
         intro=f"Your payment to {business_name} has been received.",
         content_html=content
     )
+
+
+async def send_pending_booking_notification(
+    provider_email: str,
+    provider_name: str,
+    client_name: str,
+    scheduled_date: str,
+    start_time: str,
+    end_time: str,
+    property_address: Optional[str] = None,
+    schedule_id: Optional[int] = None
+) -> dict:
+    """Notify provider when client books an appointment (pending approval)"""
+    
+    content = f"""
+    <p>Hi {provider_name},</p>
+    <p><strong>{client_name}</strong> has requested a cleaning appointment and is awaiting your approval.</p>
+    
+    <div style="background: {THEME['background']}; border-radius: 12px; padding: 24px; margin: 24px 0;">
+        <div style="margin-bottom: 16px;">
+            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">📅 Requested Date</div>
+            <div style="font-size: 16px; color: {THEME['text_primary']}; font-weight: 600;">{scheduled_date}</div>
+        </div>
+        <div style="margin-bottom: 16px;">
+            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">⏰ Time</div>
+            <div style="font-size: 16px; color: {THEME['text_primary']}; font-weight: 600;">{start_time} - {end_time}</div>
+        </div>
+        {f'<div style="margin-bottom: 16px;"><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 6px;">📍 Location</div><div style="font-size: 15px; color: {THEME["text_primary"]};">{property_address}</div></div>' if property_address else ''}
+        <div>
+            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">👤 Client</div>
+            <div style="font-size: 15px; color: {THEME['text_primary']};">{client_name}</div>
+        </div>
+    </div>
+    
+    <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;">
+        <p style="margin: 0; color: #92400e; font-size: 14px; font-weight: 600;">
+            ⏳ Action Required: Accept this appointment or propose an alternative time
+        </p>
+    </div>
+    
+    <p style="color: {THEME['text_muted']}; font-size: 14px;">
+        Visit your Schedule page to review and respond to this booking request.
+    </p>
+    """
+    
+    return await send_email(
+        to=provider_email,
+        subject=f"🗓️ New Booking Request from {client_name} - Action Needed",
+        title="New Appointment Request",
+        intro=f"{client_name} has requested a cleaning appointment.",
+        content_html=content,
+        cta_url=f"{FRONTEND_URL}/dashboard/schedule",
+        cta_label="Review Request",
+        is_user_email=True
+    )

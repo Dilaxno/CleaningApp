@@ -28,6 +28,7 @@ async def get_scheduling_info_by_client(
     Returns business info, working hours, and estimated duration.
     """
     from ..models import BusinessConfig
+    from .upload import generate_presigned_url
     
     # Get client
     client = db.query(Client).filter(Client.id == client_id).first()
@@ -68,7 +69,12 @@ async def get_scheduling_info_by_client(
     
     if business_config:
         business_name = business_config.business_name or user.full_name or "Service Provider"
-        logo_url = business_config.logo_url
+        # Generate presigned URL for logo if it exists
+        if business_config.logo_url:
+            try:
+                logo_url = generate_presigned_url(business_config.logo_url)
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to generate presigned URL for logo: {e}")
     elif user:
         business_name = user.full_name or "Service Provider"
     
@@ -94,9 +100,10 @@ async def create_client_booking(
 ):
     """
     Public endpoint for client to book an appointment.
-    Creates a schedule entry for the provider.
+    Creates a PENDING schedule entry that requires provider approval.
     """
     from ..models import BusinessConfig
+    from ..email_service import send_pending_booking_notification
     
     logger.info(f"📅 Client booking request for client {data.client_id}")
     
@@ -123,11 +130,13 @@ async def create_client_booking(
     end_time = datetime.fromisoformat(data.end_time.replace('Z', '+00:00'))
     duration_minutes = int((end_time - start_time).total_seconds() / 60)
     
-    # Format times for display
+    # Format times for display (24h format for storage)
+    start_time_24h = start_time.strftime("%H:%M")
+    end_time_24h = end_time.strftime("%H:%M")
     start_time_display = start_time.strftime("%I:%M %p")
     end_time_display = end_time.strftime("%I:%M %p")
     
-    # Create schedule entry
+    # Create schedule entry with PENDING approval status
     schedule = Schedule(
         user_id=client.user_id,
         client_id=client.id,
@@ -135,50 +144,50 @@ async def create_client_booking(
         description=contract.description or f"Service appointment for {client.business_name}",
         service_type=contract.contract_type or "standard",
         scheduled_date=start_time.date(),
-        start_time=start_time_display,
-        end_time=end_time_display,
+        start_time=start_time_24h,
+        end_time=end_time_24h,
         duration_minutes=duration_minutes,
         status="scheduled",
-        approval_status="accepted",
+        approval_status="pending",  # Requires provider approval
         address=client.form_data.get('address') if client.form_data else None,
         price=contract.total_value,
-        notes="Booked directly by client"
+        notes="Booked by client - awaiting provider approval"
     )
     db.add(schedule)
     
-    # Update contract and client status
-    contract.status = "scheduled"
-    client.status = "scheduled"
+    # Update client status to pending_approval
+    client.status = "pending_approval"
     
     db.commit()
     db.refresh(schedule)
     
-    logger.info(f"✅ Client booking created: schedule {schedule.id}")
+    logger.info(f"✅ Client booking created (pending): schedule {schedule.id}")
     
-    # Send confirmation email to provider
+    # Send notification email to provider about pending booking
     try:
         if user.email:
-            await send_scheduling_accepted_email(
+            await send_pending_booking_notification(
                 provider_email=user.email,
                 provider_name=user.full_name or "Service Provider",
                 client_name=client.contact_name or client.business_name,
-                contract_id=contract.id,
-                selected_date=start_time.strftime("%Y-%m-%d"),
+                scheduled_date=start_time.strftime("%Y-%m-%d"),
                 start_time=start_time_display,
                 end_time=end_time_display,
-                property_address=client.form_data.get('address') if client.form_data else None
+                property_address=client.form_data.get('address') if client.form_data else None,
+                schedule_id=schedule.id
             )
-            logger.info(f"📧 Booking confirmation email sent to provider {user.email}")
+            logger.info(f"📧 Pending booking notification sent to provider {user.email}")
     except Exception as e:
-        logger.error(f"Failed to send booking confirmation email: {e}")
+        logger.error(f"Failed to send pending booking notification: {e}")
     
     return {
-        "message": "Booking confirmed",
+        "message": "Booking request submitted - awaiting provider approval",
         "schedule_id": schedule.id,
         "scheduled_date": start_time.strftime("%Y-%m-%d"),
         "start_time": start_time_display,
         "end_time": end_time_display,
-        "duration_minutes": duration_minutes
+        "duration_minutes": duration_minutes,
+        "status": "pending"
     }
 
 
@@ -512,6 +521,7 @@ async def get_public_scheduling_info(
     Returns contract details, business info, and available time slots.
     """
     from ..models import BusinessConfig
+    from .upload import generate_presigned_url
     
     # Find contract by public_id
     contract = db.query(Contract).filter(
@@ -562,7 +572,12 @@ async def get_public_scheduling_info(
     
     if business_config:
         business_name = business_config.business_name or user.full_name or "Service Provider"
-        logo_url = business_config.logo_url
+        # Generate presigned URL for logo if it exists
+        if business_config.logo_url:
+            try:
+                logo_url = generate_presigned_url(business_config.logo_url)
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to generate presigned URL for logo: {e}")
     elif user:
         business_name = user.full_name or "Service Provider"
     

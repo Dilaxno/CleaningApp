@@ -273,6 +273,7 @@ async def generate_contract_html(
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Service Agreement - {contract_number}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * {{
             margin: 0;
@@ -280,71 +281,69 @@ async def generate_contract_html(
             box-sizing: border-box;
         }}
         body {{
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            font-size: 11pt;
-            line-height: 1.6;
-            color: #1E293B;
+            font-family: 'Poppins', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 10pt;
+            line-height: 1.7;
+            color: #0A2540;
             background: white;
-            padding: 40px 50px;
+            padding: 50px 60px;
         }}
         .header {{
             display: flex;
-            justify-content: space-between;
+            justify-content: flex-end;
             align-items: flex-start;
-            margin-bottom: 30px;
-            padding-bottom: 20px;
-            border-bottom: 3px solid #000000;
+            margin-bottom: 40px;
         }}
         .logo-section {{
             display: flex;
             align-items: center;
-            gap: 15px;
+            gap: 10px;
         }}
         .logo {{
-            max-height: 60px;
-            max-width: 180px;
+            max-height: 40px;
+            max-width: 150px;
             object-fit: contain;
         }}
         .company-name {{
-            font-size: 24pt;
-            font-weight: 700;
-            color: #1E293B;
-        }}
-        .contract-info {{
-            text-align: right;
-        }}
-        .contract-title {{
             font-size: 14pt;
             font-weight: 600;
-            color: #000000;
-            margin-bottom: 5px;
+            color: #0A2540;
         }}
-        .contract-number {{
+        .contract-title {{
+            font-size: 22pt;
+            font-weight: 600;
+            color: #0A2540;
+            margin-bottom: 20px;
+        }}
+        .contract-intro {{
             font-size: 10pt;
-            color: #64748B;
+            color: #425466;
+            margin-bottom: 30px;
+            line-height: 1.8;
         }}
-        .contract-date {{
-            font-size: 10pt;
-            color: #64748B;
-        }}
-        h1 {{
-            font-size: 20pt;
-            color: #1E293B;
-            text-align: center;
-            margin: 30px 0;
-            padding-bottom: 15px;
-            border-bottom: 1px solid #E2E8F0;
+        .contract-intro strong {{
+            color: #0A2540;
         }}
         .section {{
-            margin-bottom: 25px;
+            margin-bottom: 28px;
         }}
         .section-title {{
-            font-size: 12pt;
+            font-size: 11pt;
             font-weight: 600;
-            color: #000000;
+            color: #0A2540;
             margin-bottom: 12px;
-            padding-bottom: 5px;
-            border-bottom: 1px solid #E2E8F0;
+        }}
+        .section-number {{
+            color: #0A2540;
+            margin-right: 8px;
+        }}
+        .section-content {{
+            color: #425466;
+            font-size: 10pt;
+            line-height: 1.8;
+        }}
+        .section-content strong {{
+            color: #0A2540;
         }}
         .info-grid {{
             display: grid;
@@ -353,65 +352,69 @@ async def generate_contract_html(
         }}
         .info-box {{
             background: #F8FAFC;
-            padding: 15px;
-            border-radius: 8px;
-            border: 1px solid #E2E8F0;
+            padding: 18px;
+            border-radius: 6px;
         }}
         .info-box h4 {{
-            font-size: 9pt;
+            font-size: 8pt;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.8px;
             color: #64748B;
-            margin-bottom: 8px;
+            margin-bottom: 10px;
+            font-weight: 500;
         }}
         .info-box p {{
             font-size: 10pt;
-            color: #1E293B;
+            color: #0A2540;
             margin-bottom: 4px;
         }}
         .pricing-table {{
             width: 100%;
             border-collapse: collapse;
-            margin-top: 10px;
+            margin-top: 12px;
         }}
         .pricing-table th,
         .pricing-table td {{
-            padding: 12px 15px;
+            padding: 12px 16px;
             text-align: left;
             border-bottom: 1px solid #E2E8F0;
         }}
         .pricing-table th {{
             background: #F8FAFC;
-            font-size: 9pt;
+            font-size: 8pt;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             color: #64748B;
-            font-weight: 600;
+            font-weight: 500;
         }}
         .pricing-table td {{
             font-size: 10pt;
+            color: #0A2540;
         }}
         .pricing-table .total-row {{
-            background: #000000;
+            background: #0A2540;
             color: white;
             font-weight: 600;
         }}
         .pricing-table .total-row td {{
             border-bottom: none;
         }}
-        .terms-list {{
+        .bullet-list {{
             list-style: none;
             padding: 0;
+            margin: 0;
         }}
-        .terms-list li {{
-            padding: 8px 0;
+        .bullet-list li {{
+            padding: 6px 0;
             padding-left: 20px;
             position: relative;
             font-size: 10pt;
+            color: #425466;
+            line-height: 1.6;
         }}
-        .terms-list li:before {{
+        .bullet-list li:before {{
             content: "•";
-            color: #000000;
+            color: #0A2540;
             font-weight: bold;
             position: absolute;
             left: 0;
@@ -419,7 +422,13 @@ async def generate_contract_html(
         .inclusions-exclusions {{
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 20px;
+            gap: 24px;
+        }}
+        .inclusions-exclusions h4 {{
+            font-size: 9pt;
+            font-weight: 600;
+            color: #0A2540;
+            margin-bottom: 10px;
         }}
         .inclusions-exclusions ul {{
             list-style: none;
@@ -427,54 +436,55 @@ async def generate_contract_html(
         }}
         .inclusions-exclusions li {{
             padding: 5px 0;
-            padding-left: 18px;
+            padding-left: 20px;
             position: relative;
             font-size: 10pt;
+            color: #425466;
         }}
         .inclusions li:before {{
             content: "✓";
-            color: #000000;
+            color: #10B981;
             position: absolute;
             left: 0;
+            font-weight: 600;
         }}
         .exclusions li:before {{
             content: "✗";
-            color: #000000;
+            color: #EF4444;
             position: absolute;
             left: 0;
+            font-weight: 600;
         }}
         .signatures {{
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 40px;
-            margin-top: 40px;
+            gap: 50px;
+            margin-top: 50px;
             padding-top: 30px;
-            border-top: 2px solid #E2E8F0;
+            border-top: 1px solid #E2E8F0;
             page-break-inside: avoid;
         }}
         .signature-box {{
-            text-align: center;
             page-break-inside: avoid;
         }}
-        }}
         .signature-box h4 {{
-            font-size: 10pt;
+            font-size: 9pt;
             color: #64748B;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
+            font-weight: 500;
         }}
         .signature-line {{
-            height: 80px;
-            border: 2px dashed #E2E8F0;
-            border-radius: 8px;
+            height: 70px;
+            border-bottom: 1px solid #0A2540;
             display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 10px;
-            background: #FAFAFA;
+            align-items: flex-end;
+            justify-content: flex-start;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
             overflow: hidden;
         }}
         .signature-line img {{
-            max-height: 70px;
+            max-height: 60px;
             max-width: 180px;
             object-fit: contain;
             display: block;
@@ -482,82 +492,101 @@ async def generate_contract_html(
         .signature-name {{
             font-size: 10pt;
             font-weight: 600;
-            color: #1E293B;
+            color: #0A2540;
         }}
         .signature-role {{
             font-size: 9pt;
             color: #64748B;
+            font-weight: 400;
         }}
         .footer {{
-            margin-top: 40px;
+            margin-top: 50px;
             padding-top: 20px;
             border-top: 1px solid #E2E8F0;
             text-align: center;
+            font-size: 8pt;
+            color: #94A3B8;
+        }}
+        .terms-note {{
             font-size: 9pt;
             color: #64748B;
-        }}
-        .highlight {{
-            background: #000000;
-            color: white;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-weight: 600;
+            font-style: italic;
+            margin-top: 8px;
         }}
     </style>
 </head>
 <body>
-    <!-- Header -->
+    <!-- Header with Logo on Top Right -->
     <div class="header">
         <div class="logo-section">
             {"<img src='" + logo_url + "' alt='Logo' class='logo'>" if logo_url else ""}
-            <span class="company-name">{business_name}</span>
-        </div>
-        <div class="contract-info">
-            <div class="contract-title">SERVICE AGREEMENT</div>
-            <div class="contract-number">{contract_number}</div>
-            <div class="contract-date">{contract_date}</div>
+            {"" if logo_url else "<span class='company-name'>" + business_name + "</span>"}
         </div>
     </div>
 
-    <!-- Parties Section -->
+    <!-- Contract Title -->
+    <div class="contract-title">Service Agreement</div>
+    
+    <!-- Contract Intro -->
+    <p class="contract-intro">
+        This Service Agreement (the "Agreement") is made and entered into on <strong>{contract_date}</strong> 
+        by and between <strong>{business_name}</strong> ("Service Provider") and <strong>{client_name}</strong> ("Client").
+        <br/><span style="color: #94A3B8; font-size: 9pt;">Contract #{contract_number}</span>
+    </p>
+
+    <!-- 1. Purpose -->
     <div class="section">
-        <div class="section-title">Parties to This Agreement</div>
-        <div class="info-grid">
-            <div class="info-box">
-                <h4>Service Provider</h4>
-                <p><strong>{business_name}</strong></p>
-                <p>Professional Cleaning Services</p>
+        <div class="section-title"><span class="section-number">1.</span>Purpose</div>
+        <p class="section-content">
+            The purpose of this Agreement is to outline the terms and conditions for the cleaning and maintenance services 
+            to be provided by <strong>{business_name}</strong> ("Service Provider") to <strong>{client_name}</strong> ("Client").
+        </p>
+    </div>
+
+    <!-- 2. Scope of Work -->
+    <div class="section">
+        <div class="section-title"><span class="section-number">2.</span>Scope of Work</div>
+        <p class="section-content" style="margin-bottom: 12px;">Service Provider will provide the following services to Client:</p>
+        <div class="inclusions-exclusions">
+            <div class="inclusions">
+                <h4>Services Included</h4>
+                <ul>{inclusions_html}</ul>
             </div>
-            <div class="info-box">
-                <h4>Client</h4>
-                <p><strong>{client_name}</strong></p>
-                <p>{client.business_name}</p>
-                <p>{client_email}</p>
-                <p>{client_phone}</p>
+            <div class="exclusions">
+                <h4>Not Included</h4>
+                <ul>{exclusions_html}</ul>
             </div>
         </div>
     </div>
 
-    <!-- Property Details -->
+    <!-- 3. Property & Service Details -->
     <div class="section">
-        <div class="section-title">Property Details</div>
+        <div class="section-title"><span class="section-number">3.</span>Property & Service Details</div>
         <div class="info-grid">
             <div class="info-box">
                 <h4>Service Location</h4>
+                <p><strong>{client.business_name}</strong></p>
                 <p>{client_address or "To be confirmed"}</p>
+                <p>{client_email}</p>
+                <p>{client_phone}</p>
             </div>
             <div class="info-box">
                 <h4>Property Information</h4>
                 <p><strong>Type:</strong> {property_type}</p>
                 <p><strong>Size:</strong> {property_size} sq ft</p>
                 <p><strong>Frequency:</strong> {frequency}</p>
+                <p><strong>Start Date:</strong> {start_date}</p>
             </div>
         </div>
     </div>
 
-    <!-- Pricing -->
+    <!-- 4. Payment and Pricing -->
     <div class="section">
-        <div class="section-title">Service Pricing</div>
+        <div class="section-title"><span class="section-number">4.</span>Payment and Pricing</div>
+        <p class="section-content" style="margin-bottom: 12px;">
+            The Client will pay the Service Provider the total agreed sum, outlined in the pricing below, for 
+            the completion of the scope of work outlined in this Agreement.
+        </p>
         <table class="pricing-table">
             <thead>
                 <tr>
@@ -572,66 +601,41 @@ async def generate_contract_html(
                     <td>{frequency} cleaning service</td>
                     <td style="text-align: right;">USD ${quote['base_price']:,.2f}</td>
                 </tr>
-                {"<tr><td>Frequency Discount</td><td>" + str(quote['discount_percent']) + "% off for " + frequency.lower() + " service</td><td style='text-align: right; color: #000000;'>-USD $" + f"{quote['discount_amount']:,.2f}" + "</td></tr>" if quote['discount_amount'] > 0 else ""}
+                {"<tr><td>Frequency Discount</td><td>" + str(quote['discount_percent']) + "% off for " + frequency.lower() + " service</td><td style='text-align: right; color: #10B981;'>-USD $" + f"{quote['discount_amount']:,.2f}" + "</td></tr>" if quote['discount_amount'] > 0 else ""}
                 <tr class="total-row">
                     <td><strong>Total Per Visit</strong></td>
                     <td>Estimated {quote['estimated_hours']} hours, {quote['cleaners']} cleaner(s)</td>
                     <td style="text-align: right;"><strong>USD ${quote['final_price']:,.2f}</strong></td>
                 </tr>
-                {f"<tr><td colspan='3' style='padding-top: 15px; border-top: 2px solid #e5e7eb;'></td></tr><tr style='background-color: #f8fafc;'><td><strong>Contract Term</strong></td><td>{quote['term_duration']} {quote['term_unit']} ({quote['service_occurrences']} visits)</td><td style='text-align: right;'></td></tr><tr class='total-row' style='background-color: #00C4B4; color: white;'><td><strong>Total Contract Value</strong></td><td>For entire {quote['term_duration']} {quote['term_unit'].lower()} term</td><td style='text-align: right;'><strong>USD ${quote['total_term_rate']:,.2f}</strong></td></tr>" if quote.get('total_term_rate') else ""}
+                {f"<tr><td colspan='3' style='padding-top: 15px; border-top: 2px solid #e5e7eb;'></td></tr><tr style='background-color: #f8fafc;'><td><strong>Contract Term</strong></td><td>{quote['term_duration']} {quote['term_unit']} ({quote['service_occurrences']} visits)</td><td style='text-align: right;'></td></tr><tr class='total-row' style='background-color: #0A2540; color: white;'><td><strong>Total Contract Value</strong></td><td>For entire {quote['term_duration']} {quote['term_unit'].lower()} term</td><td style='text-align: right;'><strong>USD ${quote['total_term_rate']:,.2f}</strong></td></tr>" if quote.get('total_term_rate') else ""}
             </tbody>
         </table>
+        <p class="terms-note">Payment due within {payment_due_days} days of service completion. A {late_fee}% late fee applies after due date.</p>
     </div>
 
-    <!-- Services Included/Excluded -->
+    <!-- 5. Terms -->
     <div class="section">
-        <div class="section-title">Scope of Services</div>
-        <div class="inclusions-exclusions">
-            <div class="inclusions">
-                <h4 style="font-size: 10pt; color: #000000; margin-bottom: 10px;">✓ Services Included</h4>
-                <ul>{inclusions_html}</ul>
-            </div>
-            <div class="exclusions">
-                <h4 style="font-size: 10pt; color: #000000; margin-bottom: 10px;">✗ Not Included</h4>
-                <ul>{exclusions_html}</ul>
-            </div>
-        </div>
-    </div>
-
-    <!-- Terms -->
-    <div class="section">
-        <div class="section-title">Terms & Conditions</div>
-        <ul class="terms-list">
-            <li><strong>Service Start Date:</strong> {start_date}<br/>
-                <span style="font-size: 8pt; color: #64748B; font-style: italic;">{start_date_note}</span>
-            </li>
-            <li><strong>Payment Terms:</strong> Payment due within {payment_due_days} days of service completion. All amounts are in USD.</li>
-            <li><strong>Late Payment:</strong> {late_fee}% late fee applies after due date</li>
+        <div class="section-title"><span class="section-number">5.</span>Terms</div>
+        <p class="section-content">
+            This Agreement will begin on the date of acceptance and will remain in effect until all services have been completed.
+        </p>
+        <ul class="bullet-list" style="margin-top: 12px;">
             <li><strong>Cancellation:</strong> 24-hour notice required for cancellations to avoid charges</li>
             <li><strong>Access:</strong> Client agrees to provide necessary access to the property</li>
             <li><strong>Liability:</strong> Service provider maintains appropriate insurance coverage</li>
         </ul>
-        <p style="margin-top: 15px; font-size: 9pt; color: #64748B; line-height: 1.6;">
-            <strong>Note on Service Start Date:</strong> The Service Start Date activates the agreement terms and conditions. {'For recurring services, billing begins immediately upon signing, and the first cleaning will be scheduled separately based on your availability.' if is_recurring else 'For one-time services, the Service Start Date aligns with your scheduled service appointment.'}
-        </p>
+        <p class="terms-note">{'For recurring services, billing begins immediately upon signing, and the first cleaning will be scheduled separately based on your availability.' if is_recurring else 'For one-time services, the Service Start Date aligns with your scheduled service appointment.'}</p>
     </div>
 
-    <!-- Legal Clauses -->
+    <!-- 6. Legal Provisions -->
     <div class="section">
-        <div class="section-title">Legal Provisions</div>
-        <div style="font-size: 9pt; color: #475569; line-height: 1.7;">
-            <p style="margin-bottom: 12px;"><strong>1. Governing Law & Jurisdiction:</strong> This Agreement shall be governed by and construed in accordance with the laws of the state in which the Service Provider operates. Any disputes arising under this Agreement shall be resolved in the courts of competent jurisdiction in that state.</p>
-            
-            <p style="margin-bottom: 12px;"><strong>2. Severability:</strong> If any provision of this Agreement is found to be invalid, illegal, or unenforceable, the remaining provisions shall continue in full force and effect. The invalid provision shall be modified to the minimum extent necessary to make it valid and enforceable.</p>
-            
-            <p style="margin-bottom: 12px;"><strong>3. Non-Waiver:</strong> The failure of either party to enforce any provision of this Agreement shall not constitute a waiver of that party's right to enforce that provision or any other provision in the future.</p>
-            
-            <p style="margin-bottom: 12px;"><strong>4. Dispute Resolution:</strong> The parties agree to attempt to resolve any disputes arising from this Agreement through good faith negotiation. If negotiation fails, disputes shall be resolved through binding arbitration in accordance with the rules of the American Arbitration Association, unless both parties agree to court proceedings.</p>
-            
-            <p style="margin-bottom: 12px;"><strong>5. Entire Agreement:</strong> This Agreement constitutes the entire agreement between the parties and supersedes all prior negotiations, representations, or agreements relating to this subject matter.</p>
-            
-            <p><strong>6. Electronic Signatures:</strong> Both parties agree that electronic signatures on this Agreement are legally binding and have the same legal effect as handwritten signatures.</p>
-        </div>
+        <div class="section-title"><span class="section-number">6.</span>Legal Provisions</div>
+        <ul class="bullet-list">
+            <li><strong>Governing Law:</strong> This Agreement shall be governed by the laws of the state in which the Service Provider operates.</li>
+            <li><strong>Severability:</strong> If any provision is found invalid, the remaining provisions continue in full force.</li>
+            <li><strong>Dispute Resolution:</strong> Parties agree to resolve disputes through good faith negotiation first.</li>
+            <li><strong>Electronic Signatures:</strong> Electronic signatures are legally binding and have the same effect as handwritten signatures.</li>
+        </ul>
     </div>
 
     <!-- Signatures -->
@@ -639,7 +643,7 @@ async def generate_contract_html(
         <div class="signature-box">
             <h4>Service Provider</h4>
             <div class="signature-line">
-                {"<img src='" + signature_url + "' alt='Provider Signature' style='max-height: 70px; max-width: 180px; object-fit: contain;'>" if signature_url else "<span style='color: #94A3B8; font-size: 9pt;'>Signature pending</span>"}
+                {"<img src='" + signature_url + "' alt='Provider Signature'>" if signature_url else ""}
             </div>
             <div class="signature-name">{business_name}</div>
             <div class="signature-role">Authorized Representative</div>
@@ -647,7 +651,7 @@ async def generate_contract_html(
         <div class="signature-box">
             <h4>Client</h4>
             <div class="signature-line">
-                {"<img src='" + client_signature + "' alt='Client Signature' style='max-height: 70px; max-width: 180px; object-fit: contain;'>" if client_signature else "<span style='color: #94A3B8; font-size: 9pt;'>Awaiting signature</span>"}
+                {"<img src='" + client_signature + "' alt='Client Signature'>" if client_signature else ""}
             </div>
             <div class="signature-name">{client_name}</div>
             <div class="signature-role">Client Representative</div>
@@ -656,9 +660,8 @@ async def generate_contract_html(
 
     <!-- Footer -->
     <div class="footer">
-        <p style="margin-bottom: 4px;">Electronically generated via CleanEnroll</p>
-        <p style="margin-bottom: 4px;">Contract #{contract_number} • Generated on {contract_date}</p>
-        <p style="font-size: 8pt; color: #94A3B8;">All monetary amounts are in USD unless otherwise specified</p>
+        <p>Contract #{contract_number} • Generated on {contract_date}</p>
+        <p style="margin-top: 4px;">All monetary amounts are in USD unless otherwise specified</p>
     </div>
 </body>
 </html>
