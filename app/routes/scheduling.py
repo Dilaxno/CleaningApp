@@ -6,7 +6,6 @@ from typing import Optional, List
 from datetime import datetime, timedelta
 from ..database import get_db
 from ..models import User, Client, Contract, SchedulingProposal, Schedule
-from ..models_invoice import Invoice
 from ..auth import get_current_user
 from ..email_service import (
     send_scheduling_proposal_email,
@@ -176,11 +175,6 @@ async def client_accept_slot(
     db: Session = Depends(get_db)
 ):
     """Client accepts a proposed time slot"""
-    from ..models import Schedule, BusinessConfig
-    from ..models_invoice import Invoice
-    from ..email_service import send_invoice_payment_link_email
-    from ..config import DODO_PAYMENTS_API_KEY, DODO_PAYMENTS_ENVIRONMENT, FRONTEND_URL
-    
     logger.info(f"📥 Received slot acceptance for proposal {proposal_id}: {data.dict()}")
     
     proposal = db.query(SchedulingProposal).filter(
@@ -252,191 +246,12 @@ async def client_accept_slot(
     except Exception as e:
         logger.error(f"Failed to send scheduling acceptance email: {e}")
     
-    # Auto-create invoice and send payment link
-    invoice_id = None
-    try:
-        invoice_id = await _create_invoice_for_schedule(
-            schedule=schedule,
-            user=user,
-            client=client,
-            contract=contract,
-            db=db
-        )
-    except Exception as e:
-        logger.error(f"⚠️ Failed to create invoice: {e}")
-    
     return {
         "message": "Time slot accepted", 
         "proposal_id": proposal_id,
         "schedule_id": schedule.id,
-        "client_status": client.status,
-        "invoice_id": invoice_id
+        "client_status": client.status
     }
-
-
-async def _create_invoice_for_schedule(
-    schedule: Schedule,
-    user: User,
-    client: Client,
-    contract: Contract,
-    db: Session
-) -> Optional[int]:
-    """Create invoice and send payment link when schedule is confirmed"""
-    from ..models import BusinessConfig
-    from ..models_invoice import Invoice
-    from ..email_service import send_invoice_payment_link_email
-    from ..config import DODO_PAYMENTS_API_KEY, DODO_PAYMENTS_ENVIRONMENT, FRONTEND_URL, DODO_DEFAULT_TAX_CATEGORY
-    from dodopayments import AsyncDodoPayments
-    
-    logger.info(f"📄 Creating invoice for schedule {schedule.id}")
-    
-    # Get business config
-    business_config = db.query(BusinessConfig).filter(
-        BusinessConfig.user_id == user.id
-    ).first()
-    
-    # Determine base amount
-    base_amount = schedule.price or (contract.total_value if contract else 0)
-    
-    if base_amount <= 0:
-        logger.warning(f"⚠️ Cannot create invoice with zero amount")
-        return None
-    
-    # Determine service type
-    service_type = client.frequency or "one-time"
-    is_recurring = service_type in ["weekly", "bi-weekly", "monthly"]
-    
-    # Calculate frequency discount
-    frequency_discount = 0
-    if business_config:
-        if service_type == "weekly" and business_config.discount_weekly:
-            frequency_discount = base_amount * (business_config.discount_weekly / 100)
-        elif service_type == "bi-weekly" and business_config.discount_monthly:
-            frequency_discount = base_amount * (business_config.discount_monthly / 100 / 2)
-        elif service_type == "monthly" and business_config.discount_monthly:
-            frequency_discount = base_amount * (business_config.discount_monthly / 100)
-    
-    total_amount = base_amount - frequency_discount
-    
-    # Generate invoice number
-    year = datetime.now().year
-    count = db.query(Invoice).filter(
-        Invoice.user_id == user.id,
-        Invoice.created_at >= datetime(year, 1, 1)
-    ).count() + 1
-    invoice_number = f"INV-{year}-{user.id:04d}-{count:04d}"
-    
-    # Billing interval
-    billing_interval = None
-    billing_interval_count = 1
-    if is_recurring:
-        intervals = {"weekly": ("week", 1), "bi-weekly": ("week", 2), "monthly": ("month", 1)}
-        billing_interval, billing_interval_count = intervals.get(service_type, ("month", 1))
-    
-    # Create invoice
-    invoice = Invoice(
-        user_id=user.id,
-        client_id=client.id,
-        contract_id=contract.id if contract else None,
-        schedule_id=schedule.id,
-        invoice_number=invoice_number,
-        title=f"Cleaning Service - {schedule.title}",
-        description=f"Service scheduled for {schedule.scheduled_date.strftime('%B %d, %Y')}",
-        service_type=service_type,
-        base_amount=base_amount,
-        frequency_discount=frequency_discount,
-        addon_amount=0,
-        tax_amount=0,
-        total_amount=total_amount,
-        is_recurring=is_recurring,
-        recurrence_pattern=service_type if is_recurring else None,
-        billing_interval=billing_interval,
-        billing_interval_count=billing_interval_count,
-        status="pending",
-        due_date=datetime.utcnow() + timedelta(days=business_config.payment_due_days if business_config else 15)
-    )
-    
-    db.add(invoice)
-    db.commit()
-    db.refresh(invoice)
-    
-    logger.info(f"✅ Invoice created: {invoice_number}")
-    
-    # Generate payment link
-    if not DODO_PAYMENTS_API_KEY:
-        logger.warning("⚠️ DODO_PAYMENTS_API_KEY not configured")
-        return invoice.id
-    
-    business_name = business_config.business_name if business_config else "Cleaning Service"
-    
-    dodo_client = AsyncDodoPayments(
-        bearer_token=DODO_PAYMENTS_API_KEY,
-        environment=DODO_PAYMENTS_ENVIRONMENT or "test_mode",
-    )
-    
-    try:
-        product_data = {
-            "name": f"{invoice.title} - {invoice.invoice_number}",
-            "description": invoice.description or f"Cleaning service from {business_name}",
-            "price": {
-                "currency": invoice.currency.upper(),
-                "price": int(invoice.total_amount * 100),
-                "type": "one_time_price"
-            },
-            "tax_category": DODO_DEFAULT_TAX_CATEGORY,
-        }
-        
-        if is_recurring and billing_interval:
-            product_data["billing"] = {"type": "recurring", "interval": billing_interval, "interval_count": billing_interval_count}
-        else:
-            product_data["billing"] = {"type": "one_time"}
-        
-        product = await dodo_client.products.create(**product_data)
-        product_id = getattr(product, "product_id", None) or product.get("product_id")
-        
-        return_url = f"{FRONTEND_URL}/payment/success/{invoice.id}"
-        
-        session = await dodo_client.checkout_sessions.create(
-            product_cart=[{"product_id": product_id, "quantity": 1}],
-            customer={"email": client.email or "", "name": client.contact_name or client.business_name or ""},
-            metadata={"invoice_id": str(invoice.id), "invoice_number": invoice.invoice_number, "provider_user_id": str(user.id), "client_id": str(client.id)},
-            return_url=return_url,
-        )
-        
-        checkout_url = getattr(session, "checkout_url", None) or session.get("checkout_url")
-        
-        invoice.dodo_product_id = product_id
-        invoice.dodo_payment_link = checkout_url
-        invoice.status = "sent"
-        db.commit()
-        
-        logger.info(f"✅ Payment link generated: {checkout_url}")
-        
-        # Send email
-        if client.email:
-            try:
-                await send_invoice_payment_link_email(
-                    to=client.email,
-                    client_name=client.contact_name or client.business_name,
-                    business_name=business_name,
-                    invoice_number=invoice.invoice_number,
-                    invoice_title=invoice.title,
-                    total_amount=invoice.total_amount,
-                    currency=invoice.currency,
-                    due_date=invoice.due_date.strftime("%B %d, %Y") if invoice.due_date else None,
-                    payment_link=checkout_url,
-                    is_recurring=is_recurring,
-                    recurrence_pattern=service_type if is_recurring else None
-                )
-                logger.info(f"📧 Payment link email sent to {client.email}")
-            except Exception as e:
-                logger.error(f"❌ Failed to send payment link email: {e}")
-        
-        return invoice.id
-        
-    except Exception as e:
-        logger.error(f"❌ Failed to create payment link: {e}")
-        return invoice.id
 
 
 @router.post("/proposals/{proposal_id}/counter")
@@ -520,3 +335,210 @@ async def get_public_contract_proposals(
         "expires_at": p.expires_at.isoformat() if p.expires_at else None,
         "created_at": p.created_at.isoformat()
     } for p in proposals]
+
+
+
+@router.get("/public/contract/{contract_public_id}")
+async def get_public_scheduling_info(
+    contract_public_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Public endpoint for client to get scheduling info for a contract.
+    Returns contract details, business info, and available time slots.
+    """
+    from ..models import BusinessConfig
+    
+    # Find contract by public_id
+    contract = db.query(Contract).filter(
+        Contract.public_id == contract_public_id
+    ).first()
+    
+    if not contract:
+        raise HTTPException(status_code=404, detail="Contract not found")
+    
+    # Get client info
+    client = db.query(Client).filter(Client.id == contract.client_id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    
+    # Get provider/business info
+    user = db.query(User).filter(User.id == contract.user_id).first()
+    business_config = db.query(BusinessConfig).filter(
+        BusinessConfig.user_id == contract.user_id
+    ).first()
+    
+    # Calculate estimated duration from contract or business config
+    estimated_duration = 60  # Default 60 minutes
+    
+    # Try to get from client's form_data (property size based calculation)
+    if client.form_data:
+        form_data = client.form_data
+        property_size = form_data.get('propertySize') or form_data.get('property_size')
+        if property_size and business_config and business_config.cleaning_time_per_sqft:
+            # Calculate based on sqft
+            estimated_duration = max(60, int(property_size) * business_config.cleaning_time_per_sqft // 100)
+    
+    # Get working hours from business config
+    working_hours = {
+        "start": "09:00",
+        "end": "17:00"
+    }
+    working_days = ["monday", "tuesday", "wednesday", "thursday", "friday"]
+    
+    if business_config:
+        if business_config.working_hours:
+            working_hours = business_config.working_hours
+        if business_config.working_days:
+            working_days = business_config.working_days
+    
+    # Get business branding
+    business_name = "Service Provider"
+    logo_url = None
+    
+    if business_config:
+        business_name = business_config.business_name or user.full_name or "Service Provider"
+        logo_url = business_config.logo_url
+    elif user:
+        business_name = user.full_name or "Service Provider"
+    
+    return {
+        "contract_id": contract.id,
+        "contract_public_id": contract.public_id,
+        "contract_title": contract.title,
+        "client_name": client.contact_name or client.business_name,
+        "business_name": business_name,
+        "logo_url": logo_url,
+        "estimated_duration": estimated_duration,
+        "working_hours": working_hours,
+        "working_days": working_days,
+        "status": contract.status
+    }
+
+
+class DirectBookingRequest(BaseModel):
+    contract_public_id: str
+    selected_date: str  # YYYY-MM-DD
+    selected_time: str  # HH:MM
+
+
+@router.post("/public/book")
+async def create_direct_booking(
+    data: DirectBookingRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Public endpoint for client to directly book a time slot.
+    Creates a schedule entry without requiring provider proposals.
+    """
+    logger.info(f"📅 Direct booking request for contract {data.contract_public_id}")
+    
+    # Find contract by public_id
+    contract = db.query(Contract).filter(
+        Contract.public_id == data.contract_public_id
+    ).first()
+    
+    if not contract:
+        raise HTTPException(status_code=404, detail="Contract not found")
+    
+    # Check contract status - must be signed
+    if contract.status not in ["signed", "new"]:
+        raise HTTPException(status_code=400, detail=f"Contract status is '{contract.status}', booking not allowed")
+    
+    # Get client and user
+    client = db.query(Client).filter(Client.id == contract.client_id).first()
+    user = db.query(User).filter(User.id == contract.user_id).first()
+    
+    if not client or not user:
+        raise HTTPException(status_code=404, detail="Client or provider not found")
+    
+    # Get business config for duration calculation
+    from ..models import BusinessConfig
+    business_config = db.query(BusinessConfig).filter(
+        BusinessConfig.user_id == contract.user_id
+    ).first()
+    
+    # Calculate duration
+    estimated_duration = 60
+    if client.form_data:
+        form_data = client.form_data
+        property_size = form_data.get('propertySize') or form_data.get('property_size')
+        if property_size and business_config and business_config.cleaning_time_per_sqft:
+            estimated_duration = max(60, int(property_size) * business_config.cleaning_time_per_sqft // 100)
+    
+    # Calculate end time
+    start_hour, start_min = map(int, data.selected_time.split(':'))
+    end_hour = start_hour + (estimated_duration // 60)
+    end_min = start_min + (estimated_duration % 60)
+    if end_min >= 60:
+        end_hour += 1
+        end_min -= 60
+    end_time = f"{end_hour:02d}:{end_min:02d}"
+    
+    # Format times for display
+    def format_time_12h(time_str):
+        hour, minute = map(int, time_str.split(':'))
+        period = "AM" if hour < 12 else "PM"
+        display_hour = hour if hour <= 12 else hour - 12
+        if display_hour == 0:
+            display_hour = 12
+        return f"{display_hour}:{minute:02d} {period}"
+    
+    start_time_display = format_time_12h(data.selected_time)
+    end_time_display = format_time_12h(end_time)
+    
+    # Create schedule entry
+    schedule = Schedule(
+        user_id=contract.user_id,
+        client_id=client.id,
+        title=f"{contract.title} - {client.contact_name or client.business_name}",
+        description=contract.description or f"Service appointment for {client.business_name}",
+        service_type=contract.contract_type or "standard",
+        scheduled_date=datetime.fromisoformat(data.selected_date),
+        start_time=start_time_display,
+        end_time=end_time_display,
+        duration_minutes=estimated_duration,
+        status="scheduled",
+        approval_status="accepted",
+        address=client.form_data.get('address') if client.form_data else None,
+        price=contract.total_value,
+        notes="Booked directly by client"
+    )
+    db.add(schedule)
+    
+    # Update contract status to scheduled
+    contract.status = "scheduled"
+    
+    # Update client status to scheduled
+    client.status = "scheduled"
+    
+    db.commit()
+    db.refresh(schedule)
+    
+    logger.info(f"✅ Direct booking created: schedule {schedule.id} for {data.selected_date} at {data.selected_time}")
+    
+    # Send confirmation email to provider
+    try:
+        if user.email:
+            await send_scheduling_accepted_email(
+                provider_email=user.email,
+                provider_name=user.full_name or "Service Provider",
+                client_name=client.contact_name or client.business_name,
+                contract_id=contract.id,
+                selected_date=data.selected_date,
+                start_time=start_time_display,
+                end_time=end_time_display,
+                property_address=client.form_data.get('address') if client.form_data else None
+            )
+            logger.info(f"📧 Booking confirmation email sent to provider {user.email}")
+    except Exception as e:
+        logger.error(f"Failed to send booking confirmation email: {e}")
+    
+    return {
+        "message": "Booking confirmed",
+        "schedule_id": schedule.id,
+        "scheduled_date": data.selected_date,
+        "start_time": start_time_display,
+        "end_time": end_time_display,
+        "duration_minutes": estimated_duration
+    }

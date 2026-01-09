@@ -704,8 +704,16 @@ async def send_contract_fully_executed_email(
     contract_pdf_url: Optional[str] = None,
     scheduled_time_confirmed: bool = False,
     scheduled_start_time: Optional[str] = None,
+    contract_public_id: Optional[str] = None,
 ) -> dict:
     """Notify client when contract is fully signed by both parties"""
+    from .config import FRONTEND_URL
+    
+    # Build scheduling link
+    scheduling_url = None
+    if contract_public_id:
+        frontend_base = FRONTEND_URL or "http://localhost:5173"
+        scheduling_url = f"{frontend_base}/scheduling/{contract_public_id}"
     
     # Build scheduled time section if applicable
     schedule_section = ""
@@ -718,6 +726,20 @@ async def send_contract_fully_executed_email(
           <p style="margin: 0; color: #166534; font-size: 14px;">
             📅 {scheduled_start_time}
           </p>
+        </div>
+        """
+    elif scheduling_url:
+        schedule_section = f"""
+        <div style="background: #e0f2fe; border: 1px solid #0ea5e9; border-radius: 12px; padding: 20px; margin: 20px 0; text-align: center;">
+          <p style="margin: 0 0 12px 0; color: #0369a1; font-size: 15px; font-weight: 600;">
+            📅 Next Step: Schedule Your First Appointment
+          </p>
+          <p style="margin: 0 0 16px 0; color: #0369a1; font-size: 14px;">
+            Click the button below to pick a date and time that works for you.
+          </p>
+          <a href="{scheduling_url}" style="display: inline-block; background: #00C4B4; color: white; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+            Schedule Now →
+          </a>
         </div>
         """
     elif start_date:

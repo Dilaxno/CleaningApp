@@ -393,7 +393,8 @@ async def sign_contract_as_provider(
                 total_value=contract.total_value,
                 property_address=property_address,
                 business_phone=business_phone,
-                contract_pdf_url=pdf_url
+                contract_pdf_url=pdf_url,
+                contract_public_id=contract.public_id
             )
             logger.info(f"✅ Sent fully executed contract email to {client.email}")
         except Exception as e:
