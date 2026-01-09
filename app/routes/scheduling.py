@@ -18,6 +18,170 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/scheduling", tags=["Scheduling"])
 
 
+@router.get("/info/{client_id}")
+async def get_scheduling_info_by_client(
+    client_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Public endpoint for client to get scheduling info.
+    Returns business info, working hours, and estimated duration.
+    """
+    from ..models import BusinessConfig
+    
+    # Get client
+    client = db.query(Client).filter(Client.id == client_id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    
+    # Get provider/business info
+    user = db.query(User).filter(User.id == client.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Provider not found")
+    
+    business_config = db.query(BusinessConfig).filter(
+        BusinessConfig.user_id == client.user_id
+    ).first()
+    
+    # Calculate estimated duration from client's form_data
+    estimated_duration = 60  # Default 60 minutes
+    
+    if client.form_data:
+        form_data = client.form_data
+        property_size = form_data.get('propertySize') or form_data.get('property_size')
+        if property_size and business_config and business_config.cleaning_time_per_sqft:
+            estimated_duration = max(60, int(property_size) * business_config.cleaning_time_per_sqft // 100)
+    
+    # Get working hours from business config
+    working_hours = {"start": "09:00", "end": "17:00"}
+    working_days = ["monday", "tuesday", "wednesday", "thursday", "friday"]
+    
+    if business_config:
+        if business_config.working_hours:
+            working_hours = business_config.working_hours
+        if business_config.working_days:
+            working_days = business_config.working_days
+    
+    # Get business branding
+    business_name = "Service Provider"
+    logo_url = None
+    
+    if business_config:
+        business_name = business_config.business_name or user.full_name or "Service Provider"
+        logo_url = business_config.logo_url
+    elif user:
+        business_name = user.full_name or "Service Provider"
+    
+    return {
+        "business_name": business_name,
+        "logo_url": logo_url,
+        "estimated_duration": estimated_duration,
+        "working_hours": working_hours,
+        "working_days": working_days
+    }
+
+
+class ClientBookingRequest(BaseModel):
+    client_id: int
+    start_time: str  # ISO format
+    end_time: str  # ISO format
+
+
+@router.post("/book")
+async def create_client_booking(
+    data: ClientBookingRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Public endpoint for client to book an appointment.
+    Creates a schedule entry for the provider.
+    """
+    from ..models import BusinessConfig
+    
+    logger.info(f"📅 Client booking request for client {data.client_id}")
+    
+    # Get client
+    client = db.query(Client).filter(Client.id == data.client_id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    
+    # Get the most recent contract for this client
+    contract = db.query(Contract).filter(
+        Contract.client_id == data.client_id
+    ).order_by(Contract.created_at.desc()).first()
+    
+    if not contract:
+        raise HTTPException(status_code=404, detail="No contract found for client")
+    
+    # Get provider
+    user = db.query(User).filter(User.id == client.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Provider not found")
+    
+    # Parse times
+    start_time = datetime.fromisoformat(data.start_time.replace('Z', '+00:00'))
+    end_time = datetime.fromisoformat(data.end_time.replace('Z', '+00:00'))
+    duration_minutes = int((end_time - start_time).total_seconds() / 60)
+    
+    # Format times for display
+    start_time_display = start_time.strftime("%I:%M %p")
+    end_time_display = end_time.strftime("%I:%M %p")
+    
+    # Create schedule entry
+    schedule = Schedule(
+        user_id=client.user_id,
+        client_id=client.id,
+        title=f"{contract.title} - {client.contact_name or client.business_name}",
+        description=contract.description or f"Service appointment for {client.business_name}",
+        service_type=contract.contract_type or "standard",
+        scheduled_date=start_time.date(),
+        start_time=start_time_display,
+        end_time=end_time_display,
+        duration_minutes=duration_minutes,
+        status="scheduled",
+        approval_status="accepted",
+        address=client.form_data.get('address') if client.form_data else None,
+        price=contract.total_value,
+        notes="Booked directly by client"
+    )
+    db.add(schedule)
+    
+    # Update contract and client status
+    contract.status = "scheduled"
+    client.status = "scheduled"
+    
+    db.commit()
+    db.refresh(schedule)
+    
+    logger.info(f"✅ Client booking created: schedule {schedule.id}")
+    
+    # Send confirmation email to provider
+    try:
+        if user.email:
+            await send_scheduling_accepted_email(
+                provider_email=user.email,
+                provider_name=user.full_name or "Service Provider",
+                client_name=client.contact_name or client.business_name,
+                contract_id=contract.id,
+                selected_date=start_time.strftime("%Y-%m-%d"),
+                start_time=start_time_display,
+                end_time=end_time_display,
+                property_address=client.form_data.get('address') if client.form_data else None
+            )
+            logger.info(f"📧 Booking confirmation email sent to provider {user.email}")
+    except Exception as e:
+        logger.error(f"Failed to send booking confirmation email: {e}")
+    
+    return {
+        "message": "Booking confirmed",
+        "schedule_id": schedule.id,
+        "scheduled_date": start_time.strftime("%Y-%m-%d"),
+        "start_time": start_time_display,
+        "end_time": end_time_display,
+        "duration_minutes": duration_minutes
+    }
+
+
 class TimeSlot(BaseModel):
     date: str  # YYYY-MM-DD
     start_time: str  # HH:MM
