@@ -1,6 +1,7 @@
 """
-Automated status transitions for contracts
-Handles scheduled → active and active → completed transitions
+Automated status transitions for contracts and clients
+Handles signed → active and active → completed transitions for contracts
+Handles scheduled → active transitions for clients
 """
 
 from datetime import datetime
@@ -13,8 +14,11 @@ logger = logging.getLogger(__name__)
 
 def update_contract_statuses(db: Session) -> dict:
     """
-    Update contract statuses based on dates
+    Update contract and client statuses based on dates
     Should be run as a scheduled job (e.g., daily cron)
+    
+    Contract statuses: new → signed → active → completed/cancelled
+    Client statuses: new_lead → contacted → scheduled → active → completed
     
     Returns:
         dict: Summary of status changes made
@@ -22,7 +26,7 @@ def update_contract_statuses(db: Session) -> dict:
     from ..models import Client, Schedule
     
     summary = {
-        "scheduled_to_active": 0,
+        "signed_to_active": 0,
         "active_to_completed": 0,
         "clients_to_active": 0,
         "total_updated": 0
@@ -32,16 +36,17 @@ def update_contract_statuses(db: Session) -> dict:
         now = datetime.utcnow()
         today = now.date()
         
-        # 1. Update SCHEDULED → ACTIVE (start date has arrived)
-        scheduled_contracts = db.query(Contract).filter(
-            Contract.status == "scheduled",
+        # 1. Update SIGNED → ACTIVE (start date has arrived)
+        # Contracts become active when their start date arrives
+        signed_contracts = db.query(Contract).filter(
+            Contract.status == "signed",
             Contract.start_date <= now
         ).all()
         
-        for contract in scheduled_contracts:
+        for contract in signed_contracts:
             contract.status = "active"
-            summary["scheduled_to_active"] += 1
-            logger.info(f"✅ Contract {contract.id} transitioned: scheduled → active")
+            summary["signed_to_active"] += 1
+            logger.info(f"✅ Contract {contract.id} transitioned: signed → active")
         
         # 2. Update ACTIVE → COMPLETED (end date has passed)
         active_contracts = db.query(Contract).filter(
@@ -74,7 +79,7 @@ def update_contract_statuses(db: Session) -> dict:
                 logger.info(f"✅ Client {client.id} transitioned: scheduled → active (schedule {first_schedule.id} date arrived)")
         
         # Commit all changes
-        total = summary["scheduled_to_active"] + summary["active_to_completed"] + summary["clients_to_active"]
+        total = summary["signed_to_active"] + summary["active_to_completed"] + summary["clients_to_active"]
         if total > 0:
             db.commit()
             summary["total_updated"] = total
@@ -92,7 +97,9 @@ def update_contract_statuses(db: Session) -> dict:
 
 def validate_status_transition(current_status: str, new_status: str) -> bool:
     """
-    Validate if a status transition is allowed
+    Validate if a contract status transition is allowed
+    
+    Contract statuses: new → signed → active → completed/cancelled
     
     Args:
         current_status: Current contract status
@@ -101,11 +108,10 @@ def validate_status_transition(current_status: str, new_status: str) -> bool:
     Returns:
         bool: True if transition is valid, False otherwise
     """
-    # Define valid transitions
+    # Define valid transitions for contracts
     valid_transitions = {
         "new": ["signed", "cancelled"],
-        "signed": ["scheduled", "cancelled"],
-        "scheduled": ["active", "cancelled"],
+        "signed": ["active", "cancelled"],
         "active": ["completed", "cancelled"],
         "cancelled": [],  # Terminal state
         "completed": []   # Terminal state
@@ -138,16 +144,13 @@ def get_next_required_action(contract: Contract) -> str:
             return "Contract ready to be marked as signed"
     
     elif contract.status == "signed":
-        return "Client needs to confirm schedule slot"
-    
-    elif contract.status == "scheduled":
         if contract.start_date:
             days_until_start = (contract.start_date - datetime.utcnow()).days
             if days_until_start > 0:
                 return f"Service starts in {days_until_start} days"
             else:
                 return "Service should start today - update to active status"
-        return "Start date not set"
+        return "Waiting for service to begin"
     
     elif contract.status == "active":
         if contract.end_date:

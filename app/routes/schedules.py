@@ -390,14 +390,7 @@ async def approve_schedule(
             client.status = "scheduled"
             logger.info(f"✅ Updated client {client.id} status to 'scheduled'")
         
-        # Update contract status to 'scheduled' if there's an associated contract
-        contract = db.query(Contract).filter(
-            Contract.client_id == schedule.client_id,
-            Contract.user_id == current_user.id
-        ).order_by(Contract.created_at.desc()).first()
-        if contract and contract.status not in ["cancelled", "completed"]:
-            contract.status = "scheduled"
-            logger.info(f"✅ Updated contract {contract.id} status to 'scheduled'")
+        # Note: Contract status stays as 'signed' - 'scheduled' is a client status, not contract status
         
         db.commit()
         return {"message": "Schedule accepted", "schedule_id": schedule_id}
@@ -573,14 +566,7 @@ async def client_accept_proposal(
         client.status = "scheduled"
         logger.info(f"✅ Updated client {client.id} status to 'scheduled'")
     
-    # Update contract status to 'scheduled' if there's an associated contract
-    contract = db.query(Contract).filter(
-        Contract.client_id == schedule.client_id,
-        Contract.user_id == schedule.user_id
-    ).order_by(Contract.created_at.desc()).first()
-    if contract and contract.status not in ["cancelled", "completed"]:
-        contract.status = "scheduled"
-        logger.info(f"✅ Updated contract {contract.id} status to 'scheduled'")
+    # Note: Contract status stays as 'signed' - 'scheduled' is a client status, not contract status
     
     db.commit()
     

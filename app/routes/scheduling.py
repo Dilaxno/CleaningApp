@@ -381,9 +381,7 @@ async def client_accept_slot(
     client.status = "scheduled"
     logger.info(f"✅ Updated client {client.id} status to 'scheduled'")
     
-    # Update contract status to 'scheduled'
-    contract.status = "scheduled"
-    logger.info(f"✅ Updated contract {contract.id} status to 'scheduled'")
+    # Note: Contract status stays as 'signed' - 'scheduled' is a client status, not contract status
     
     # Create calendar event (Schedule)
     schedule = Schedule(
@@ -689,8 +687,7 @@ async def create_direct_booking(
     )
     db.add(schedule)
     
-    # Update contract status to scheduled
-    contract.status = "scheduled"
+    # Note: Contract status stays as 'signed' - 'scheduled' is a client status, not contract status
     
     # Update client status to scheduled
     client.status = "scheduled"
