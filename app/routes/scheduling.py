@@ -561,12 +561,18 @@ async def get_public_scheduling_info(
         "end": "17:00"
     }
     working_days = ["monday", "tuesday", "wednesday", "thursday", "friday"]
+    day_schedules = None
+    off_work_periods = None
     
     if business_config:
         if business_config.working_hours:
             working_hours = business_config.working_hours
         if business_config.working_days:
             working_days = business_config.working_days
+        if business_config.day_schedules:
+            day_schedules = business_config.day_schedules
+        if business_config.off_work_periods:
+            off_work_periods = business_config.off_work_periods
     
     # Get business branding
     business_name = "Service Provider"
@@ -593,6 +599,8 @@ async def get_public_scheduling_info(
         "estimated_duration": estimated_duration,
         "working_hours": working_hours,
         "working_days": working_days,
+        "day_schedules": day_schedules,
+        "off_work_periods": off_work_periods,
         "status": contract.status
     }
 

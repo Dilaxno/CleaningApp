@@ -26,6 +26,11 @@ class BusinessConfigCreate(BaseModel):
     workingDays: Optional[List[str]] = None
     workingHours: Optional[Dict[str, str]] = None
     breakTimes: Optional[List[str]] = None
+    daySchedules: Optional[Dict] = None  # Per-day working hours
+    offWorkPeriods: Optional[List[Dict]] = None  # Off-work periods (vacations, holidays)
+    customAddons: Optional[List[Dict]] = None  # Custom add-on services
+    suppliesProvided: Optional[str] = None  # "provider" or "client"
+    availableSupplies: Optional[List[str]] = None  # List of supply IDs
     ratePerSqft: Optional[str] = None
     ratePerRoom: Optional[str] = None
     hourlyRate: Optional[str] = None
@@ -106,6 +111,11 @@ def get_current_user_business_config(current_user: User = Depends(get_current_us
         "workingDays": config.working_days,
         "workingHours": config.working_hours,
         "breakTimes": config.break_times,
+        "daySchedules": config.day_schedules,
+        "offWorkPeriods": config.off_work_periods,
+        "customAddons": config.custom_addons,
+        "suppliesProvided": config.supplies_provided,
+        "availableSupplies": config.available_supplies,
         "ratePerSqft": config.rate_per_sqft,
         "ratePerRoom": config.rate_per_room,
         "hourlyRate": config.hourly_rate,
@@ -167,6 +177,16 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 existing.working_hours = data.workingHours
             if data.breakTimes is not None:
                 existing.break_times = data.breakTimes
+            if data.daySchedules is not None:
+                existing.day_schedules = data.daySchedules
+            if data.offWorkPeriods is not None:
+                existing.off_work_periods = data.offWorkPeriods
+            if data.customAddons is not None:
+                existing.custom_addons = data.customAddons
+            if data.suppliesProvided is not None:
+                existing.supplies_provided = data.suppliesProvided
+            if data.availableSupplies is not None:
+                existing.available_supplies = data.availableSupplies
             if data.ratePerSqft is not None:
                 existing.rate_per_sqft = to_float(data.ratePerSqft)
             if data.ratePerRoom is not None:
@@ -224,6 +244,11 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 working_days=data.workingDays,
                 working_hours=data.workingHours,
                 break_times=data.breakTimes,
+                day_schedules=data.daySchedules,
+                off_work_periods=data.offWorkPeriods,
+                custom_addons=data.customAddons,
+                supplies_provided=data.suppliesProvided,
+                available_supplies=data.availableSupplies,
                 rate_per_sqft=to_float(data.ratePerSqft),
                 rate_per_room=to_float(data.ratePerRoom),
                 hourly_rate=to_float(data.hourlyRate),

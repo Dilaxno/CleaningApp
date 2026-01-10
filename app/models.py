@@ -75,6 +75,11 @@ class BusinessConfig(Base):
     working_days = Column(JSON, nullable=True)  # e.g., ["monday", "tuesday", "wednesday", "thursday", "friday"]
     working_hours = Column(JSON, nullable=True)  # e.g., {"start": "09:00", "end": "17:00"}
     break_times = Column(JSON, nullable=True)  # e.g., [{"start": "12:00", "end": "13:00"}]
+    day_schedules = Column(JSON, nullable=True)  # Per-day working hours: {"monday": {"enabled": true, "startTime": "09:00", "endTime": "17:00"}, ...}
+    off_work_periods = Column(JSON, nullable=True)  # Off-work periods: [{"id": "...", "name": "Vacation", "startDate": "2026-01-15", "endDate": "2026-01-20", "allDay": true, ...}]
+    custom_addons = Column(JSON, nullable=True)  # Custom add-on services: [{"id": "...", "name": "Oven cleaning", "price": "25", "pricingMetric": "per service"}]
+    supplies_provided = Column(String(20), nullable=True)  # "provider" or "client"
+    available_supplies = Column(JSON, nullable=True)  # List of supply IDs the provider brings
     rate_per_sqft = Column(Float, nullable=True)
     rate_per_room = Column(Float, nullable=True)
     hourly_rate = Column(Float, nullable=True)
