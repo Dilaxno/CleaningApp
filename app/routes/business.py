@@ -394,3 +394,39 @@ def get_public_branding(firebase_uid: str, db: Session = Depends(get_db)):
         "businessName": config.business_name,
         "logoUrl": logo_presigned_url,
     }
+
+
+@router.get("/public/addons/{firebase_uid}")
+def get_public_addons(firebase_uid: str, db: Session = Depends(get_db)):
+    """
+    Public endpoint to get business addon services for client-facing forms.
+    No authentication required - accessed via shareable form links.
+    """
+    logger.info(f"📥 Getting public addons for firebase_uid: {firebase_uid}")
+    
+    # Validate firebase_uid format to prevent injection
+    if not firebase_uid or len(firebase_uid) > 128 or not firebase_uid.replace('-', '').replace('_', '').isalnum():
+        raise HTTPException(status_code=400, detail="Invalid business identifier")
+    
+    user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
+    if not user:
+        logger.error(f"❌ User not found for firebase_uid: {firebase_uid}")
+        raise HTTPException(status_code=404, detail="Business not found")
+
+    config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
+    
+    # Return empty addons if no config exists
+    if not config:
+        logger.info(f"⚠️ No business config found, returning empty addons")
+        return {
+            "customAddons": [],
+            "addonWindows": None,
+            "addonCarpets": None,
+        }
+
+    logger.info(f"✅ Returning public addons for user_id: {user.id}")
+    return {
+        "customAddons": config.custom_addons or [],
+        "addonWindows": config.addon_windows,
+        "addonCarpets": config.addon_carpets,
+    }
