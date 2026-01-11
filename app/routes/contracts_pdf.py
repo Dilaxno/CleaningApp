@@ -603,7 +603,7 @@ async def generate_contract_html(
                 </tr>
                 {"<tr><td>Frequency Discount</td><td>" + str(quote['discount_percent']) + "% off for " + frequency.lower() + " service</td><td style='text-align: right; color: #10B981;'>-USD $" + f"{quote['discount_amount']:,.2f}" + "</td></tr>" if quote['discount_amount'] > 0 else ""}
                 <tr class="total-row">
-                    <td><strong>Total Per Visit</strong></td>
+                    <td><strong>{"Total" if frequency in ["One-time", "one-time"] else "Total Per Visit"}</strong></td>
                     <td>Estimated {quote['estimated_hours']} hours, {quote['cleaners']} cleaner(s)</td>
                     <td style="text-align: right;"><strong>USD ${quote['final_price']:,.2f}</strong></td>
                 </tr>
