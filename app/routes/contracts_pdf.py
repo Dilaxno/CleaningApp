@@ -259,8 +259,14 @@ async def generate_contract_html(
     property_type = client.property_type or "Commercial"
     
     # Service details (frequency already extracted above for start_date logic)
-    inclusions = business_config.standard_inclusions or []
-    exclusions = business_config.standard_exclusions or []
+    # Combine standard and custom inclusions/exclusions
+    standard_inclusions = business_config.standard_inclusions or []
+    custom_inclusions = business_config.custom_inclusions or []
+    inclusions = standard_inclusions + custom_inclusions
+    
+    standard_exclusions = business_config.standard_exclusions or []
+    custom_exclusions = business_config.custom_exclusions or []
+    exclusions = standard_exclusions + custom_exclusions
     
     # Build inclusions/exclusions HTML
     inclusions_html = "".join([f"<li>{item}</li>" for item in inclusions]) if inclusions else "<li>Standard cleaning services</li>"

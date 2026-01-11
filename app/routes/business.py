@@ -51,6 +51,8 @@ class BusinessConfigCreate(BaseModel):
     lateFeePercent: Optional[str] = None
     standardInclusions: Optional[List[str]] = None
     standardExclusions: Optional[List[str]] = None
+    customInclusions: Optional[List[str]] = None
+    customExclusions: Optional[List[str]] = None
     preferredUnits: Optional[str] = None
 
 
@@ -136,6 +138,8 @@ def get_current_user_business_config(current_user: User = Depends(get_current_us
         "lateFeePercent": config.late_fee_percent,
         "standardInclusions": config.standard_inclusions,
         "standardExclusions": config.standard_exclusions,
+        "customInclusions": config.custom_inclusions,
+        "customExclusions": config.custom_exclusions,
         "preferredUnits": config.preferred_units,
     }
 
@@ -227,6 +231,10 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 existing.standard_inclusions = data.standardInclusions
             if data.standardExclusions is not None:
                 existing.standard_exclusions = data.standardExclusions
+            if data.customInclusions is not None:
+                existing.custom_inclusions = data.customInclusions
+            if data.customExclusions is not None:
+                existing.custom_exclusions = data.customExclusions
             if data.preferredUnits is not None:
                 existing.preferred_units = data.preferredUnits
             db.commit()
@@ -269,6 +277,8 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 late_fee_percent=to_float(data.lateFeePercent) or 1.5,
                 standard_inclusions=data.standardInclusions,
                 standard_exclusions=data.standardExclusions,
+                custom_inclusions=data.customInclusions,
+                custom_exclusions=data.customExclusions,
                 preferred_units=data.preferredUnits,
             )
             db.add(config)
@@ -350,6 +360,8 @@ def get_business_config(firebase_uid: str, db: Session = Depends(get_db)):
         "lateFeePercent": config.late_fee_percent,
         "standardInclusions": config.standard_inclusions,
         "standardExclusions": config.standard_exclusions,
+        "customInclusions": config.custom_inclusions,
+        "customExclusions": config.custom_exclusions,
         "preferredUnits": config.preferred_units,
     }
 

@@ -100,6 +100,8 @@ class BusinessConfig(Base):
     late_fee_percent = Column(Float, default=1.5)
     standard_inclusions = Column(JSON, default=list)
     standard_exclusions = Column(JSON, default=list)
+    custom_inclusions = Column(JSON, default=list)  # Custom user-added inclusions
+    custom_exclusions = Column(JSON, default=list)  # Custom user-added exclusions
     preferred_units = Column(String(20), default="sqft")
     
     # Custom SMTP settings (standard SMTP, not Resend)
