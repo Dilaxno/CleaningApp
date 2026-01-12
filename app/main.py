@@ -35,6 +35,11 @@ from .routes.payouts import router as payouts_router
 from .routes.smtp import router as smtp_router
 from .routes.integration_requests import router as integration_requests_router
 
+# Import all models to ensure they're registered with SQLAlchemy Base
+# This is needed for relationships between models in different files
+from . import models  # noqa: F401
+from . import models_invoice  # noqa: F401
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,

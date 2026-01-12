@@ -53,6 +53,7 @@ async def generate_contract_pdf_task(ctx, client_id: int, owner_uid: str, form_d
     """
     from .database import SessionLocal
     from .models import User, Client, Contract, BusinessConfig
+    from . import models_invoice  # noqa: F401 - Ensure Invoice model is registered for Client relationship
     from .routes.contracts_pdf import calculate_quote, generate_contract_html, html_to_pdf
     from .routes.upload import get_r2_client, generate_presigned_url
     from .config import R2_BUCKET_NAME
@@ -148,6 +149,7 @@ async def send_form_notification_emails_task(ctx, client_id: int, user_id: int, 
     """
     from .database import SessionLocal
     from .models import User, Client, BusinessConfig
+    from . import models_invoice  # noqa: F401 - Ensure Invoice model is registered for Client relationship
     from .email_service import send_new_client_notification, send_form_submission_confirmation
     
     logger.info(f"📧 Starting email notifications for client {client_id}")
