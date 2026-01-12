@@ -23,6 +23,7 @@ class BusinessConfigCreate(BaseModel):
     # Pricing
     pricingModel: Optional[str] = None
     meetingsRequired: Optional[bool] = None
+    paymentHandling: Optional[str] = None  # "manual" or "automatic"
     workingDays: Optional[List[str]] = None
     workingHours: Optional[Dict[str, str]] = None
     breakTimes: Optional[List[str]] = None
@@ -175,6 +176,8 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
             if data.meetingsRequired is not None:
                 logger.info(f"📝 Setting meetings_required to: {data.meetingsRequired}")
                 existing.meetings_required = data.meetingsRequired
+            if data.paymentHandling is not None:
+                existing.payment_handling = data.paymentHandling
             if data.workingDays is not None:
                 existing.working_days = data.workingDays
             if data.workingHours is not None:
@@ -249,6 +252,7 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 onboarding_complete=data.onboardingComplete,
                 pricing_model=data.pricingModel,
                 meetings_required=data.meetingsRequired,
+                payment_handling=data.paymentHandling,
                 working_days=data.workingDays,
                 working_hours=data.workingHours,
                 break_times=data.breakTimes,
