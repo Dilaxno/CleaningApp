@@ -71,6 +71,7 @@ class BusinessConfig(Base):
     pricing_model = Column(String(50), nullable=True)  # sqft, room, hourly, flat
     meetings_required = Column(Boolean, default=False)  # Whether client meetings are required before confirmation
     payment_handling = Column(String(20), nullable=True)  # "manual" or "automatic" - how provider handles payments
+    cancellation_window = Column(Integer, default=24)  # Hours notice required for cancellation
     
     # Availability settings
     working_days = Column(JSON, nullable=True)  # e.g., ["monday", "tuesday", "wednesday", "thursday", "friday"]

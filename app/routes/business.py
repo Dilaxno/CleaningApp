@@ -24,6 +24,7 @@ class BusinessConfigCreate(BaseModel):
     pricingModel: Optional[str] = None
     meetingsRequired: Optional[bool] = None
     paymentHandling: Optional[str] = None  # "manual" or "automatic"
+    cancellationWindow: Optional[str] = None  # Hours notice required for cancellation
     workingDays: Optional[List[str]] = None
     workingHours: Optional[Dict[str, str]] = None
     breakTimes: Optional[List[str]] = None
@@ -178,6 +179,8 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 existing.meetings_required = data.meetingsRequired
             if data.paymentHandling is not None:
                 existing.payment_handling = data.paymentHandling
+            if data.cancellationWindow is not None:
+                existing.cancellation_window = to_int(data.cancellationWindow) or 24
             if data.workingDays is not None:
                 existing.working_days = data.workingDays
             if data.workingHours is not None:
@@ -253,6 +256,7 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 pricing_model=data.pricingModel,
                 meetings_required=data.meetingsRequired,
                 payment_handling=data.paymentHandling,
+                cancellation_window=to_int(data.cancellationWindow) or 24,
                 working_days=data.workingDays,
                 working_hours=data.workingHours,
                 break_times=data.breakTimes,
