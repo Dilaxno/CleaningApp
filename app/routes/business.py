@@ -78,6 +78,15 @@ def to_int(val: Optional[str]) -> Optional[int]:
         return None
 
 
+def is_provided(val) -> bool:
+    """Check if a value was actually provided (not None and not empty string)."""
+    if val is None:
+        return False
+    if isinstance(val, str) and val == "":
+        return False
+    return True
+
+
 @router.get("")
 def get_current_user_business_config(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Get business config for the currently authenticated user"""
@@ -168,26 +177,26 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
         if existing:
             logger.info(f"📝 Updating existing config for user_id: {user.id}")
             logger.info(f"📝 Current DB values: logo_url={existing.logo_url}, rate_per_sqft={existing.rate_per_sqft}, pricing_model={existing.pricing_model}")
-            # Only update fields that are explicitly provided (not None)
-            if data.businessName is not None:
+            # Only update fields that are explicitly provided (not None and not empty string)
+            if is_provided(data.businessName):
                 logger.info(f"📝 Updating business_name: {data.businessName}")
                 existing.business_name = data.businessName
-            if data.logoUrl is not None:
+            if is_provided(data.logoUrl):
                 logger.info(f"📝 Updating logo_url: {data.logoUrl}")
                 existing.logo_url = data.logoUrl
-            if data.signatureUrl is not None:
+            if is_provided(data.signatureUrl):
                 existing.signature_url = data.signatureUrl
             if data.onboardingComplete is not None:
                 logger.info(f"📝 Setting onboarding_complete to: {data.onboardingComplete}")
                 existing.onboarding_complete = data.onboardingComplete
-            if data.pricingModel is not None:
+            if is_provided(data.pricingModel):
                 existing.pricing_model = data.pricingModel
             if data.meetingsRequired is not None:
                 logger.info(f"📝 Setting meetings_required to: {data.meetingsRequired}")
                 existing.meetings_required = data.meetingsRequired
-            if data.paymentHandling is not None:
+            if is_provided(data.paymentHandling):
                 existing.payment_handling = data.paymentHandling
-            if data.cancellationWindow is not None:
+            if is_provided(data.cancellationWindow):
                 existing.cancellation_window = to_int(data.cancellationWindow) or 24
             if data.workingDays is not None:
                 existing.working_days = data.workingDays
@@ -201,53 +210,53 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 existing.off_work_periods = data.offWorkPeriods
             if data.customAddons is not None:
                 existing.custom_addons = data.customAddons
-            if data.suppliesProvided is not None:
+            if is_provided(data.suppliesProvided):
                 existing.supplies_provided = data.suppliesProvided
             if data.availableSupplies is not None:
                 existing.available_supplies = data.availableSupplies
-            if data.ratePerSqft is not None:
+            if is_provided(data.ratePerSqft):
                 converted_rate = to_float(data.ratePerSqft)
                 logger.info(f"📝 Updating rate_per_sqft: raw={data.ratePerSqft}, converted={converted_rate}")
                 existing.rate_per_sqft = converted_rate
-            if data.ratePerRoom is not None:
+            if is_provided(data.ratePerRoom):
                 converted_rate = to_float(data.ratePerRoom)
                 logger.info(f"📝 Updating rate_per_room: raw={data.ratePerRoom}, converted={converted_rate}")
                 existing.rate_per_room = converted_rate
-            if data.hourlyRate is not None:
+            if is_provided(data.hourlyRate):
                 converted_rate = to_float(data.hourlyRate)
                 logger.info(f"📝 Updating hourly_rate: raw={data.hourlyRate}, converted={converted_rate}")
                 existing.hourly_rate = converted_rate
-            if data.flatRate is not None:
+            if is_provided(data.flatRate):
                 converted_rate = to_float(data.flatRate)
                 logger.info(f"📝 Updating flat_rate: raw={data.flatRate}, converted={converted_rate}")
                 existing.flat_rate = converted_rate
-            if data.minimumCharge is not None:
+            if is_provided(data.minimumCharge):
                 existing.minimum_charge = to_float(data.minimumCharge)
-            if data.cleaningTimePerSqft is not None:
+            if is_provided(data.cleaningTimePerSqft):
                 existing.cleaning_time_per_sqft = to_int(data.cleaningTimePerSqft)
-            if data.cleanersSmallJob is not None:
+            if is_provided(data.cleanersSmallJob):
                 existing.cleaners_small_job = to_int(data.cleanersSmallJob) or 1
-            if data.cleanersLargeJob is not None:
+            if is_provided(data.cleanersLargeJob):
                 existing.cleaners_large_job = to_int(data.cleanersLargeJob) or 2
-            if data.bufferTime is not None:
+            if is_provided(data.bufferTime):
                 existing.buffer_time = to_int(data.bufferTime) or 30
-            if data.premiumEveningWeekend is not None:
+            if is_provided(data.premiumEveningWeekend):
                 existing.premium_evening_weekend = to_float(data.premiumEveningWeekend)
-            if data.premiumDeepClean is not None:
+            if is_provided(data.premiumDeepClean):
                 existing.premium_deep_clean = to_float(data.premiumDeepClean)
-            if data.discountWeekly is not None:
+            if is_provided(data.discountWeekly):
                 existing.discount_weekly = to_float(data.discountWeekly)
-            if data.discountMonthly is not None:
+            if is_provided(data.discountMonthly):
                 existing.discount_monthly = to_float(data.discountMonthly)
-            if data.discountLongTerm is not None:
+            if is_provided(data.discountLongTerm):
                 existing.discount_long_term = to_float(data.discountLongTerm)
-            if data.addonWindows is not None:
+            if is_provided(data.addonWindows):
                 existing.addon_windows = to_float(data.addonWindows)
-            if data.addonCarpets is not None:
+            if is_provided(data.addonCarpets):
                 existing.addon_carpets = to_float(data.addonCarpets)
-            if data.paymentDueDays is not None:
+            if is_provided(data.paymentDueDays):
                 existing.payment_due_days = to_int(data.paymentDueDays) or 15
-            if data.lateFeePercent is not None:
+            if is_provided(data.lateFeePercent):
                 existing.late_fee_percent = to_float(data.lateFeePercent) or 1.5
             if data.standardInclusions is not None:
                 existing.standard_inclusions = data.standardInclusions
@@ -257,7 +266,7 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 existing.custom_inclusions = data.customInclusions
             if data.customExclusions is not None:
                 existing.custom_exclusions = data.customExclusions
-            if data.preferredUnits is not None:
+            if is_provided(data.preferredUnits):
                 existing.preferred_units = data.preferredUnits
             db.commit()
             config = existing
