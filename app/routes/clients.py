@@ -396,6 +396,7 @@ class PublicClientCreate(BaseModel):
     formData: Optional[dict] = None  # Store all form fields as JSON
     clientSignature: Optional[str] = None  # Base64 signature from client
     turnstileToken: Optional[str] = None  # Cloudflare Turnstile token for bot prevention
+    quoteAccepted: Optional[bool] = False  # Whether client accepted the quote
     
     @field_validator('phone')
     @classmethod
@@ -405,12 +406,122 @@ class PublicClientCreate(BaseModel):
         return v
 
 
+class QuotePreviewRequest(BaseModel):
+    """Schema for quote preview - calculates quote without creating client"""
+    ownerUid: str
+    formData: dict
+
+
+class QuotePreviewResponse(BaseModel):
+    """Response for quote preview"""
+    basePrice: float
+    discountPercent: float
+    discountAmount: float
+    finalPrice: float
+    estimatedHours: float
+    cleaners: int
+    pricingModel: str
+    frequency: str
+    pricingExplanation: str
+    quotePending: bool = False
+
+
 class PublicSubmitResponse(BaseModel):
     client: Optional[ClientResponse] = None
     contractPdfUrl: Optional[str] = None
     jobId: Optional[str] = None
     message: str
     requiresCaptcha: bool = False
+
+
+@router.post("/public/quote-preview", response_model=QuotePreviewResponse)
+async def get_quote_preview(
+    data: QuotePreviewRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Public endpoint to calculate and preview quote before form submission.
+    No client is created - just returns the calculated quote with explanation.
+    """
+    from .contracts_pdf import calculate_quote
+    
+    client_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "unknown")
+    if client_ip and "," in client_ip:
+        client_ip = client_ip.split(",")[0].strip()
+    
+    logger.info(f"📊 Quote preview request for owner UID: {data.ownerUid} from IP: {client_ip}")
+    
+    # Find the user by Firebase UID
+    user = db.query(User).filter(User.firebase_uid == data.ownerUid).first()
+    if not user:
+        logger.error(f"❌ User not found for Firebase UID: {data.ownerUid}")
+        raise HTTPException(status_code=404, detail="Business not found")
+    
+    # Get business config
+    config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
+    if not config:
+        logger.warning(f"⚠️ No business config found for user {user.id}")
+        return QuotePreviewResponse(
+            basePrice=0,
+            discountPercent=0,
+            discountAmount=0,
+            finalPrice=0,
+            estimatedHours=0,
+            cleaners=1,
+            pricingModel="",
+            frequency=data.formData.get("cleaningFrequency", ""),
+            pricingExplanation="Quote will be provided by the service provider.",
+            quotePending=True
+        )
+    
+    # Calculate quote
+    quote = calculate_quote(config, data.formData)
+    
+    # Build pricing explanation
+    pricing_model = config.pricing_model or ""
+    property_size = int(data.formData.get("squareFootage", 0) or 0)
+    num_rooms = int(data.formData.get("numberOfOffices", 0) or data.formData.get("numberOfRooms", 0) or 0)
+    frequency = data.formData.get("cleaningFrequency", "")
+    
+    explanation_parts = []
+    
+    if quote.get("quote_pending"):
+        explanation = "Quote will be provided by the service provider after reviewing your requirements."
+    else:
+        # Base rate explanation
+        if pricing_model == "sqft" and config.rate_per_sqft:
+            explanation_parts.append(f"${config.rate_per_sqft:.2f} per sq ft × {property_size:,} sq ft = ${quote['base_price']:,.2f}")
+        elif pricing_model == "room" and config.rate_per_room:
+            rooms = num_rooms if num_rooms > 0 else max(1, property_size // 200) if property_size > 0 else 5
+            explanation_parts.append(f"${config.rate_per_room:.2f} per room × {rooms} rooms = ${quote['base_price']:,.2f}")
+        elif pricing_model == "hourly" and config.hourly_rate:
+            explanation_parts.append(f"${config.hourly_rate:.2f}/hour × {quote['estimated_hours']:.1f} hours = ${quote['base_price']:,.2f}")
+        elif pricing_model == "flat" and config.flat_rate:
+            explanation_parts.append(f"Flat rate: ${config.flat_rate:,.2f}")
+        else:
+            explanation_parts.append(f"Base service rate: ${quote['base_price']:,.2f}")
+        
+        # Discount explanation
+        if quote['discount_percent'] > 0:
+            explanation_parts.append(f"{quote['discount_percent']:.0f}% {frequency.lower()} discount: -${quote['discount_amount']:,.2f}")
+        
+        explanation = " • ".join(explanation_parts)
+    
+    logger.info(f"✅ Quote preview calculated: ${quote['final_price']:,.2f} for {frequency}")
+    
+    return QuotePreviewResponse(
+        basePrice=quote['base_price'],
+        discountPercent=quote['discount_percent'],
+        discountAmount=quote['discount_amount'],
+        finalPrice=quote['final_price'],
+        estimatedHours=quote['estimated_hours'],
+        cleaners=quote['cleaners'],
+        pricingModel=pricing_model,
+        frequency=frequency,
+        pricingExplanation=explanation,
+        quotePending=quote.get('quote_pending', False)
+    )
 
 
 @router.post("/public/submit")

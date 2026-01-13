@@ -1,11 +1,15 @@
 import random
 import string
 import logging
+import hashlib
+import base64
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
+import pyotp
+from cryptography.fernet import Fernet
 from ..database import get_db
 from ..models import User
 from ..schemas import UserResponse, UserUpdate, MessageResponse
@@ -13,11 +17,19 @@ from ..auth import get_current_user
 from ..email_service import send_email
 from ..rate_limiter import create_rate_limiter
 from ..turnstile import verify_turnstile
+from ..config import SECRET_KEY
 
 # Firebase Admin SDK for password updates
 import firebase_admin
 from firebase_admin import credentials, auth as firebase_auth
 from ..config import FIREBASE_PROJECT_ID
+
+# Generate encryption key from SECRET_KEY for backup codes
+def get_fernet_key():
+    key = hashlib.sha256(SECRET_KEY.encode()).digest()
+    return base64.urlsafe_b64encode(key)
+
+cipher = Fernet(get_fernet_key())
 
 logger = logging.getLogger(__name__)
 
@@ -58,9 +70,57 @@ class ResetPasswordRequest(BaseModel):
     new_password: str
 
 
+class RecoveryMethodsRequest(BaseModel):
+    email: str
+    turnstileToken: Optional[str] = None
+
+
+class RecoveryMethodsResponse(BaseModel):
+    has_totp: bool
+    has_phone: bool
+    has_recovery_email: bool
+    has_backup_codes: bool
+    recovery_email_hint: Optional[str] = None
+    phone_hint: Optional[str] = None
+
+
+class VerifyRecoveryRequest(BaseModel):
+    email: str
+    method: str  # "totp", "phone", "recovery_email", "backup_code"
+    code: str
+
+
 def generate_otp() -> str:
     """Generate a 6-digit OTP"""
     return ''.join(random.choices(string.digits, k=6))
+
+
+def mask_email(email: str) -> str:
+    """Mask email for privacy: jo***@gm***.com"""
+    if not email or '@' not in email:
+        return "***@***.***"
+    local, domain = email.split('@')
+    domain_parts = domain.split('.')
+    masked_local = local[:2] + "***" if len(local) > 2 else local[0] + "***"
+    masked_domain = domain_parts[0][:2] + "***" if len(domain_parts[0]) > 2 else domain_parts[0][0] + "***"
+    return f"{masked_local}@{masked_domain}.{domain_parts[-1]}"
+
+
+def mask_phone(phone: str) -> str:
+    """Mask phone for privacy: ***-***-1234"""
+    if not phone or len(phone) < 4:
+        return "***-***-****"
+    return f"***-***-{phone[-4:]}"
+
+
+def decrypt_backup_codes(encrypted_codes: List[str]) -> List[str]:
+    """Decrypt backup codes"""
+    return [cipher.decrypt(code.encode()).decode() for code in encrypted_codes]
+
+
+def encrypt_backup_codes(codes: List[str]) -> List[str]:
+    """Encrypt backup codes before storing"""
+    return [cipher.encrypt(code.encode()).decode() for code in codes]
 
 
 # Rate limiters
@@ -163,19 +223,19 @@ async def reset_password(
     data: ResetPasswordRequest,
     db: Session = Depends(get_db)
 ):
-    """Reset password after OTP verification"""
+    """Reset password after OTP or 2FA verification"""
     stored = otp_storage.get(data.email)
     
     if not stored or not stored.get("verified"):
-        raise HTTPException(status_code=400, detail="Please verify OTP first.")
+        raise HTTPException(status_code=400, detail="Please verify your identity first.")
     
     # Check expiry again
     if datetime.utcnow() > stored["expiry"]:
         del otp_storage[data.email]
         raise HTTPException(status_code=400, detail="Session expired. Please start over.")
     
-    # Verify OTP matches
-    if stored["otp"] != data.otp:
+    # For email OTP, verify OTP matches (skip for 2FA verified sessions)
+    if stored["otp"] != "2fa_verified" and stored["otp"] != data.otp:
         raise HTTPException(status_code=400, detail="Invalid OTP.")
     
     # Get user
@@ -204,6 +264,198 @@ async def reset_password(
         "message": "Password reset successful",
         "success": True
     }
+
+
+# ==================== Account Recovery with 2FA ====================
+
+@router.post("/recovery/methods", response_model=RecoveryMethodsResponse)
+async def get_recovery_methods(
+    data: RecoveryMethodsRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    _: None = Depends(rate_limit_password_reset)
+):
+    """Get available 2FA recovery methods for an account"""
+    # Verify Turnstile token
+    if data.turnstileToken:
+        client_ip = request.client.host if request.client else None
+        is_valid = await verify_turnstile(data.turnstileToken, client_ip)
+        if not is_valid:
+            raise HTTPException(status_code=400, detail="CAPTCHA verification failed")
+    
+    # Check if user exists
+    user = db.query(User).filter(User.email == data.email).first()
+    if not user:
+        # Return empty response to not reveal if email exists
+        return RecoveryMethodsResponse(
+            has_totp=False,
+            has_phone=False,
+            has_recovery_email=False,
+            has_backup_codes=False
+        )
+    
+    return RecoveryMethodsResponse(
+        has_totp=user.totp_enabled or False,
+        has_phone=user.phone_2fa_enabled or False,
+        has_recovery_email=user.recovery_email_verified or False,
+        has_backup_codes=bool(user.backup_codes and len(user.backup_codes) > 0),
+        recovery_email_hint=mask_email(user.recovery_email) if user.recovery_email_verified else None,
+        phone_hint=mask_phone(user.phone_number) if user.phone_2fa_enabled else None
+    )
+
+
+@router.post("/recovery/send-code")
+async def send_recovery_code(
+    data: RecoveryMethodsRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    _: None = Depends(rate_limit_password_reset)
+):
+    """Send recovery code to recovery email or phone"""
+    user = db.query(User).filter(User.email == data.email).first()
+    if not user:
+        return {"message": "If recovery methods are available, a code has been sent."}
+    
+    # Generate OTP
+    otp = generate_otp()
+    expiry = datetime.utcnow() + timedelta(minutes=10)
+    
+    # Store OTP
+    otp_storage[f"recovery_{data.email}"] = {
+        "otp": otp,
+        "expiry": expiry,
+        "attempts": 0
+    }
+    
+    # Send to recovery email if available
+    if user.recovery_email_verified and user.recovery_email:
+        content_html = f"""
+        <p>You requested to recover your CleanEnroll account. Use the code below to verify your identity:</p>
+        <div style="background: #f8f9fb; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
+          <p style="margin: 0 0 8px 0; color: #64748B; font-size: 14px;">Your recovery code</p>
+          <p style="margin: 0; font-size: 36px; font-weight: 700; letter-spacing: 8px; color: #1E293B;">{otp}</p>
+        </div>
+        <p style="color: #64748B; font-size: 14px;">This code expires in 10 minutes.</p>
+        <p style="color: #64748B; font-size: 14px;">If you didn't request this, please secure your account immediately.</p>
+        """
+        
+        await send_email(
+            to=user.recovery_email,
+            subject="Account Recovery Code - CleanEnroll",
+            title="Recover Your Account",
+            intro="We received a request to recover your account.",
+            content_html=content_html,
+        )
+        logger.info(f"Recovery code sent to recovery email for: {user.email}")
+    
+    return {"message": "If recovery methods are available, a code has been sent."}
+
+
+@router.post("/recovery/verify")
+async def verify_recovery_method(
+    data: VerifyRecoveryRequest,
+    db: Session = Depends(get_db)
+):
+    """Verify identity using 2FA recovery method"""
+    user = db.query(User).filter(User.email == data.email).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid request")
+    
+    verified = False
+    
+    if data.method == "totp":
+        # Verify TOTP code
+        if not user.totp_enabled or not user.totp_secret:
+            raise HTTPException(status_code=400, detail="TOTP not enabled for this account")
+        
+        totp = pyotp.TOTP(user.totp_secret)
+        if totp.verify(data.code, valid_window=1):
+            verified = True
+        else:
+            raise HTTPException(status_code=400, detail="Invalid authenticator code")
+    
+    elif data.method == "backup_code":
+        # Verify backup code
+        if not user.backup_codes:
+            raise HTTPException(status_code=400, detail="No backup codes available")
+        
+        try:
+            decrypted_codes = decrypt_backup_codes(user.backup_codes)
+            normalized_code = data.code.upper().replace(" ", "")
+            
+            if normalized_code in decrypted_codes:
+                # Remove used code
+                decrypted_codes.remove(normalized_code)
+                user.backup_codes = encrypt_backup_codes(decrypted_codes)
+                db.commit()
+                verified = True
+            else:
+                raise HTTPException(status_code=400, detail="Invalid backup code")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Backup code verification error: {e}")
+            raise HTTPException(status_code=400, detail="Invalid backup code")
+    
+    elif data.method == "recovery_email":
+        # Verify recovery email OTP
+        stored = otp_storage.get(f"recovery_{data.email}")
+        if not stored:
+            raise HTTPException(status_code=400, detail="No recovery code found. Please request a new one.")
+        
+        if stored["attempts"] >= 5:
+            del otp_storage[f"recovery_{data.email}"]
+            raise HTTPException(status_code=400, detail="Too many attempts. Please request a new code.")
+        
+        if datetime.utcnow() > stored["expiry"]:
+            del otp_storage[f"recovery_{data.email}"]
+            raise HTTPException(status_code=400, detail="Code expired. Please request a new one.")
+        
+        if stored["otp"] != data.code:
+            stored["attempts"] += 1
+            raise HTTPException(status_code=400, detail="Invalid recovery code")
+        
+        verified = True
+        del otp_storage[f"recovery_{data.email}"]
+    
+    elif data.method == "phone":
+        # Verify phone OTP (similar to recovery email)
+        stored = otp_storage.get(f"recovery_{data.email}")
+        if not stored:
+            raise HTTPException(status_code=400, detail="No recovery code found. Please request a new one.")
+        
+        if stored["attempts"] >= 5:
+            del otp_storage[f"recovery_{data.email}"]
+            raise HTTPException(status_code=400, detail="Too many attempts. Please request a new code.")
+        
+        if datetime.utcnow() > stored["expiry"]:
+            del otp_storage[f"recovery_{data.email}"]
+            raise HTTPException(status_code=400, detail="Code expired. Please request a new one.")
+        
+        if stored["otp"] != data.code:
+            stored["attempts"] += 1
+            raise HTTPException(status_code=400, detail="Invalid recovery code")
+        
+        verified = True
+        del otp_storage[f"recovery_{data.email}"]
+    
+    else:
+        raise HTTPException(status_code=400, detail="Invalid recovery method")
+    
+    if verified:
+        # Create a verified session for password reset
+        expiry = datetime.utcnow() + timedelta(minutes=15)
+        otp_storage[data.email] = {
+            "otp": "2fa_verified",
+            "expiry": expiry,
+            "attempts": 0,
+            "verified": True,
+            "method": data.method
+        }
+        
+        return {"message": "Identity verified successfully", "verified": True}
+    
+    raise HTTPException(status_code=400, detail="Verification failed")
 
 
 @router.get("/me", response_model=UserResponse)
