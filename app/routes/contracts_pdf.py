@@ -346,6 +346,8 @@ async def generate_contract_html(
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
         }}
         body {{
             font-family: 'Poppins', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -439,15 +441,17 @@ async def generate_contract_html(
             width: 100%;
             border-collapse: collapse;
             margin-top: 12px;
+            background-color: white;
         }}
         .pricing-table th,
         .pricing-table td {{
             padding: 12px 16px;
             text-align: left;
             border-bottom: 1px solid #E2E8F0;
+            background-color: white;
         }}
         .pricing-table th {{
-            background: #F8FAFC;
+            background-color: #F8FAFC;
             font-size: 8pt;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -464,6 +468,7 @@ async def generate_contract_html(
         .pricing-table .total-row td {{
             border-bottom: none;
             border-top: 2px solid #e5e7eb;
+            background-color: white;
         }}
         .bullet-list {{
             list-style: none;
@@ -673,7 +678,7 @@ async def generate_contract_html(
                     <td>{"Service provider will provide quote" if quote.get('quote_pending') else f"Estimated {quote['estimated_hours']} hours, {quote['cleaners']} cleaner(s)"}</td>
                     <td style="text-align: right;"><strong>{"Quote Pending" if quote.get('quote_pending') else f"USD ${quote['final_price']:,.2f}"}</strong></td>
                 </tr>
-                {f"<tr><td colspan='3' style='padding-top: 15px; border-top: 2px solid #e5e7eb;'></td></tr><tr style='background-color: #f8fafc;'><td><strong>Contract Term</strong></td><td>{quote['term_duration']} {quote['term_unit']} ({quote['service_occurrences']} visits)</td><td style='text-align: right;'></td></tr><tr class='total-row'><td><strong>Total Contract Value</strong></td><td>For entire {quote['term_duration']} {quote['term_unit'].lower()} term</td><td style='text-align: right;'><strong>USD ${quote['total_term_rate']:,.2f}</strong></td></tr>" if quote.get('total_term_rate') and not quote.get('quote_pending') else ""}
+                {f"<tr style='background-color: #f8fafc;'><td style='padding-top: 20px;'><strong>Contract Term</strong></td><td style='padding-top: 20px;'>{quote['term_duration']} {quote['term_unit']} ({quote['service_occurrences']} visits)</td><td style='text-align: right; padding-top: 20px;'></td></tr><tr class='total-row'><td><strong>Total Contract Value</strong></td><td>For entire {quote['term_duration']} {quote['term_unit'].lower()} term</td><td style='text-align: right;'><strong>USD ${quote['total_term_rate']:,.2f}</strong></td></tr>" if quote.get('total_term_rate') and not quote.get('quote_pending') else ""}
             </tbody>
         </table>
         <p class="terms-note">Payment due within {payment_due_days} days of service completion. A {late_fee}% late fee applies after due date.</p>
