@@ -486,25 +486,26 @@ async def get_quote_preview(
     
     explanation_parts = []
     
+    business_name = config.business_name or "This business"
+    
     if quote.get("quote_pending"):
         explanation = "Quote will be provided by the service provider after reviewing your requirements."
     else:
-        # Base rate explanation
+        # Base rate explanation - show business name and rate per metric
         if pricing_model == "sqft" and config.rate_per_sqft:
-            explanation_parts.append(f"${config.rate_per_sqft:.2f} per sq ft × {property_size:,} sq ft = ${quote['base_price']:,.2f}")
+            explanation_parts.append(f"{business_name} prices their jobs at ${config.rate_per_sqft:.2f} per sq ft")
         elif pricing_model == "room" and config.rate_per_room:
-            rooms = num_rooms if num_rooms > 0 else max(1, property_size // 200) if property_size > 0 else 5
-            explanation_parts.append(f"${config.rate_per_room:.2f} per room × {rooms} rooms = ${quote['base_price']:,.2f}")
+            explanation_parts.append(f"{business_name} prices their jobs at ${config.rate_per_room:.2f} per room")
         elif pricing_model == "hourly" and config.hourly_rate:
-            explanation_parts.append(f"${config.hourly_rate:.2f}/hour × {quote['estimated_hours']:.1f} hours = ${quote['base_price']:,.2f}")
+            explanation_parts.append(f"{business_name} prices their jobs at ${config.hourly_rate:.2f} per hour")
         elif pricing_model == "flat" and config.flat_rate:
-            explanation_parts.append(f"Flat rate: ${config.flat_rate:,.2f}")
+            explanation_parts.append(f"{business_name} prices their jobs at a flat rate of ${config.flat_rate:,.2f}")
         else:
             explanation_parts.append(f"Base service rate: ${quote['base_price']:,.2f}")
         
         # Discount explanation
         if quote['discount_percent'] > 0:
-            explanation_parts.append(f"{quote['discount_percent']:.0f}% {frequency.lower()} discount: -${quote['discount_amount']:,.2f}")
+            explanation_parts.append(f"{quote['discount_percent']:.0f}% {frequency.lower()} discount applied")
         
         explanation = " • ".join(explanation_parts)
     

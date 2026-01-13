@@ -459,12 +459,13 @@ async def generate_contract_html(
             color: #0A2540;
         }}
         .pricing-table .total-row {{
-            background: #f8fafc;
+            background: #0A2540;
             font-weight: 600;
         }}
         .pricing-table .total-row td {{
             border-bottom: none;
             border-top: 2px solid #e5e7eb;
+            color: #FFFFFF;
         }}
         .bullet-list {{
             list-style: none;
