@@ -50,10 +50,16 @@ class ContractGenerateRequest(BaseModel):
 
 def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
     """Calculate quote based on business config and form data"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     pricing_model = config.pricing_model
     property_size = int(form_data.get("squareFootage", 0) or 0)
     num_rooms = int(form_data.get("numberOfOffices", 0) or form_data.get("numberOfRooms", 0) or 0)
     frequency = form_data.get("cleaningFrequency", "Weekly")
+    
+    logger.info(f"📊 Quote calculation - pricing_model: {pricing_model}, property_size: {property_size}, num_rooms: {num_rooms}, frequency: {frequency}")
+    logger.info(f"📊 Config rates - sqft: {config.rate_per_sqft}, room: {config.rate_per_room}, hourly: {config.hourly_rate}, flat: {config.flat_rate}")
     
     base_price = 0.0
     estimated_hours = 0.0
@@ -89,9 +95,33 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
         base_price = config.flat_rate
         estimated_hours = 2  # Default estimate for flat rate
     
+    # If no pricing model matched or base_price is still 0, try fallbacks
+    if base_price == 0:
+        logger.warning(f"⚠️ Base price is 0 - trying fallback rates")
+        # Try each rate type as fallback
+        if config.flat_rate and config.flat_rate > 0:
+            base_price = config.flat_rate
+            estimated_hours = 2
+            logger.info(f"📊 Using flat_rate fallback: ${base_price}")
+        elif config.hourly_rate and config.hourly_rate > 0:
+            estimated_hours = max(2, property_size / 500) if property_size > 0 else 2
+            base_price = estimated_hours * config.hourly_rate
+            logger.info(f"📊 Using hourly_rate fallback: ${base_price}")
+        elif config.rate_per_sqft and config.rate_per_sqft > 0 and property_size > 0:
+            base_price = property_size * config.rate_per_sqft
+            estimated_hours = max(1, property_size / 500)
+            logger.info(f"📊 Using rate_per_sqft fallback: ${base_price}")
+        elif config.rate_per_room and config.rate_per_room > 0:
+            # Estimate rooms from property size if not provided
+            rooms = num_rooms if num_rooms > 0 else max(1, property_size / 200) if property_size > 0 else 5
+            base_price = rooms * config.rate_per_room
+            estimated_hours = rooms * 0.5
+            logger.info(f"📊 Using rate_per_room fallback: ${base_price}")
+    
     # Apply minimum charge
     if config.minimum_charge and base_price < config.minimum_charge:
         base_price = config.minimum_charge
+        logger.info(f"📊 Applied minimum charge: ${base_price}")
     
     # Apply frequency discount
     discount_percent = 0
@@ -147,6 +177,15 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
         except (ValueError, TypeError):
             pass
     
+    # Ensure minimum values for display
+    if estimated_hours < 1:
+        estimated_hours = 1.0
+    
+    # If still no price, set a flag for "quote pending"
+    quote_pending = base_price == 0 and final_price == 0
+    
+    logger.info(f"📊 Final quote - base: ${base_price}, discount: ${discount_amount}, final: ${final_price}, hours: {estimated_hours}, pending: {quote_pending}")
+    
     return {
         "base_price": round(base_price, 2),
         "discount_percent": discount_percent,
@@ -160,6 +199,7 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
         "term_unit": term_unit,
         "total_term_rate": round(total_term_rate, 2) if total_term_rate else None,
         "service_occurrences": service_occurrences,
+        "quote_pending": quote_pending,
     }
 
 
@@ -183,16 +223,29 @@ async def generate_contract_html(
     logo_url = None
     signature_url = None
     
+    logger.info(f"🏢 Business config - name: {business_name}, logo_url key: {business_config.logo_url}")
+    
     # Download and convert logo to base64 for Playwright
     if business_config.logo_url:
         try:
-            presigned_logo_url = generate_presigned_url(business_config.logo_url)
-            logger.info(f"✅ Generated presigned URL for logo: {business_config.logo_url}")
+            # Check if logo_url is already a full URL (shouldn't be, but handle it)
+            if business_config.logo_url.startswith('http'):
+                presigned_logo_url = business_config.logo_url
+                logger.info(f"ℹ️ Logo URL is already a full URL")
+            else:
+                presigned_logo_url = generate_presigned_url(business_config.logo_url)
+            logger.info(f"✅ Generated presigned URL for logo: {presigned_logo_url[:100]}...")
             logo_url = await download_image_as_base64(presigned_logo_url)
             if logo_url:
-                logger.info("✅ Logo downloaded and converted to base64")
+                logger.info(f"✅ Logo downloaded and converted to base64 ({len(logo_url)} chars)")
+            else:
+                logger.warning(f"⚠️ Logo download returned None for URL: {presigned_logo_url[:100]}...")
         except Exception as e:
-            logger.warning(f"⚠️ Failed to generate logo URL: {e}")
+            logger.error(f"❌ Failed to generate/download logo: {type(e).__name__}: {e}")
+            import traceback
+            logger.error(f"❌ Traceback: {traceback.format_exc()}")
+    else:
+        logger.info("ℹ️ No logo_url configured in business config")
     
     # Download and convert provider signature to base64
     if provider_signature:
@@ -605,15 +658,15 @@ async def generate_contract_html(
                 <tr>
                     <td>Base Service Rate</td>
                     <td>{frequency} cleaning service</td>
-                    <td style="text-align: right;">USD ${quote['base_price']:,.2f}</td>
+                    <td style="text-align: right;">{"Quote Pending" if quote.get('quote_pending') else f"USD ${quote['base_price']:,.2f}"}</td>
                 </tr>
                 {"<tr><td>Frequency Discount</td><td>" + str(quote['discount_percent']) + "% off for " + frequency.lower() + " service</td><td style='text-align: right; color: #10B981;'>-USD $" + f"{quote['discount_amount']:,.2f}" + "</td></tr>" if quote['discount_amount'] > 0 else ""}
                 <tr class="total-row">
                     <td><strong>{"Total" if frequency in ["One-time", "one-time"] else "Total Per Visit"}</strong></td>
-                    <td>Estimated {quote['estimated_hours']} hours, {quote['cleaners']} cleaner(s)</td>
-                    <td style="text-align: right;"><strong>USD ${quote['final_price']:,.2f}</strong></td>
+                    <td>{"Service provider will provide quote" if quote.get('quote_pending') else f"Estimated {quote['estimated_hours']} hours, {quote['cleaners']} cleaner(s)"}</td>
+                    <td style="text-align: right;"><strong>{"Quote Pending" if quote.get('quote_pending') else f"USD ${quote['final_price']:,.2f}"}</strong></td>
                 </tr>
-                {f"<tr><td colspan='3' style='padding-top: 15px; border-top: 2px solid #e5e7eb;'></td></tr><tr style='background-color: #f8fafc;'><td><strong>Contract Term</strong></td><td>{quote['term_duration']} {quote['term_unit']} ({quote['service_occurrences']} visits)</td><td style='text-align: right;'></td></tr><tr class='total-row'><td><strong>Total Contract Value</strong></td><td>For entire {quote['term_duration']} {quote['term_unit'].lower()} term</td><td style='text-align: right;'><strong>USD ${quote['total_term_rate']:,.2f}</strong></td></tr>" if quote.get('total_term_rate') else ""}
+                {f"<tr><td colspan='3' style='padding-top: 15px; border-top: 2px solid #e5e7eb;'></td></tr><tr style='background-color: #f8fafc;'><td><strong>Contract Term</strong></td><td>{quote['term_duration']} {quote['term_unit']} ({quote['service_occurrences']} visits)</td><td style='text-align: right;'></td></tr><tr class='total-row'><td><strong>Total Contract Value</strong></td><td>For entire {quote['term_duration']} {quote['term_unit'].lower()} term</td><td style='text-align: right;'><strong>USD ${quote['total_term_rate']:,.2f}</strong></td></tr>" if quote.get('total_term_rate') and not quote.get('quote_pending') else ""}
             </tbody>
         </table>
         <p class="terms-note">Payment due within {payment_due_days} days of service completion. A {late_fee}% late fee applies after due date.</p>
@@ -683,22 +736,43 @@ async def download_image_as_base64(url: str) -> str:
     import httpx
     import base64
     
+    if not url:
+        logger.warning("⚠️ download_image_as_base64 called with empty URL")
+        return None
+    
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        logger.info(f"📥 Downloading image from: {url[:100]}...")
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.get(url)
+            logger.info(f"📥 Response status: {response.status_code}, content-type: {response.headers.get('content-type')}")
             response.raise_for_status()
             
             # Determine content type
             content_type = response.headers.get('content-type', 'image/png')
             
+            # Handle content types that might have charset
+            if ';' in content_type:
+                content_type = content_type.split(';')[0].strip()
+            
             # Convert to base64
             image_bytes = response.content
+            if len(image_bytes) == 0:
+                logger.warning("⚠️ Downloaded image has 0 bytes")
+                return None
+                
+            logger.info(f"📥 Downloaded {len(image_bytes)} bytes")
             b64_encoded = base64.b64encode(image_bytes).decode('utf-8')
             
             # Return as data URL
             return f"data:{content_type};base64,{b64_encoded}"
+    except httpx.HTTPStatusError as e:
+        logger.error(f"❌ HTTP error downloading image: {e.response.status_code} - {e}")
+        return None
+    except httpx.RequestError as e:
+        logger.error(f"❌ Request error downloading image: {e}")
+        return None
     except Exception as e:
-        logger.warning(f"⚠️ Failed to download image from {url}: {e}")
+        logger.error(f"❌ Failed to download image from {url[:100]}...: {type(e).__name__}: {e}")
         return None
 
 
