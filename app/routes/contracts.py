@@ -344,14 +344,15 @@ async def sign_contract_as_provider(
         form_data = client.form_data if client.form_data else {}
         quote = calculate_quote(business_config, form_data)
         
-        # Generate HTML with both signatures
+        # Generate HTML with both signatures - use contract's created_at for consistent dates
         html = await generate_contract_html(
             business_config,
             client,
             form_data,
             quote,
             client_signature=contract.client_signature,
-            provider_signature=signature_to_use
+            provider_signature=signature_to_use,
+            contract_created_at=contract.created_at
         )
         
         # Convert to PDF

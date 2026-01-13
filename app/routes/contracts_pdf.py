@@ -209,7 +209,8 @@ async def generate_contract_html(
     form_data: dict,
     quote: dict,
     client_signature: Optional[str] = None,
-    provider_signature: Optional[str] = None
+    provider_signature: Optional[str] = None,
+    contract_created_at: Optional[datetime] = None
 ) -> str:
     """Generate HTML for the contract"""
     
@@ -289,9 +290,10 @@ async def generate_contract_html(
                 logger.info("✅ Client signature downloaded and converted to base64")
         # else: assume it's already in correct format
     
-    # Contract details
-    contract_date = datetime.now().strftime("%B %d, %Y")
-    contract_number = f"CLN-{datetime.now().strftime('%Y%m%d')}-{client.id:04d}"
+    # Contract details - use passed date or current date for new contracts
+    base_date = contract_created_at or datetime.now()
+    contract_date = base_date.strftime("%B %d, %Y")
+    contract_number = f"CLN-{base_date.strftime('%Y%m%d')}-{client.id:04d}"
     
     # Smart start date logic based on service type
     frequency = quote["frequency"]
@@ -299,11 +301,11 @@ async def generate_contract_html(
     
     if is_recurring:
         # Recurring contracts: billing starts on signing date
-        start_date = datetime.now().strftime("%B %d, %Y")
+        start_date = base_date.strftime("%B %d, %Y")
         start_date_note = "Agreement effective immediately upon signing. First service will be scheduled separately."
     else:
         # One-time/deep cleans: align with service date (typically 7 days out)
-        start_date = (datetime.now() + timedelta(days=7)).strftime("%B %d, %Y")
+        start_date = (base_date + timedelta(days=7)).strftime("%B %d, %Y")
         start_date_note = "Agreement effective on scheduled service date."
     
     payment_due_days = business_config.payment_due_days or 15

@@ -869,14 +869,15 @@ async def sign_contract(
                 # Provider signature is base64, need to upload it too if not already done
                 provider_signature_url = contract.provider_signature
             
-            # Generate HTML with signature URLs
+            # Generate HTML with signature URLs - use contract's created_at for consistent dates
             html = await generate_contract_html(
                 config, 
                 client, 
                 form_data, 
                 quote,
                 client_signature=client_signature_url or data.signature,  # Use URL if available
-                provider_signature=provider_signature_url
+                provider_signature=provider_signature_url,
+                contract_created_at=contract.created_at
             )
             
             # Verify signature URL is in HTML
