@@ -168,6 +168,7 @@ async def generate_trial_contract(
             'payment_due_days': 15,
             'late_fee_percent': 1.5,
             'preferred_units': 'sqft',
+            'user_id': 0,  # For logging purposes
             'standard_inclusions': [
                 'Dusting and wiping all surfaces',
                 'Vacuuming and mopping floors',
@@ -180,7 +181,9 @@ async def generate_trial_contract(
                 'Deep carpet cleaning',
                 'Heavy-duty cleaning',
                 'Move-in/move-out cleaning'
-            ]
+            ],
+            'custom_inclusions': [],  # Custom user-added inclusions
+            'custom_exclusions': []   # Custom user-added exclusions
         })()
         
         # Create mock client
