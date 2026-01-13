@@ -213,6 +213,14 @@ async def generate_contract_html(
 ) -> str:
     """Generate HTML for the contract"""
     
+    # Debug logging for business config pricing
+    logger.info(f"💰 Business config pricing - model: {business_config.pricing_model}, sqft: {business_config.rate_per_sqft}, room: {business_config.rate_per_room}, hourly: {business_config.hourly_rate}, flat: {business_config.flat_rate}")
+    logger.info(f"🖼️ Business config branding - name: {business_config.business_name}, logo: {business_config.logo_url}")
+    
+    # Warn if all pricing fields are NULL
+    if not any([business_config.rate_per_sqft, business_config.rate_per_room, business_config.hourly_rate, business_config.flat_rate]):
+        logger.warning(f"⚠️ ALL PRICING FIELDS ARE NULL for user_id: {business_config.user_id} - user needs to update pricing in Settings")
+    
     # Debug logging for signatures
     logger.info(f"🖊️ Generating PDF - Client signature present: {bool(client_signature)}, Provider signature present: {bool(provider_signature)}")
     if client_signature:

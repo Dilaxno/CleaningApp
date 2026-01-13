@@ -59,6 +59,7 @@ class BusinessConfigCreate(BaseModel):
 
 
 def to_float(val: Optional[str]) -> Optional[float]:
+    """Convert string to float, returning None for empty/invalid values."""
     if val is None or val == "":
         return None
     try:
@@ -68,6 +69,7 @@ def to_float(val: Optional[str]) -> Optional[float]:
 
 
 def to_int(val: Optional[str]) -> Optional[int]:
+    """Convert string to int, returning None for empty/invalid values."""
     if val is None or val == "":
         return None
     try:
@@ -149,7 +151,10 @@ def get_current_user_business_config(current_user: User = Depends(get_current_us
 @router.post("")
 def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get_db)):
     logger.info(f"📥 Creating business config for firebase_uid: {data.firebaseUid}")
-    logger.info(f"📋 Data received: pricingModel={data.pricingModel}")
+    logger.info(f"📋 Data received: pricingModel={data.pricingModel}, logoUrl={data.logoUrl}")
+    logger.info(f"📋 Pricing data: ratePerSqft={data.ratePerSqft}, ratePerRoom={data.ratePerRoom}, hourlyRate={data.hourlyRate}, flatRate={data.flatRate}")
+    logger.info(f"📋 Business name: {data.businessName}")
+    logger.info(f"📋 All data fields: {data.model_dump()}")
     
     try:
         user = db.query(User).filter(User.firebase_uid == data.firebaseUid).first()
@@ -162,10 +167,13 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
         existing = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
         if existing:
             logger.info(f"📝 Updating existing config for user_id: {user.id}")
+            logger.info(f"📝 Current DB values: logo_url={existing.logo_url}, rate_per_sqft={existing.rate_per_sqft}, pricing_model={existing.pricing_model}")
             # Only update fields that are explicitly provided (not None)
             if data.businessName is not None:
+                logger.info(f"📝 Updating business_name: {data.businessName}")
                 existing.business_name = data.businessName
             if data.logoUrl is not None:
+                logger.info(f"📝 Updating logo_url: {data.logoUrl}")
                 existing.logo_url = data.logoUrl
             if data.signatureUrl is not None:
                 existing.signature_url = data.signatureUrl
@@ -198,13 +206,21 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
             if data.availableSupplies is not None:
                 existing.available_supplies = data.availableSupplies
             if data.ratePerSqft is not None:
-                existing.rate_per_sqft = to_float(data.ratePerSqft)
+                converted_rate = to_float(data.ratePerSqft)
+                logger.info(f"📝 Updating rate_per_sqft: raw={data.ratePerSqft}, converted={converted_rate}")
+                existing.rate_per_sqft = converted_rate
             if data.ratePerRoom is not None:
-                existing.rate_per_room = to_float(data.ratePerRoom)
+                converted_rate = to_float(data.ratePerRoom)
+                logger.info(f"📝 Updating rate_per_room: raw={data.ratePerRoom}, converted={converted_rate}")
+                existing.rate_per_room = converted_rate
             if data.hourlyRate is not None:
-                existing.hourly_rate = to_float(data.hourlyRate)
+                converted_rate = to_float(data.hourlyRate)
+                logger.info(f"📝 Updating hourly_rate: raw={data.hourlyRate}, converted={converted_rate}")
+                existing.hourly_rate = converted_rate
             if data.flatRate is not None:
-                existing.flat_rate = to_float(data.flatRate)
+                converted_rate = to_float(data.flatRate)
+                logger.info(f"📝 Updating flat_rate: raw={data.flatRate}, converted={converted_rate}")
+                existing.flat_rate = converted_rate
             if data.minimumCharge is not None:
                 existing.minimum_charge = to_float(data.minimumCharge)
             if data.cleaningTimePerSqft is not None:
