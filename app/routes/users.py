@@ -37,6 +37,7 @@ class UserCreate(BaseModel):
     fullName: Optional[str] = None
     accountType: Optional[str] = None
     hearAbout: Optional[str] = None
+    profilePictureUrl: Optional[str] = None
 
 
 class UserUpdate(BaseModel):
@@ -82,6 +83,9 @@ def create_or_update_user(data: UserCreate, db: Session = Depends(get_db)):
                 user.account_type = data.accountType
             if data.hearAbout:
                 user.hear_about = data.hearAbout
+            # Set profile picture from Google if provided and user doesn't have one
+            if data.profilePictureUrl and not user.profile_picture_url:
+                user.profile_picture_url = data.profilePictureUrl
         else:
             logger.info(f"🆕 Creating new user for firebase_uid: {data.firebaseUid}")
             user = User(
@@ -90,6 +94,7 @@ def create_or_update_user(data: UserCreate, db: Session = Depends(get_db)):
                 full_name=data.fullName,
                 account_type=data.accountType,
                 hear_about=data.hearAbout,
+                profile_picture_url=data.profilePictureUrl,  # Save Google profile picture
                 plan=None,  # Users must select a paid plan after onboarding
             )
             db.add(user)

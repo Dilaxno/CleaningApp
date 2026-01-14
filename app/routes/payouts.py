@@ -21,7 +21,8 @@ router = APIRouter(prefix="/payouts", tags=["Payouts"])
 
 class PayoutRequest(BaseModel):
     invoice_ids: List[int]
-    payout_method: str = "bank_transfer"
+    payout_method: str = "bank_transfer"  # "bank_transfer" | "paypal"
+    payout_details: Optional[dict] = None  # e.g., {"bank_name": "...", "account_holder": "...", "account_number": "...", "routing_number": "..."} or {"paypal_email": "..."}
     notes: Optional[str] = None
 
 
@@ -218,6 +219,7 @@ async def request_payout(
         status="pending",
         invoice_ids=data.invoice_ids,
         payout_method=data.payout_method,
+        payout_details=data.payout_details,
         notes=data.notes,
         requested_at=datetime.utcnow()
     )
@@ -282,3 +284,18 @@ async def get_available_invoices_for_payout(
         })
     
     return result
+
+
+@router.get("/last-method")
+async def get_last_payout_method(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Return the most recently used payout method and details for pre-filling forms"""
+    last = db.query(Payout).filter(Payout.user_id == current_user.id).order_by(Payout.requested_at.desc()).first()
+    if not last:
+        return {"payout_method": None, "payout_details": None}
+    return {
+        "payout_method": last.payout_method,
+        "payout_details": last.payout_details or None
+    }

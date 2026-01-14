@@ -503,6 +503,20 @@ async def auto_create_invoice_from_schedule(
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
     
+    # Idempotency: if an invoice already exists for this schedule, return it
+    existing_invoice = db.query(Invoice).filter(
+        Invoice.user_id == current_user.id,
+        Invoice.schedule_id == schedule.id
+    ).order_by(Invoice.created_at.desc()).first()
+    if existing_invoice:
+        logger.info(f"ℹ️ Invoice already exists for schedule {schedule_id}: {existing_invoice.invoice_number}")
+        return {
+            "invoice_id": existing_invoice.id,
+            "invoice_number": existing_invoice.invoice_number,
+            "total_amount": existing_invoice.total_amount,
+            "status": existing_invoice.status
+        }
+    
     # Get contract for pricing info
     contract = db.query(Contract).filter(
         Contract.client_id == client.id,

@@ -125,9 +125,12 @@ async def create_client_booking(
     if not user:
         raise HTTPException(status_code=404, detail="Provider not found")
     
-    # Parse times
-    start_time = datetime.fromisoformat(data.start_time.replace('Z', '+00:00'))
-    end_time = datetime.fromisoformat(data.end_time.replace('Z', '+00:00'))
+    # Parse times - treat as local time (no timezone conversion)
+    # Remove any timezone info to treat as naive local time
+    start_time_str = data.start_time.replace('Z', '').split('+')[0].split('.')[0]
+    end_time_str = data.end_time.replace('Z', '').split('+')[0].split('.')[0]
+    start_time = datetime.fromisoformat(start_time_str)
+    end_time = datetime.fromisoformat(end_time_str)
     duration_minutes = int((end_time - start_time).total_seconds() / 60)
     
     # Format times for display (24h format for storage)
