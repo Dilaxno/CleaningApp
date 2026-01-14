@@ -472,7 +472,9 @@ async def generate_contract_html(
         }}
         .pricing-table td {{
             font-size: 10pt;
-            color: #0A2540;
+            color: #0A2540 !important;
+            background: white !important;
+            background-color: white !important;
         }}
         .pricing-table .total-row {{
             font-weight: 600;
@@ -480,10 +482,13 @@ async def generate_contract_html(
         .pricing-table .total-row td {{
             border-bottom: none;
             border-top: 2px solid #e5e7eb;
+            background: white !important;
             background-color: white !important;
             color: #0A2540 !important;
+            font-size: 10pt;
         }}
         .pricing-table tr {{
+            background: white !important;
             background-color: white !important;
         }}
         .bullet-list {{
@@ -715,12 +720,12 @@ async def generate_contract_html(
                     <td style="text-align: right;">{"Quote Pending" if quote.get('quote_pending') else f"USD ${quote['base_price']:,.2f}"}</td>
                 </tr>
                 {"<tr><td>Frequency Discount</td><td>" + str(quote['discount_percent']) + "% off for " + frequency.lower() + " service</td><td style='text-align: right; color: #10B981;'>-USD $" + f"{quote['discount_amount']:,.2f}" + "</td></tr>" if quote['discount_amount'] > 0 else ""}
-                <tr class="total-row" style="background-color: white !important;">
-                    <td style="background-color: white !important;"><strong>{"Total" if frequency in ["One-time", "one-time"] else "Total Per Visit"}</strong></td>
-                    <td style="background-color: white !important;">{"Service provider will provide quote" if quote.get('quote_pending') else f"Estimated {quote['estimated_hours']} hours, {quote['cleaners']} cleaner(s)"}</td>
-                    <td style="text-align: right; background-color: white !important;"><strong>{"Quote Pending" if quote.get('quote_pending') else f"USD ${quote['final_price']:,.2f}"}</strong></td>
+                <tr class="total-row">
+                    <td><strong>{"Total" if frequency in ["One-time", "one-time"] else "Total Per Visit"}</strong></td>
+                    <td>{"Service provider will provide quote" if quote.get('quote_pending') else f"Estimated {quote['estimated_hours']} hours, {quote['cleaners']} cleaner(s)"}</td>
+                    <td style="text-align: right;"><strong>{"Quote Pending" if quote.get('quote_pending') else f"USD ${quote['final_price']:,.2f}"}</strong></td>
                 </tr>
-                {f"<tr style='background-color: white !important;'><td style='padding-top: 20px; background-color: white !important;'><strong>Contract Term</strong></td><td style='padding-top: 20px; background-color: white !important;'>{quote['term_duration']} {quote['term_unit']} ({quote['service_occurrences']} visits)</td><td style='text-align: right; padding-top: 20px; background-color: white !important;'></td></tr><tr class='total-row' style='background-color: white !important;'><td style='background-color: white !important;'><strong>Total Contract Value</strong></td><td style='background-color: white !important;'>For entire {quote['term_duration']} {quote['term_unit'].lower()} term</td><td style='text-align: right; background-color: white !important;'><strong>USD ${quote['total_term_rate']:,.2f}</strong></td></tr>" if quote.get('total_term_rate') and not quote.get('quote_pending') else ""}
+                {f"<tr><td style='padding-top: 20px;'><strong>Contract Term</strong></td><td style='padding-top: 20px;'>{quote['term_duration']} {quote['term_unit']} ({quote['service_occurrences']} visits)</td><td style='text-align: right; padding-top: 20px;'></td></tr><tr class='total-row'><td><strong>Total Contract Value</strong></td><td>For entire {quote['term_duration']} {quote['term_unit'].lower()} term</td><td style='text-align: right;'><strong>USD ${quote['total_term_rate']:,.2f}</strong></td></tr>" if quote.get('total_term_rate') and not quote.get('quote_pending') else ""}
             </tbody>
         </table>
         <p class="terms-note">Payment due within {payment_due_days} days of service completion. A {late_fee}% late fee applies after due date.</p>
