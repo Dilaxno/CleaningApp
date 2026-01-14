@@ -444,9 +444,10 @@ async def generate_contract_html(
             border-collapse: collapse;
             margin-top: 12px;
             background-color: white;
+            page-break-inside: avoid;
         }}
         .pricing-table thead {{
-            display: table-header-group;
+            display: table-row-group;
         }}
         .pricing-table th,
         .pricing-table td {{
@@ -457,6 +458,16 @@ async def generate_contract_html(
             background-color: white !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
+        }}
+        .pricing-table .table-header {{
+            font-size: 8pt;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #64748B !important;
+            font-weight: 600;
+            border-bottom: 2px solid #E2E8F0;
+            background: white !important;
+            background-color: white !important;
         }}
         .pricing-table th {{
             background: white !important;
@@ -706,14 +717,12 @@ async def generate_contract_html(
             the completion of the scope of work outlined in this Agreement.
         </p>
         <table class="pricing-table">
-            <thead>
-                <tr>
-                    <th>Description</th>
-                    <th>Details</th>
-                    <th style="text-align: right;">Amount (USD)</th>
-                </tr>
-            </thead>
             <tbody>
+                <tr class="header-row">
+                    <td class="table-header">Description</td>
+                    <td class="table-header">Details</td>
+                    <td class="table-header" style="text-align: right;">Amount (USD)</td>
+                </tr>
                 <tr>
                     <td>Base Service Rate</td>
                     <td>{frequency} cleaning service</td>
