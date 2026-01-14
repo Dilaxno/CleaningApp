@@ -333,6 +333,11 @@ async def sign_contract_as_provider(
     db.commit()
     db.refresh(contract)
     
+    # Increment client count now that contract is fully signed
+    from ..plan_limits import increment_client_count
+    increment_client_count(current_user, db)
+    logger.info(f"📊 Client count incremented for user {current_user.id}: {current_user.clients_this_month}")
+    
     # Regenerate PDF with provider signature
     logger.info(f"📄 Regenerating contract PDF with provider signature")
     try:

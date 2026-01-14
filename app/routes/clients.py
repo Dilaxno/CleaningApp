@@ -152,8 +152,8 @@ async def create_client(
     """Create a new client"""
     logger.info(f"📥 Creating client for user_id: {current_user.id}")
     
-    # Check if user can add more clients
-    from ..plan_limits import can_add_client, increment_client_count
+    # Check if user can add more clients (but don't increment yet - that happens when contract is signed)
+    from ..plan_limits import can_add_client
     can_add, error_message = can_add_client(current_user, db)
     
     if not can_add:
@@ -176,9 +176,8 @@ async def create_client(
     db.commit()
     db.refresh(client)
     
-    # Increment client count after successful creation
-    increment_client_count(current_user, db)
-    logger.info(f"✅ Client created: id={client.id}, client count: {current_user.clients_this_month}")
+    # Note: Client count is incremented when contract is fully signed (both parties)
+    logger.info(f"✅ Client created: id={client.id}")
     return ClientResponse(
         id=client.id,
         businessName=client.business_name,
