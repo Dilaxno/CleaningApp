@@ -249,3 +249,109 @@ def patch_user(
 ):
     """Partially update user settings (authenticated - same as PUT)"""
     return update_user(firebase_uid, data, current_user, db)
+
+
+# Payout Information Models
+class PayoutInfoUpdate(BaseModel):
+    country: str  # ISO country code
+    currency: str  # Currency code
+    accountHolderName: str
+    bankName: Optional[str] = None
+    accountNumber: Optional[str] = None
+    routingNumber: Optional[str] = None  # US routing / UK sort code
+    iban: Optional[str] = None  # IBAN for Europe
+    swiftBic: Optional[str] = None  # SWIFT/BIC code
+    bankAddress: Optional[str] = None
+
+
+class PayoutInfoResponse(BaseModel):
+    country: Optional[str] = None
+    currency: Optional[str] = None
+    accountHolderName: Optional[str] = None
+    bankName: Optional[str] = None
+    accountNumber: Optional[str] = None  # Masked for security
+    routingNumber: Optional[str] = None  # Masked for security
+    iban: Optional[str] = None  # Masked for security
+    swiftBic: Optional[str] = None
+    bankAddress: Optional[str] = None
+    isConfigured: bool = False
+
+
+def mask_sensitive(value: Optional[str], visible_chars: int = 4) -> Optional[str]:
+    """Mask sensitive data, showing only last few characters"""
+    if not value or len(value) <= visible_chars:
+        return value
+    return "*" * (len(value) - visible_chars) + value[-visible_chars:]
+
+
+@router.get("/{firebase_uid}/payout-info", response_model=PayoutInfoResponse)
+def get_payout_info(
+    firebase_uid: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get user's payout information (masked for security)"""
+    if not validate_firebase_uid(firebase_uid):
+        raise HTTPException(status_code=400, detail="Invalid firebase_uid format")
+    
+    verify_user_access(firebase_uid, current_user)
+    
+    is_configured = bool(
+        current_user.payout_country and 
+        current_user.payout_account_holder_name and
+        (current_user.payout_account_number or current_user.payout_iban)
+    )
+    
+    return PayoutInfoResponse(
+        country=current_user.payout_country,
+        currency=current_user.payout_currency,
+        accountHolderName=current_user.payout_account_holder_name,
+        bankName=current_user.payout_bank_name,
+        accountNumber=mask_sensitive(current_user.payout_account_number),
+        routingNumber=mask_sensitive(current_user.payout_routing_number),
+        iban=mask_sensitive(current_user.payout_iban),
+        swiftBic=current_user.payout_swift_bic,
+        bankAddress=current_user.payout_bank_address,
+        isConfigured=is_configured
+    )
+
+
+@router.put("/{firebase_uid}/payout-info")
+def update_payout_info(
+    firebase_uid: str,
+    data: PayoutInfoUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Update user's payout information"""
+    if not validate_firebase_uid(firebase_uid):
+        raise HTTPException(status_code=400, detail="Invalid firebase_uid format")
+    
+    verify_user_access(firebase_uid, current_user)
+    
+    logger.info(f"📥 Updating payout info for user: {current_user.id}")
+    
+    try:
+        current_user.payout_country = data.country
+        current_user.payout_currency = data.currency
+        current_user.payout_account_holder_name = data.accountHolderName
+        current_user.payout_bank_name = data.bankName
+        current_user.payout_account_number = data.accountNumber
+        current_user.payout_routing_number = data.routingNumber
+        current_user.payout_iban = data.iban
+        current_user.payout_swift_bic = data.swiftBic
+        current_user.payout_bank_address = data.bankAddress
+        
+        db.commit()
+        db.refresh(current_user)
+        
+        logger.info(f"✅ Payout info updated for user: {current_user.id}")
+        
+        return {
+            "success": True,
+            "message": "Payout information saved successfully"
+        }
+    except Exception as e:
+        logger.error(f"❌ Error updating payout info: {str(e)}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))

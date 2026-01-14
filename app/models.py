@@ -47,6 +47,16 @@ class User(Base):
     notify_payment_received = Column(Boolean, default=True, nullable=False)  # Email when payment is received
     notify_reminders = Column(Boolean, default=True, nullable=False)  # Email for upcoming appointments
     notify_marketing = Column(Boolean, default=False, nullable=False)  # Marketing and product updates
+    # Payout information
+    payout_country = Column(String(2), nullable=True)  # ISO country code (e.g., "US", "GB", "FR")
+    payout_currency = Column(String(3), nullable=True)  # Currency code (e.g., "USD", "EUR", "GBP")
+    payout_account_holder_name = Column(String(255), nullable=True)  # Account holder name
+    payout_bank_name = Column(String(255), nullable=True)  # Bank name
+    payout_account_number = Column(String(50), nullable=True)  # Account number (encrypted in production)
+    payout_routing_number = Column(String(50), nullable=True)  # Routing/Sort code (US/UK)
+    payout_iban = Column(String(50), nullable=True)  # IBAN (Europe)
+    payout_swift_bic = Column(String(20), nullable=True)  # SWIFT/BIC code
+    payout_bank_address = Column(String(500), nullable=True)  # Bank address (for international transfers)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
