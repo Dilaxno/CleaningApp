@@ -295,12 +295,21 @@ async def status_automation_task(ctx):
 
 
 class WorkerSettings:
-    """ARQ Worker Settings"""
+    """ARQ Worker Settings - Optimized for Scale"""
     functions = [generate_contract_pdf_task, send_form_notification_emails_task, smtp_health_check_task, status_automation_task]
     redis_settings = get_redis_settings()
-    max_jobs = 10  # Concurrency limit: max 10 jobs at once (5 PDF + 5 emails)
-    job_timeout = 300  # 5 minutes timeout per job
-    keep_result = 3600  # Keep job results for 1 hour
+    
+    # Scalability settings - adjust based on server resources
+    # For 2GB RAM: max_jobs=10, For 4GB RAM: max_jobs=20, For 8GB RAM: max_jobs=40
+    max_jobs = int(os.getenv("ARQ_MAX_JOBS", "20"))  # Increased from 10 to 20
+    job_timeout = int(os.getenv("ARQ_JOB_TIMEOUT", "600"))  # Increased to 10 minutes
+    keep_result = int(os.getenv("ARQ_KEEP_RESULT", "3600"))  # Keep job results for 1 hour
+    
+    # Health check settings
+    health_check_interval = 60  # Check worker health every 60 seconds
+    
+    # Retry settings for failed jobs
+    max_tries = 3  # Retry failed jobs up to 3 times
     
     # Cron jobs - run daily
     from arq.cron import cron
@@ -308,3 +317,5 @@ class WorkerSettings:
         cron(smtp_health_check_task, hour=6, minute=0),  # 6 AM UTC
         cron(status_automation_task, hour=0, minute=5),  # 12:05 AM UTC - update statuses at start of day
     ]
+    
+    logger.info(f"🔧 ARQ Worker configured: max_jobs={max_jobs}, timeout={job_timeout}s")
