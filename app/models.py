@@ -184,9 +184,9 @@ class Contract(Base):
     # new: Initial lead submission
     # signed: Contract reviewed and signed by both parties
     # scheduled: Client confirmed the schedule slot
-    # active: First schedule date has arrived, service in progress
-    # cancelled: Owner cancelled the contract
-    # completed: Contract term finished
+    # active: First schedule date has arrived, service in progress (automatic transition)
+    # cancelled: Owner manually cancelled the contract (manual only)
+    # completed: Contract term finished (automatic transition when end_date passes)
     status = Column(String(50), default="new")
     start_date = Column(DateTime, nullable=True)
     end_date = Column(DateTime, nullable=True)

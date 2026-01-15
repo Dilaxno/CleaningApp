@@ -99,7 +99,11 @@ def validate_status_transition(current_status: str, new_status: str) -> bool:
     """
     Validate if a contract status transition is allowed
     
-    Contract statuses: new → signed → active → completed/cancelled
+    Contract statuses: new → signed → scheduled → active → completed/cancelled
+    
+    Note: 
+    - 'completed' status is automatic only (set by system when end_date passes)
+    - 'cancelled' status is manual only (requires owner action)
     
     Args:
         current_status: Current contract status
@@ -108,11 +112,12 @@ def validate_status_transition(current_status: str, new_status: str) -> bool:
     Returns:
         bool: True if transition is valid, False otherwise
     """
-    # Define valid transitions for contracts
+    # Define valid manual transitions for contracts
     valid_transitions = {
         "new": ["signed", "cancelled"],
-        "signed": ["active", "cancelled"],
-        "active": ["completed", "cancelled"],
+        "signed": ["scheduled", "cancelled"],
+        "scheduled": ["active", "cancelled"],
+        "active": ["cancelled"],  # Only cancellation allowed manually; completion is automatic
         "cancelled": [],  # Terminal state
         "completed": []   # Terminal state
     }

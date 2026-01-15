@@ -217,9 +217,25 @@ async def update_contract(
         contract.contract_type = data.contractType
     if data.status is not None:
         # Validate status transition
-        valid_statuses = ['new', 'signed', 'scheduled', 'active', 'cancelled', 'completed']
+        valid_statuses = ['new', 'signed', 'scheduled', 'active', 'cancelled']
         if data.status not in valid_statuses:
             raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {', '.join(valid_statuses)}")
+        
+        # Prevent manual completion - completed status is automatic only
+        if data.status == 'completed':
+            raise HTTPException(
+                status_code=400, 
+                detail="Cannot manually set status to 'completed'. Contracts are automatically completed when the end date passes."
+            )
+        
+        # Validate status transition logic
+        from ..services.status_automation import validate_status_transition
+        if not validate_status_transition(contract.status, data.status):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid status transition from '{contract.status}' to '{data.status}'"
+            )
+        
         contract.status = data.status
     if data.startDate is not None:
         contract.start_date = data.startDate
