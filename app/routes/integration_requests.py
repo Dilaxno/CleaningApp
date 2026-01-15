@@ -51,6 +51,7 @@ class IntegrationRequestResponse(BaseModel):
 class SubmitStatusResponse(BaseModel):
     can_submit: bool
     days_until_next: Optional[int] = None
+    seconds_until_next: Optional[int] = None
     last_submission_date: Optional[datetime] = None
 
 
@@ -70,10 +71,13 @@ async def get_submit_status(
     
     if recent_request:
         next_allowed = recent_request.created_at + relativedelta(months=1)
-        days_until_next = (next_allowed - datetime.utcnow()).days
+        time_diff = next_allowed - datetime.utcnow()
+        days_until_next = time_diff.days
+        seconds_until_next = int(time_diff.total_seconds())
         return SubmitStatusResponse(
             can_submit=False,
             days_until_next=max(1, days_until_next),
+            seconds_until_next=max(0, seconds_until_next),
             last_submission_date=recent_request.created_at
         )
     
@@ -142,10 +146,32 @@ async def create_integration_request(
     ).first()
     
     if recent_request:
-        days_until_next = (recent_request.created_at + relativedelta(months=1) - datetime.utcnow()).days
+        next_allowed = recent_request.created_at + relativedelta(months=1)
+        time_diff = next_allowed - datetime.utcnow()
+        seconds_remaining = int(time_diff.total_seconds())
+        
+        # Format time remaining
+        if seconds_remaining > 86400:  # More than 1 day
+            days = seconds_remaining // 86400
+            hours = (seconds_remaining % 86400) // 3600
+            time_str = f"{days} day(s) and {hours} hour(s)"
+        elif seconds_remaining > 3600:  # More than 1 hour
+            hours = seconds_remaining // 3600
+            minutes = (seconds_remaining % 3600) // 60
+            time_str = f"{hours} hour(s) and {minutes} minute(s)"
+        else:  # Less than 1 hour
+            minutes = seconds_remaining // 60
+            seconds = seconds_remaining % 60
+            time_str = f"{minutes} minute(s) and {seconds} second(s)"
+        
         raise HTTPException(
             status_code=429,
-            detail=f"You can only submit one integration request per month. You can submit another request in {max(1, days_until_next)} day(s)."
+            detail={
+                "message": f"Rate limit exceeded. Maximum 1 request per month. Try again in {time_str}.",
+                "retry_after": seconds_remaining,
+                "limit": 1,
+                "window_seconds": 30 * 24 * 3600  # 30 days
+            }
         )
     
     # Check if similar request already exists (case-insensitive name match)

@@ -185,7 +185,12 @@ async def rate_limit_dependency(
             logger.warning(f"🚫 Rate limit EXCEEDED for {key} - {current_count}/{limit} requests used")
             raise HTTPException(
                 status_code=429,
-                detail=f"Rate limit exceeded. Maximum {limit} requests per {window_seconds} seconds. Try again in {retry_after} seconds.",
+                detail={
+                    "message": f"Rate limit exceeded. Maximum {limit} requests per {window_seconds} seconds.",
+                    "retry_after": retry_after,
+                    "limit": limit,
+                    "window_seconds": window_seconds
+                },
                 headers={"Retry-After": str(retry_after)}
             )
         
