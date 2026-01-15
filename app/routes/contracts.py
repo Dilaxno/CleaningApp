@@ -458,10 +458,15 @@ async def delete_contract(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Delete a contract"""
+    """Delete a contract and its related invoices"""
+    from ..models_invoice import Invoice
+    
     contract = db.query(Contract).filter(Contract.id == contract_id, Contract.user_id == current_user.id).first()
     if not contract:
         raise HTTPException(status_code=404, detail="Contract not found")
+    
+    # Delete related invoices first to avoid foreign key constraint violation
+    db.query(Invoice).filter(Invoice.contract_id == contract_id).delete()
     
     db.delete(contract)
     db.commit()
