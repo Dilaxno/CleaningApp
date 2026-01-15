@@ -586,3 +586,71 @@ async def auto_create_invoice_from_schedule(
         "total_amount": invoice.total_amount,
         "status": invoice.status
     }
+
+
+
+@router.post("/{invoice_id}/mark-paid")
+async def mark_invoice_as_paid(
+    invoice_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Manually mark an invoice as paid (for offline payments, cash, check, etc.)
+    This endpoint allows providers to mark invoices as paid when payment is received outside the platform
+    """
+    logger.info(f"💰 Manually marking invoice {invoice_id} as paid by user {current_user.id}")
+    
+    invoice = db.query(Invoice).filter(
+        Invoice.id == invoice_id,
+        Invoice.user_id == current_user.id
+    ).first()
+    
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    if invoice.status == "paid":
+        logger.info(f"Invoice {invoice_id} already marked as paid")
+        return {
+            "message": "Invoice already marked as paid",
+            "invoice_id": invoice.id,
+            "status": invoice.status,
+            "paid_at": invoice.paid_at.isoformat() if invoice.paid_at else None
+        }
+    
+    # Update invoice status
+    invoice.status = "paid"
+    invoice.paid_at = datetime.utcnow()
+    invoice.dodo_payment_id = f"manual-{datetime.utcnow().timestamp()}"  # Mark as manual payment
+    
+    db.commit()
+    db.refresh(invoice)
+    
+    logger.info(f"✅ Invoice {invoice_id} manually marked as paid")
+    
+    # Optionally send notification to provider
+    from ..email_service import send_payment_received_notification
+    client = db.query(Client).filter(Client.id == invoice.client_id).first()
+    
+    if current_user.email and current_user.notify_payment_received:
+        try:
+            await send_payment_received_notification(
+                provider_email=current_user.email,
+                provider_name=current_user.full_name or "Provider",
+                client_name=client.business_name if client else "Client",
+                invoice_number=invoice.invoice_number,
+                amount=invoice.total_amount,
+                currency=invoice.currency,
+                payment_date=invoice.paid_at.strftime("%B %d, %Y") if invoice.paid_at else None
+            )
+        except Exception as e:
+            logger.warning(f"Failed to send payment notification: {e}")
+    
+    return {
+        "message": "Invoice marked as paid successfully",
+        "invoice_id": invoice.id,
+        "invoice_number": invoice.invoice_number,
+        "status": invoice.status,
+        "paid_at": invoice.paid_at.isoformat() if invoice.paid_at else None,
+        "total_amount": invoice.total_amount
+    }
