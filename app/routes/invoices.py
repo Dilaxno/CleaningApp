@@ -310,6 +310,7 @@ async def generate_payment_link(
                 "price": int(invoice.total_amount * 100),  # Convert to cents
                 "type": "one_time_price",
                 "discount": 0,  # Required by Dodo API
+                "purchasing_power_parity": False,  # Required by Dodo API
             },
             "tax_category": DODO_DEFAULT_TAX_CATEGORY,
         }
