@@ -120,7 +120,7 @@ THEME = {
 
 LOGO_URL = "https://res.cloudinary.com/dxqum9ywx/image/upload/v1767444587/CleaningAPP_logo_black_z96svy.png"
 
-# Base HTML email template
+# Base HTML email template - Modern Akkio-style with clean top bar
 BASE_TEMPLATE = """
 <!doctype html>
 <html lang="en" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
@@ -131,10 +131,10 @@ BASE_TEMPLATE = """
     <meta name="x-apple-disable-message-reformatting" />
     <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
     <title>{{ subject }}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <style>
       body, table, td, a, h1, h2, h3, p, strong, em, span, div { 
-        font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
       }
@@ -142,6 +142,8 @@ BASE_TEMPLATE = """
         width: 100% !important;
         -webkit-text-size-adjust: 100%;
         -ms-text-size-adjust: 100%;
+        margin: 0;
+        padding: 0;
       }
       img {
         max-width: 100%;
@@ -158,89 +160,73 @@ BASE_TEMPLATE = """
         mso-table-rspace: 0pt;
       }
       .container { 
-        max-width: 640px; 
+        max-width: 600px; 
         margin: 0 auto;
+        width: 100%;
+      }
+      .top-bar {
+        height: 4px;
+        background: {{ theme.primary }};
         width: 100%;
       }
       .card { 
         background: {{ theme.card_bg }}; 
-        border-radius: 16px; 
-        padding: 32px; 
+        border-radius: 8px; 
+        padding: 40px; 
         border: 1px solid {{ theme.border }};
-        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+        margin-top: 32px;
       }
       .muted { color: {{ theme.text_muted }}; }
       .btn {
         display: inline-block;
         background: {{ theme.primary }};
         color: #ffffff !important;
-        padding: 14px 28px;
-        border-radius: 12px;
+        padding: 12px 32px;
+        border-radius: 6px;
         text-decoration: none;
         font-weight: 600;
-        font-size: 16px;
+        font-size: 15px;
         line-height: 1.5;
-        transition: all 0.2s;
-        min-width: 200px;
         text-align: center;
-        -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
       }
-      .btn:hover { background: {{ theme.primary_dark }}; }
-      .badge {
-        display: inline-flex;
-        align-items: center;
-        background: {{ theme.primary }};
-        color: #ffffff !important;
-        padding: 4px 12px;
-        border-radius: 9999px;
-        font-size: 12px;
-        font-weight: 600;
+      .btn:hover { 
+        background: {{ theme.primary_dark }};
+        opacity: 0.9;
       }
       
       /* Mobile Responsive Styles */
       @media only screen and (max-width: 600px) {
         .container { 
-          padding: 0 12px !important;
+          padding: 0 16px !important;
           width: 100% !important;
         }
         .card { 
-          padding: 24px 20px !important;
-          border-radius: 12px !important;
+          padding: 28px 20px !important;
+          border-radius: 6px !important;
+          margin-top: 24px !important;
         }
         .btn { 
           display: block !important;
           width: 100% !important;
-          max-width: 100% !important;
-          min-width: auto !important;
-          padding: 16px 24px !important;
+          padding: 14px 24px !important;
           font-size: 15px !important;
           box-sizing: border-box;
         }
         img.logo { 
-          max-width: 140px !important;
+          max-width: 120px !important;
           height: auto !important;
         }
         h1 {
-          font-size: 22px !important;
+          font-size: 20px !important;
           line-height: 1.3 !important;
         }
         h2 {
-          font-size: 18px !important;
+          font-size: 17px !important;
           line-height: 1.4 !important;
         }
         p, div, td {
           font-size: 14px !important;
           line-height: 1.6 !important;
-        }
-        .mobile-hide {
-          display: none !important;
-          max-height: 0 !important;
-          overflow: hidden !important;
-          mso-hide: all !important;
-        }
-        .mobile-stack {
-          display: block !important;
-          width: 100% !important;
         }
       }
       
@@ -256,40 +242,43 @@ BASE_TEMPLATE = """
     <xml><o:OfficeDocumentSettings><o:AllowPNG/><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml>
     <![endif]-->
   </head>
-  <body style="margin:0; padding:32px 16px; background:{{ theme.background }}; color:{{ theme.text_primary }};">
-    <div class="container">
+  <body style="margin:0; padding:0; background:{{ theme.background }}; color:{{ theme.text_primary }};">
+    <!-- Top Colored Bar -->
+    <div class="top-bar"></div>
+    
+    <div class="container" style="padding: 32px 20px;">
       <!-- Logo -->
-      <div style="text-align:center; margin-bottom:24px;">
+      <div style="text-align:center; margin-bottom:8px;">
         <a href="https://cleanenroll.com" target="_blank" style="text-decoration:none;">
-          <img class="logo" src="{{ logo_url }}" width="160" alt="CleanEnroll" 
+          <img class="logo" src="{{ logo_url }}" width="140" alt="CleanEnroll" 
                style="display:block; height:auto; border:0; margin:0 auto;" />
         </a>
       </div>
 
       <!-- Card -->
       <div class="card">
-        <h1 style="margin:0 0 16px 0; font-size:24px; font-weight:700; color:{{ theme.text_primary }};">
+        <h1 style="margin:0 0 12px 0; font-size:22px; font-weight:700; color:{{ theme.text_primary }}; letter-spacing:-0.01em;">
           {{ title }}
         </h1>
 
         {% if intro %}
-        <p style="margin:0 0 20px 0; font-size:16px; line-height:1.6; color:{{ theme.text_muted }};">
+        <p style="margin:0 0 24px 0; font-size:15px; line-height:1.6; color:{{ theme.text_muted }};">
           {{ intro }}
         </p>
         {% endif %}
 
-        <div style="font-size:15px; line-height:1.7; color:{{ theme.text_primary }};">
+        <div style="font-size:15px; line-height:1.65; color:{{ theme.text_primary }};">
           {{ content_html|safe }}
         </div>
 
         {% if cta_url and cta_label %}
         <!--[if mso]>
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:28px 0 0 0;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 0 0;">
           <tr><td>
             <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="{{ cta_url }}" 
-                         style="height:48px; v-text-anchor:middle; width:200px;" arcsize="25%" 
+                         style="height:44px; v-text-anchor:middle; width:180px;" arcsize="15%" 
                          stroke="f" fillcolor="{{ theme.primary }}">
-              <center style="color:#ffffff; font-family:Arial,sans-serif; font-size:16px; font-weight:600;">
+              <center style="color:#ffffff; font-family:Arial,sans-serif; font-size:15px; font-weight:600;">
                 {{ cta_label }}
               </center>
             </v:roundrect>
@@ -297,23 +286,29 @@ BASE_TEMPLATE = """
         </table>
         <![endif]-->
         <!--[if !mso]><!-->
-        <p style="margin:28px 0 0 0;">
+        <div style="margin:24px 0 0 0; text-align:center;">
           <a class="btn" href="{{ cta_url }}">{{ cta_label }}</a>
-        </p>
+        </div>
         <!--<![endif]-->
         {% endif %}
       </div>
 
       <!-- Footer -->
-      <p class="muted" style="font-size:12px; text-align:center; margin-top:24px; line-height:1.6;">
-        © {{ year }} CleanEnroll • 
-        <a href="https://cleanenroll.com/legal#privacy-policy" style="color:{{ theme.primary }}; text-decoration:none;">Privacy</a> • 
-        <a href="https://cleanenroll.com/legal#terms-of-service" style="color:{{ theme.primary }}; text-decoration:none;">Terms</a>
+      <div style="text-align:center; margin-top:32px; padding-top:24px; border-top:1px solid {{ theme.border }};">
+        <p class="muted" style="font-size:13px; line-height:1.6; margin:0 0 8px 0; color:{{ theme.text_muted }};">
+          <a href="https://cleanenroll.com/legal#privacy-policy" style="color:{{ theme.text_muted }}; text-decoration:none; margin:0 8px;">Privacy Policy</a>
+          <span style="color:#cbd5e1;">•</span>
+          <a href="https://cleanenroll.com/legal#terms-of-service" style="color:{{ theme.text_muted }}; text-decoration:none; margin:0 8px;">Terms of Service</a>
+        </p>
+        <p class="muted" style="font-size:12px; margin:8px 0 0 0; color:#94a3b8;">
+          © {{ year }} CleanEnroll. All rights reserved.
+        </p>
         {% if is_user_email %}
-        <br/>
-        <span style="color:#94a3b8; font-size:11px;">You're receiving this because you have an account with CleanEnroll.</span>
+        <p style="color:#94a3b8; font-size:11px; margin:12px 0 0 0;">
+          You're receiving this because you have an account with CleanEnroll.
+        </p>
         {% endif %}
-      </p>
+      </div>
     </div>
   </body>
 </html>
