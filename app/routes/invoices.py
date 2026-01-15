@@ -320,8 +320,7 @@ async def generate_payment_link(
                 "interval": invoice.billing_interval,
                 "interval_count": invoice.billing_interval_count or 1,
             }
-        else:
-            product_data["billing"] = {"type": "one_time"}
+        # Note: For one-time products, omit billing parameter entirely (SDK doesn't accept it)
         
         logger.info(f"Creating Dodo product: {product_data}")
         product = await dodo_client.products.create(**product_data)
