@@ -267,6 +267,8 @@ async def batch_delete_clients(
     db: Session = Depends(get_db)
 ):
     """Batch delete multiple clients"""
+    from ..models_invoice import Invoice
+    
     if not data.clientIds:
         raise HTTPException(status_code=400, detail="No client IDs provided")
     
@@ -278,6 +280,13 @@ async def batch_delete_clients(
             Client.user_id == current_user.id
         ).first()
         if client:
+            # Get contract IDs for this client
+            contract_ids = [c.id for c in client.contracts]
+            
+            # Delete invoices linked to these contracts first (FK constraint)
+            if contract_ids:
+                db.query(Invoice).filter(Invoice.contract_id.in_(contract_ids)).delete(synchronize_session=False)
+            
             db.delete(client)
             deleted_count += 1
     
