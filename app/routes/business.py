@@ -123,6 +123,8 @@ def get_current_user_business_config(current_user: User = Depends(get_current_us
         "onboardingComplete": config.onboarding_complete,
         "pricingModel": config.pricing_model,
         "meetingsRequired": config.meetings_required,
+        "paymentHandling": config.payment_handling,
+        "cancellationWindow": config.cancellation_window,
         "workingDays": config.working_days,
         "workingHours": config.working_hours,
         "breakTimes": config.break_times,
@@ -373,6 +375,12 @@ def get_business_config(firebase_uid: str, db: Session = Depends(get_db)):
         "signatureKey": config.signature_url,  # The R2 key
         "signatureUrl": signature_presigned_url,  # Presigned URL for display
         "pricingModel": config.pricing_model,
+        "meetingsRequired": config.meetings_required,
+        "paymentHandling": config.payment_handling,
+        "cancellationWindow": config.cancellation_window,
+        "daySchedules": config.day_schedules,
+        "offWorkPeriods": config.off_work_periods,
+        "suppliesProvided": config.supplies_provided,
         "ratePerSqft": config.rate_per_sqft,
         "ratePerRoom": config.rate_per_room,
         "hourlyRate": config.hourly_rate,

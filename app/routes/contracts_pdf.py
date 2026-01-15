@@ -310,6 +310,7 @@ async def generate_contract_html(
     
     payment_due_days = business_config.payment_due_days or 15
     late_fee = business_config.late_fee_percent or 1.5
+    cancellation_window = business_config.cancellation_window or 24
     
     # Client info
     client_name = client.contact_name or client.business_name
@@ -740,14 +741,28 @@ async def generate_contract_html(
         <p class="terms-note">Payment due within {payment_due_days} days of service completion. A {late_fee}% late fee applies after due date.</p>
     </div>
 
-    <!-- 5. Terms -->
+    <!-- 5. Terms and Conditions -->
     <div class="section">
-        <div class="section-title"><span class="section-number">5.</span>Terms</div>
+        <div class="section-title"><span class="section-number">5.</span>Terms and Conditions</div>
         <p class="section-content">
             This Agreement will begin on the date of acceptance and will remain in effect until all services have been completed.
         </p>
-        <ul class="bullet-list" style="margin-top: 12px;">
-            <li><strong>Cancellation:</strong> 24-hour notice required for cancellations to avoid charges</li>
+        
+        <h4 style="margin-top: 16px; margin-bottom: 8px; color: #E2E8F0; font-size: 11pt;">Payment Terms</h4>
+        <ul class="bullet-list">
+            <li><strong>Payment Due:</strong> Payment is due within {payment_due_days} days of service completion</li>
+            <li><strong>Late Fee:</strong> A {late_fee}% late fee will be applied to any balance not paid by the due date</li>
+            <li><strong>Accepted Methods:</strong> Payment may be made via check, bank transfer, or other agreed-upon methods</li>
+        </ul>
+        
+        <h4 style="margin-top: 16px; margin-bottom: 8px; color: #E2E8F0; font-size: 11pt;">Cancellation Policy</h4>
+        <ul class="bullet-list">
+            <li><strong>Notice Required:</strong> {cancellation_window}-hour advance notice is required for cancellations</li>
+            <li><strong>Late Cancellation:</strong> Cancellations made with less than {cancellation_window} hours notice may be subject to a cancellation fee</li>
+        </ul>
+        
+        <h4 style="margin-top: 16px; margin-bottom: 8px; color: #E2E8F0; font-size: 11pt;">General Terms</h4>
+        <ul class="bullet-list">
             <li><strong>Access:</strong> Client agrees to provide necessary access to the property</li>
             <li><strong>Liability:</strong> Service provider maintains appropriate insurance coverage</li>
         </ul>
