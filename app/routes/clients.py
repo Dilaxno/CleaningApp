@@ -247,12 +247,27 @@ async def delete_client(
     db: Session = Depends(get_db)
 ):
     """Delete a client"""
+    from ..plan_limits import decrement_client_count
+    
     client = db.query(Client).filter(Client.id == client_id, Client.user_id == current_user.id).first()
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
     
+    # Check if client had a fully signed contract (both parties signed)
+    # This is when the count was incremented, so we need to decrement
+    has_signed_contract = any(
+        c.client_signature_timestamp and c.signed_at 
+        for c in client.contracts
+    )
+    
     db.delete(client)
     db.commit()
+    
+    # Decrement client count if they had a signed contract
+    if has_signed_contract:
+        decrement_client_count(current_user, db)
+        logger.info(f"📊 Client count decremented for user {current_user.id}: {current_user.clients_this_month}")
+    
     return {"message": "Client deleted"}
 
 
@@ -268,18 +283,29 @@ async def batch_delete_clients(
 ):
     """Batch delete multiple clients"""
     from ..models_invoice import Invoice
+    from ..plan_limits import decrement_client_count
     
     if not data.clientIds:
         raise HTTPException(status_code=400, detail="No client IDs provided")
     
     # Verify all clients belong to the current user and delete them
     deleted_count = 0
+    signed_contracts_count = 0
+    
     for client_id in data.clientIds:
         client = db.query(Client).filter(
             Client.id == client_id,
             Client.user_id == current_user.id
         ).first()
         if client:
+            # Check if client had a fully signed contract
+            has_signed_contract = any(
+                c.client_signature_timestamp and c.signed_at 
+                for c in client.contracts
+            )
+            if has_signed_contract:
+                signed_contracts_count += 1
+            
             # Get contract IDs for this client
             contract_ids = [c.id for c in client.contracts]
             
@@ -291,6 +317,13 @@ async def batch_delete_clients(
             deleted_count += 1
     
     db.commit()
+    
+    # Decrement client count for each deleted client that had a signed contract
+    for _ in range(signed_contracts_count):
+        decrement_client_count(current_user, db)
+    
+    if signed_contracts_count > 0:
+        logger.info(f"📊 Client count decremented by {signed_contracts_count} for user {current_user.id}: {current_user.clients_this_month}")
     
     return {
         "message": f"Successfully deleted {deleted_count} client(s)",

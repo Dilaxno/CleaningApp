@@ -96,6 +96,17 @@ def increment_client_count(user: User, db: Session) -> None:
     user.clients_this_month += 1
     db.commit()
 
+def decrement_client_count(user: User, db: Session) -> None:
+    """
+    Decrement the user's monthly client count.
+    Should be called when a client with a fully signed contract is deleted.
+    Only decrements if count is greater than 0.
+    """
+    check_and_reset_monthly_counter(user, db)
+    if user.clients_this_month > 0:
+        user.clients_this_month -= 1
+        db.commit()
+
 def get_usage_stats(user: User, db: Session) -> dict:
     """
     Get current usage statistics for the user.
