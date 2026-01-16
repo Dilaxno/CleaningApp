@@ -12,6 +12,9 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
+# Default profile picture for users without one
+DEFAULT_PROFILE_PICTURE = "https://res.cloudinary.com/dxqum9ywx/image/upload/v1768518062/pfp_dvk6gi.jpg"
+
 
 def validate_firebase_uid(firebase_uid: str) -> bool:
     """Validate firebase_uid format to prevent injection"""
@@ -86,15 +89,20 @@ def create_or_update_user(data: UserCreate, db: Session = Depends(get_db)):
             # Set profile picture from Google if provided and user doesn't have one
             if data.profilePictureUrl and not user.profile_picture_url:
                 user.profile_picture_url = data.profilePictureUrl
+            # Set default profile picture if user still doesn't have one
+            elif not user.profile_picture_url:
+                user.profile_picture_url = DEFAULT_PROFILE_PICTURE
         else:
             logger.info(f"🆕 Creating new user for firebase_uid: {data.firebaseUid}")
+            # Use provided profile picture, or default if none provided
+            profile_picture = data.profilePictureUrl or DEFAULT_PROFILE_PICTURE
             user = User(
                 firebase_uid=data.firebaseUid,
                 email=data.email,
                 full_name=data.fullName,
                 account_type=data.accountType,
                 hear_about=data.hearAbout,
-                profile_picture_url=data.profilePictureUrl,  # Save Google profile picture
+                profile_picture_url=profile_picture,
                 plan=None,  # Users must select a paid plan after onboarding
             )
             db.add(user)
