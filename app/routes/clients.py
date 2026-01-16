@@ -124,8 +124,12 @@ async def get_clients(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get all clients for the current user"""
-    clients = db.query(Client).filter(Client.user_id == current_user.id).order_by(Client.created_at.desc()).all()
+    """Get all clients for the current user (excludes pending_signature clients)"""
+    # Filter out clients with "pending_signature" status - they haven't signed the contract yet
+    clients = db.query(Client).filter(
+        Client.user_id == current_user.id,
+        Client.status != "pending_signature"
+    ).order_by(Client.created_at.desc()).all()
     return [
         ClientResponse(
             id=c.id,
@@ -341,8 +345,11 @@ async def export_clients_csv(
     end_date: Optional[str] = Query(None),
 ):
     """Export clients as CSV with optional filters"""
-    # Base query
-    query = db.query(Client).filter(Client.user_id == current_user.id)
+    # Base query - exclude pending_signature clients
+    query = db.query(Client).filter(
+        Client.user_id == current_user.id,
+        Client.status != "pending_signature"
+    )
     
     # Apply status filter
     if status and status != "all":
@@ -687,6 +694,8 @@ async def submit_public_form(
         raise HTTPException(status_code=404, detail="Business not found")
     
     # Create the client associated with the business owner
+    # Status is "pending_signature" until client signs the contract
+    # This prevents the client from appearing in provider's list before contract is signed
     client = Client(
         user_id=user.id,
         business_name=data.businessName,
@@ -698,13 +707,13 @@ async def submit_public_form(
         frequency=data.frequency,
         notes=data.notes,
         form_data=data.formData,  # Store structured form data
-        status="new_lead"
+        status="pending_signature"  # Will change to "new_lead" after contract is signed
     )
     db.add(client)
     db.commit()
     db.refresh(client)
     
-    logger.info(f"✅ Public form client created: id={client.id} for user_id={user.id}")
+    logger.info(f"✅ Public form client created: id={client.id} for user_id={user.id} with status=pending_signature")
     
     # Queue contract PDF generation as background job (async to prevent timeout)
     job_id = None
@@ -862,6 +871,12 @@ async def sign_contract(
     contract.client_signature_user_agent = user_agent[:500] if user_agent else None
     contract.client_signature_timestamp = datetime.now()
     # Status remains 'new' until both parties sign (provider signs last)
+    
+    # Update client status from "pending_signature" to "new_lead"
+    # Now the client will appear in the provider's client list
+    if client.status == "pending_signature":
+        client.status = "new_lead"
+        logger.info(f"✅ Client status updated from pending_signature to new_lead: client_id={client.id}")
     
     # Upload client signature to R2 for PDF rendering
     client_signature_url = None
