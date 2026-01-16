@@ -8,6 +8,12 @@ import asyncio
 from arq import create_pool
 from arq.connections import RedisSettings
 
+# Import all models at module level to ensure SQLAlchemy can resolve relationships
+# This must happen before any database operations
+from .database import SessionLocal
+from .models import User, Client, Contract, BusinessConfig
+from . import models_invoice  # noqa: F401 - Ensure Invoice model is registered
+
 logger = logging.getLogger(__name__)
 
 
@@ -51,9 +57,6 @@ async def generate_contract_pdf_task(ctx, client_id: int, owner_uid: str, form_d
     Returns:
         dict with contract_id and pdf_url
     """
-    from .database import SessionLocal
-    from .models import User, Client, Contract, BusinessConfig
-    from . import models_invoice  # noqa: F401 - Ensure Invoice model is registered for Client relationship
     from .routes.contracts_pdf import calculate_quote, generate_contract_html, html_to_pdf
     from .routes.upload import get_r2_client, generate_presigned_url
     from .config import R2_BUCKET_NAME
@@ -147,9 +150,6 @@ async def send_form_notification_emails_task(ctx, client_id: int, user_id: int, 
         user_id: User ID
         owner_uid: Business owner Firebase UID
     """
-    from .database import SessionLocal
-    from .models import User, Client, BusinessConfig
-    from . import models_invoice  # noqa: F401 - Ensure Invoice model is registered for Client relationship
     from .email_service import send_new_client_notification, send_form_submission_confirmation
     
     logger.info(f"📧 Starting email notifications for client {client_id}")
@@ -204,8 +204,6 @@ async def smtp_health_check_task(ctx):
     Daily cron job to verify all custom SMTP connections.
     Updates status to 'failed' if connection fails, allowing fallback to CleanEnroll.
     """
-    from .database import SessionLocal
-    from .models import BusinessConfig
     from .routes.smtp import test_smtp_connection, decrypt_password
     from datetime import datetime
     
@@ -277,7 +275,6 @@ async def status_automation_task(ctx):
     - Contracts: active → completed (when end date passes)
     - Clients: scheduled → active (when first accepted schedule date arrives)
     """
-    from .database import SessionLocal
     from .services.status_automation import update_contract_statuses
     
     logger.info("🔄 Starting daily status automation")
