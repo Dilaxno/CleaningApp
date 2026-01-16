@@ -224,6 +224,7 @@ class Contract(Base):
 
     user = relationship("User", back_populates="contracts")
     client = relationship("Client", back_populates="contracts")
+    invoices = relationship("Invoice", back_populates="contract", cascade="all, delete-orphan")
 
 
 class Schedule(Base):

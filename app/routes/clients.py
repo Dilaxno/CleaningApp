@@ -693,6 +693,21 @@ async def submit_public_form(
         logger.error(f"❌ User not found for Firebase UID: {data.ownerUid}")
         raise HTTPException(status_code=404, detail="Business not found")
     
+    # Extract frequency from formData if not provided directly
+    frequency = data.frequency
+    if not frequency and data.formData:
+        frequency = data.formData.get("cleaningFrequency")
+    
+    # If still no frequency, infer from property type (e.g., move-in-out is always one-time)
+    if not frequency and data.propertyType:
+        property_type_lower = data.propertyType.lower()
+        if 'move' in property_type_lower:
+            frequency = "One-time"
+        elif 'construction' in property_type_lower or 'post-construction' in property_type_lower:
+            frequency = "One-time"
+        elif 'event' in property_type_lower:
+            frequency = "One-time"
+    
     # Create the client associated with the business owner
     # Status is "pending_signature" until client signs the contract
     # This prevents the client from appearing in provider's list before contract is signed
@@ -704,7 +719,7 @@ async def submit_public_form(
         phone=data.phone,
         property_type=data.propertyType,
         property_size=data.propertySize,
-        frequency=data.frequency,
+        frequency=frequency,
         notes=data.notes,
         form_data=data.formData,  # Store structured form data
         status="pending_signature"  # Will change to "new_lead" after contract is signed
