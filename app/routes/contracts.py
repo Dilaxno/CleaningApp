@@ -434,6 +434,104 @@ async def sign_contract_as_provider(
     )
 
 
+@router.post("/{contract_id}/generate-payment-link")
+async def generate_contract_payment_link(
+    contract_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Generate Dodo Payments checkout link for contract using adhoc product with pay-what-you-want"""
+    from dodopayments import AsyncDodoPayments
+    from ..config import DODO_PAYMENTS_API_KEY, DODO_PAYMENTS_ENVIRONMENT, FRONTEND_URL, DODO_ADHOC_PRODUCT_ID
+    
+    logger.info(f"💳 Generating payment link for contract {contract_id}")
+    
+    contract = db.query(Contract).filter(
+        Contract.id == contract_id,
+        Contract.user_id == current_user.id
+    ).first()
+    
+    if not contract:
+        raise HTTPException(status_code=404, detail="Contract not found")
+    
+    if not contract.total_value or contract.total_value <= 0:
+        raise HTTPException(status_code=400, detail="Contract must have a valid total value")
+    
+    if not DODO_PAYMENTS_API_KEY:
+        raise HTTPException(status_code=500, detail="Payment system not configured")
+    
+    if not DODO_ADHOC_PRODUCT_ID:
+        raise HTTPException(status_code=500, detail="Adhoc product not configured")
+    
+    client = db.query(Client).filter(Client.id == contract.client_id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    
+    business_config = db.query(BusinessConfig).filter(
+        BusinessConfig.user_id == current_user.id
+    ).first()
+    business_name = business_config.business_name if business_config else "Cleaning Service"
+    
+    # Initialize Dodo client
+    dodo_client = AsyncDodoPayments(
+        bearer_token=DODO_PAYMENTS_API_KEY,
+        environment=DODO_PAYMENTS_ENVIRONMENT or "test_mode",
+    )
+    
+    try:
+        # Use the adhoc product for pay-what-you-want
+        product_id = DODO_ADHOC_PRODUCT_ID
+        logger.info(f"Using adhoc product: {product_id}")
+        
+        # Create checkout session with custom amount
+        return_url = f"{FRONTEND_URL}/contracts/payment/success/{contract.id}"
+        
+        session_data = {
+            "product_cart": [{
+                "product_id": product_id, 
+                "quantity": 1,
+                # Set custom amount for pay-what-you-want product
+                "custom_amount": int(contract.total_value * 100)  # Convert to cents
+            }],
+            "customer": {
+                "email": client.email or "",
+                "name": client.contact_name or client.business_name or "",
+            },
+            "metadata": {
+                "contract_id": str(contract.id),
+                "contract_number": f"CLN-{contract.created_at.strftime('%Y%m%d')}-{contract.id:04d}",
+                "provider_user_id": str(current_user.id),
+                "client_id": str(client.id),
+                "business_name": business_name,
+                "contract_title": contract.title,
+                "contract_description": contract.description or f"Service agreement from {business_name}",
+            },
+            "return_url": return_url,
+        }
+        
+        logger.info(f"Creating checkout session with data: {session_data}")
+        session = await dodo_client.checkout_sessions.create(**session_data)
+        
+        checkout_url = getattr(session, "checkout_url", None) or session.get("checkout_url")
+        session_id = getattr(session, "session_id", None) or session.get("session_id")
+        
+        if not checkout_url:
+            raise HTTPException(status_code=502, detail="Failed to create payment link")
+        
+        logger.info(f"✅ Payment link generated for contract {contract_id}: {checkout_url}")
+        
+        return {
+            "payment_link": checkout_url,
+            "session_id": session_id,
+            "product_id": product_id,
+            "amount": contract.total_value
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to create payment link for contract {contract_id}: {e}")
+        raise HTTPException(status_code=400, detail=f"Failed to create payment link: {str(e)}")
+
+
 @router.delete("/{contract_id}")
 async def delete_contract(
     contract_id: int,
