@@ -953,7 +953,50 @@ async def sign_contract(
     return {
         "success": True,
         "message": "Contract signed successfully. Awaiting service provider signature.",
-        "signedPdfUrl": signed_pdf_url
+        "signedPdfUrl": signed_pdf_url,
+        "pdfRegenerating": True,  # Flag indicating PDF is being regenerated with signature
+        "contractId": contract.id,
+        "contractPublicId": contract.public_id
+    }
+
+
+@router.get("/public/contract-pdf-status/{contract_public_id}")
+async def get_contract_pdf_status(
+    contract_public_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Public endpoint to check if contract PDF has been regenerated with signature.
+    Used for polling after client signs contract.
+    """
+    from ..models import Contract
+    from .upload import generate_presigned_url
+    
+    # Validate UUID format
+    if not validate_uuid(contract_public_id):
+        raise HTTPException(status_code=400, detail="Invalid contract identifier")
+    
+    # Find contract by public_id
+    contract = db.query(Contract).filter(Contract.public_id == contract_public_id).first()
+    if not contract:
+        raise HTTPException(status_code=404, detail="Contract not found")
+    
+    # Check if PDF has been regenerated (pdf_key updated after client signs)
+    # The background job updates pdf_key with format: contracts/{user_id}/{contract_id}_client_signed.pdf
+    pdf_regenerated = contract.pdf_key and "_client_signed.pdf" in contract.pdf_key
+    
+    # Generate presigned URL for the PDF
+    signed_pdf_url = None
+    if contract.pdf_key:
+        try:
+            signed_pdf_url = generate_presigned_url(contract.pdf_key, expiration=604800)  # 7 days
+        except Exception as url_err:
+            logger.warning(f"⚠️ Failed to generate presigned URL: {url_err}")
+    
+    return {
+        "pdfReady": pdf_regenerated,
+        "signedPdfUrl": signed_pdf_url,
+        "contractId": contract.id
     }
 
 
