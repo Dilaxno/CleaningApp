@@ -24,6 +24,8 @@ DODO_PAYMENTS_WEBHOOK_SECRET = os.getenv("DODO_PAYMENTS_WEBHOOK_SECRET")
 DODO_PAYMENTS_ENVIRONMENT = os.getenv("DODO_PAYMENTS_ENVIRONMENT", "test_mode")
 # Default tax category used when creating products with the API (configure per business)
 DODO_DEFAULT_TAX_CATEGORY = os.getenv("DODO_DEFAULT_TAX_CATEGORY", "digital_products")
+# Adhoc product ID for "pay what you want" client payments - prevents creating millions of products
+DODO_ADHOC_PRODUCT_ID = os.getenv("DODO_ADHOC_PRODUCT_ID", "pdt_0NWQgv8RX3EG0c34ObKdo")
  
 # Security - CRITICAL: No default secret key in production
 SECRET_KEY = os.getenv("SECRET_KEY")

@@ -14,7 +14,7 @@ from ..database import get_db
 from ..models import User, Client, Contract, Schedule, BusinessConfig
 from ..models_invoice import Invoice, Payout
 from ..auth import get_current_user
-from ..config import DODO_PAYMENTS_API_KEY, DODO_PAYMENTS_ENVIRONMENT, FRONTEND_URL, DODO_DEFAULT_TAX_CATEGORY
+from ..config import DODO_PAYMENTS_API_KEY, DODO_PAYMENTS_ENVIRONMENT, FRONTEND_URL, DODO_DEFAULT_TAX_CATEGORY, DODO_ADHOC_PRODUCT_ID
 
 logger = logging.getLogger(__name__)
 
@@ -266,7 +266,7 @@ async def generate_payment_link(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Generate Dodo Payments dynamic product and payment link for invoice"""
+    """Generate Dodo Payments checkout link using adhoc product with pay-what-you-want"""
     from dodopayments import AsyncDodoPayments
     
     logger.info(f"💳 Generating payment link for invoice {invoice_id}")
@@ -285,6 +285,9 @@ async def generate_payment_link(
     if not DODO_PAYMENTS_API_KEY:
         raise HTTPException(status_code=500, detail="Payment system not configured")
     
+    if not DODO_ADHOC_PRODUCT_ID:
+        raise HTTPException(status_code=500, detail="Adhoc product not configured")
+    
     client = db.query(Client).filter(Client.id == invoice.client_id).first()
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -301,52 +304,39 @@ async def generate_payment_link(
     )
     
     try:
-        # Create dynamic product
-        product_data = {
-            "name": f"{invoice.title} - {invoice.invoice_number}",
-            "description": invoice.description or f"Cleaning service from {business_name}",
-            "price": {
-                "currency": invoice.currency.upper(),
-                "price": int(invoice.total_amount * 100),  # Convert to cents
-                "type": "one_time_price",
-                "discount": 0,  # Required by Dodo API
-                "purchasing_power_parity": False,  # Required by Dodo API
-            },
-            "tax_category": DODO_DEFAULT_TAX_CATEGORY,
-        }
+        # Use the adhoc product instead of creating a new one
+        product_id = DODO_ADHOC_PRODUCT_ID
+        logger.info(f"Using adhoc product: {product_id}")
         
-        # Add recurring billing if applicable
-        if invoice.is_recurring and invoice.billing_interval:
-            product_data["billing"] = {
-                "type": "recurring",
-                "interval": invoice.billing_interval,
-                "interval_count": invoice.billing_interval_count or 1,
-            }
-        # Note: For one-time products, omit billing parameter entirely (SDK doesn't accept it)
-        
-        logger.info(f"Creating Dodo product: {product_data}")
-        product = await dodo_client.products.create(**product_data)
-        
-        product_id = getattr(product, "product_id", None) or product.get("product_id")
-        logger.info(f"✅ Dodo product created: {product_id}")
-        
-        # Create checkout session
+        # Create checkout session with custom amount using pay-what-you-want
         return_url = f"{FRONTEND_URL}/payment/success/{invoice.id}"
         
-        session = await dodo_client.checkout_sessions.create(
-            product_cart=[{"product_id": product_id, "quantity": 1}],
-            customer={
+        # For pay-what-you-want products, we can set a custom amount
+        session_data = {
+            "product_cart": [{
+                "product_id": product_id, 
+                "quantity": 1,
+                # Set custom amount for pay-what-you-want product
+                "custom_amount": int(invoice.total_amount * 100)  # Convert to cents
+            }],
+            "customer": {
                 "email": client.email or "",
                 "name": client.contact_name or client.business_name or "",
             },
-            metadata={
+            "metadata": {
                 "invoice_id": str(invoice.id),
                 "invoice_number": invoice.invoice_number,
                 "provider_user_id": str(current_user.id),
                 "client_id": str(client.id),
+                "business_name": business_name,
+                "invoice_title": invoice.title,
+                "invoice_description": invoice.description or f"Cleaning service from {business_name}",
             },
-            return_url=return_url,
-        )
+            "return_url": return_url,
+        }
+        
+        logger.info(f"Creating checkout session with data: {session_data}")
+        session = await dodo_client.checkout_sessions.create(**session_data)
         
         checkout_url = getattr(session, "checkout_url", None) or session.get("checkout_url")
         session_id = getattr(session, "session_id", None) or session.get("session_id")
@@ -354,20 +344,22 @@ async def generate_payment_link(
         if not checkout_url:
             raise HTTPException(status_code=502, detail="Failed to create payment link")
         
-        # Update invoice with payment info
-        invoice.dodo_product_id = product_id
+        # Update invoice with payment info (no longer storing product_id since we use adhoc)
+        invoice.dodo_product_id = product_id  # Store adhoc product ID for reference
         invoice.dodo_payment_link = checkout_url
         invoice.status = "sent"
         
         db.commit()
         
-        logger.info(f"✅ Payment link generated: {checkout_url}")
+        logger.info(f"✅ Payment link generated using adhoc product: {checkout_url}")
         
         return {
             "payment_link": checkout_url,
             "session_id": session_id,
             "product_id": product_id,
-            "invoice_id": invoice.id
+            "invoice_id": invoice.id,
+            "amount": invoice.total_amount,
+            "currency": invoice.currency
         }
         
     except Exception as e:

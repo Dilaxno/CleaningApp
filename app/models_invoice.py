@@ -51,7 +51,7 @@ class Invoice(Base):
     status = Column(String(50), default="pending")  # pending, sent, paid, overdue, cancelled
     
     # Dodo Payments integration
-    dodo_product_id = Column(String(255), nullable=True)  # Dynamic product ID
+    dodo_product_id = Column(String(255), nullable=True)  # Adhoc product ID (shared across all invoices)
     dodo_payment_link = Column(String(500), nullable=True)  # Checkout URL
     dodo_payment_id = Column(String(255), nullable=True)  # Payment ID after completion
     
