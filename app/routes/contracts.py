@@ -407,7 +407,6 @@ async def sign_contract_as_provider(
     logger.info(f"🚀 Contract {contract_id} signing completed in FAST MODE")
     
     # Return immediate response with current PDF (will be updated by background job)
-    from .upload import get_pdf_url
     pdf_url = get_pdf_url(contract.pdf_key) if contract.pdf_key else None
     
     return ContractResponse(

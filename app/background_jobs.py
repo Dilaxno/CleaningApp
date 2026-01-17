@@ -132,7 +132,17 @@ async def send_contract_emails_job(
             return
         
         # Prepare email data
-        from .routes.upload import get_pdf_url
+        from .routes.upload import generate_presigned_url
+        
+        def get_pdf_url(pdf_key: Optional[str]) -> Optional[str]:
+            """Generate presigned URL for PDF if key exists"""
+            if not pdf_key:
+                return None
+            try:
+                return generate_presigned_url(pdf_key, expiration=3600)
+            except Exception:
+                return None
+        
         pdf_url = get_pdf_url(contract.pdf_key) if contract.pdf_key else None
         business_name = business_config.business_name if business_config else "Cleaning Service"
         service_type = contract.contract_type or "Cleaning Service"
