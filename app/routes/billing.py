@@ -538,8 +538,12 @@ async def _handle_client_invoice_payment(data: Dict, db: Session):
         invoice.paid_at = datetime.utcnow()
         invoice.dodo_payment_id = data.get("payment_id") or data.get("id")
         
+        # Increment unread payments counter for provider
+        if user:
+            user.unread_payments_count = (user.unread_payments_count or 0) + 1
+        
         db.commit()
-        logger.info(f"✅ Invoice {invoice_id} marked as paid")
+        logger.info(f"✅ Invoice {invoice_id} marked as paid, unread counter updated")
         
         # Get related entities for notifications
         client = db.query(Client).filter(Client.id == invoice.client_id).first()

@@ -1369,43 +1369,61 @@ async def send_payment_received_notification(
     
     content = f"""
     <p>Hi {provider_name},</p>
-    <p>Great news! <strong>{client_name}</strong> has paid their invoice.</p>
+    <p>🎉 <strong>Excellent news!</strong> <strong>{client_name}</strong> has just paid their invoice.</p>
     
-    <div style="background: {THEME['background']}; border-radius: 12px; padding: 24px; margin: 24px 0;">
-        <div style="margin-bottom: 16px;">
-            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">Invoice Number</div>
-            <div style="font-size: 15px; color: {THEME['text_primary']}; font-weight: 600;">{invoice_number}</div>
+    <div style="background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); border: 2px solid #22c55e; border-radius: 16px; padding: 28px; margin: 24px 0; box-shadow: 0 4px 12px rgba(34, 197, 94, 0.15);">
+        <div style="text-align: center; margin-bottom: 20px;">
+            <div style="display: inline-block; background: #22c55e; color: white; padding: 12px; border-radius: 50%; margin-bottom: 12px;">
+                <svg style="width: 24px; height: 24px; fill: currentColor;" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" />
+                </svg>
+            </div>
+            <div style="font-size: 32px; color: #22c55e; font-weight: 800; margin-bottom: 8px;">${amount:,.2f} {currency}</div>
+            <div style="color: #166534; font-size: 16px; font-weight: 600;">Payment Received!</div>
         </div>
-        <div style="margin-bottom: 16px;">
-            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">Amount Received</div>
-            <div style="font-size: 24px; color: {THEME['success']}; font-weight: 700;">${amount:,.2f} {currency}</div>
+        
+        <div style="background: rgba(255, 255, 255, 0.8); border-radius: 12px; padding: 20px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div>
+                    <div style="color: #166534; font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 4px;">Invoice</div>
+                    <div style="font-size: 15px; color: #166534; font-weight: 600;">{invoice_number}</div>
+                </div>
+                <div>
+                    <div style="color: #166534; font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 4px;">Client</div>
+                    <div style="font-size: 15px; color: #166534; font-weight: 600;">{client_name}</div>
+                </div>
+            </div>
+            {f'<div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(34, 197, 94, 0.2);"><div style="color: #166534; font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 4px;">Payment Date</div><div style="font-size: 15px; color: #166534; font-weight: 600;">{payment_date}</div></div>' if payment_date else ''}
         </div>
-        <div style="margin-bottom: 16px;">
-            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">Client</div>
-            <div style="font-size: 15px; color: {THEME['text_primary']};">{client_name}</div>
-        </div>
-        {f'<div><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 6px;">Payment Date</div><div style="font-size: 15px; color: {THEME["text_primary"]};">{payment_date}</div></div>' if payment_date else ''}
     </div>
     
-    <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
-        <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
-            ✅ Payment received and added to your balance
-        </p>
+    <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 2px solid #f59e0b; border-radius: 12px; padding: 20px; margin: 20px 0;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="background: #f59e0b; color: white; padding: 8px; border-radius: 50%; flex-shrink: 0;">
+                <svg style="width: 20px; height: 20px; fill: currentColor;" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd" />
+                </svg>
+            </div>
+            <div>
+                <div style="color: #92400e; font-size: 14px; font-weight: 700; margin-bottom: 2px;">💰 Ready for Payout</div>
+                <div style="color: #92400e; font-size: 13px;">This payment has been added to your available balance and is ready for withdrawal.</div>
+            </div>
+        </div>
     </div>
     
-    <p style="color: {THEME['text_muted']}; font-size: 14px;">
-        View your payouts dashboard to request a withdrawal.
+    <p style="color: {THEME['text_muted']}; font-size: 14px; text-align: center; margin-top: 24px;">
+        🚀 <strong>Ready to withdraw?</strong> Visit your payouts dashboard to request a withdrawal to your bank account.
     </p>
     """
     
     return await send_email(
         to=provider_email,
-        subject=f"Payment Received: ${amount:,.2f} from {client_name}",
-        title="Payment Received! 💰",
-        intro=f"{client_name} has paid invoice {invoice_number}.",
+        subject=f"💰 Payment Received: ${amount:,.2f} from {client_name}",
+        title="Payment Received! 🎉",
+        intro=f"Great news! {client_name} has paid invoice {invoice_number}.",
         content_html=content,
         cta_url=f"{FRONTEND_URL}/dashboard/payouts",
-        cta_label="View Payouts",
+        cta_label="💳 View Payouts Dashboard",
         is_user_email=True,
     )
 

@@ -47,6 +47,9 @@ class User(Base):
     notify_payment_received = Column(Boolean, default=True, nullable=False)  # Email when payment is received
     notify_reminders = Column(Boolean, default=True, nullable=False)  # Email for upcoming appointments
     notify_marketing = Column(Boolean, default=False, nullable=False)  # Marketing and product updates
+    # Payment notification tracking
+    unread_payments_count = Column(Integer, default=0, nullable=False)  # Count of unread payment notifications
+    last_payment_check = Column(DateTime, nullable=True)  # Last time user checked payments
     # Payout information
     payout_country = Column(String(2), nullable=True)  # ISO country code (e.g., "US", "GB", "FR")
     payout_currency = Column(String(3), nullable=True)  # Currency code (e.g., "USD", "EUR", "GBP")

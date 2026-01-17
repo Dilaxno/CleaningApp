@@ -1,8 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from pydantic import BaseModel
+from datetime import datetime
 from ..database import get_db
 from ..models import User
+from ..models_invoice import Invoice
 from ..auth import get_current_user
 
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
@@ -15,6 +18,64 @@ class NotificationPreferences(BaseModel):
     notify_payment_received: bool
     notify_reminders: bool
     notify_marketing: bool
+
+
+class PaymentNotificationResponse(BaseModel):
+    unread_count: int
+    recent_payments: list
+
+
+@router.get("/payment-notifications", response_model=PaymentNotificationResponse)
+async def get_payment_notifications(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get unread payment notifications count and recent payments"""
+    user = db.query(User).filter(User.firebase_uid == current_user["uid"]).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Get recent payments since last check
+    last_check = user.last_payment_check or datetime(2020, 1, 1)  # Default to old date if never checked
+    
+    recent_payments_query = db.query(Invoice).filter(
+        Invoice.user_id == user.id,
+        Invoice.status == "paid",
+        Invoice.paid_at > last_check
+    ).order_by(Invoice.paid_at.desc()).limit(10)
+    
+    recent_payments = []
+    for invoice in recent_payments_query:
+        recent_payments.append({
+            "id": invoice.id,
+            "invoice_number": invoice.invoice_number,
+            "amount": invoice.total_amount,
+            "currency": invoice.currency,
+            "paid_at": invoice.paid_at.isoformat() if invoice.paid_at else None,
+            "client_name": invoice.client.business_name or invoice.client.contact_name if invoice.client else "Unknown"
+        })
+    
+    return PaymentNotificationResponse(
+        unread_count=user.unread_payments_count,
+        recent_payments=recent_payments
+    )
+
+
+@router.post("/mark-payments-read")
+async def mark_payments_read(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Mark payment notifications as read"""
+    user = db.query(User).filter(User.firebase_uid == current_user["uid"]).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    user.unread_payments_count = 0
+    user.last_payment_check = datetime.utcnow()
+    db.commit()
+    
+    return {"message": "Payment notifications marked as read"}
 
 
 @router.get("/preferences")
