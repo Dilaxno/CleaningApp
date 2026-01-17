@@ -50,9 +50,18 @@ def get_r2_client():
 def generate_presigned_url(key: str, expiration: int = PRESIGNED_URL_EXPIRATION) -> str:
     """Generate a presigned URL for accessing a private object."""
     r2 = get_r2_client()
+    
+    # Add response content type for SVG files to ensure proper rendering
+    params = {"Bucket": R2_BUCKET_NAME, "Key": key}
+    
+    # If it's an SVG file, ensure it's served with the correct content type
+    if key.lower().endswith('.svg'):
+        params["ResponseContentType"] = "image/svg+xml"
+        params["ResponseContentDisposition"] = "inline"
+    
     return r2.generate_presigned_url(
         "get_object",
-        Params={"Bucket": R2_BUCKET_NAME, "Key": key},
+        Params=params,
         ExpiresIn=expiration,
     )
 
@@ -116,12 +125,20 @@ async def upload_logo(
     try:
         r2 = get_r2_client()
 
-        r2.put_object(
-            Bucket=R2_BUCKET_NAME,
-            Key=key,
-            Body=contents,
-            ContentType=file.content_type,
-        )
+        # Set appropriate content type and metadata for SVG files
+        put_object_params = {
+            "Bucket": R2_BUCKET_NAME,
+            "Key": key,
+            "Body": contents,
+            "ContentType": file.content_type,
+        }
+        
+        # Add specific metadata for SVG files to ensure proper handling
+        if file.content_type == "image/svg+xml":
+            put_object_params["ContentDisposition"] = "inline"
+            put_object_params["CacheControl"] = "public, max-age=31536000"  # 1 year cache
+        
+        r2.put_object(**put_object_params)
 
         # Store the key (not URL) in database
         config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
