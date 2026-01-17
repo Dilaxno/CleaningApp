@@ -33,9 +33,10 @@ async def test_adhoc_payment():
         
         session_data = {
             "product_cart": [{
-                "product_id": DODO_ADHOC_PRODUCT_ID, 
+                "product_id": DODO_ADHOC_PRODUCT_ID,
                 "quantity": 1,
-                "custom_amount": int(test_amount * 100)  # Convert to cents
+                # Dynamic amount in lowest denomination (e.g., cents)
+                "amount": int(round(test_amount * 100))
             }],
             "customer": {
                 "email": "test@example.com",

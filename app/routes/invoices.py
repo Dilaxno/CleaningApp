@@ -191,6 +191,10 @@ async def create_invoice(
     subtotal = data.base_amount - frequency_discount + data.addon_amount
     tax_amount = subtotal * (data.tax_rate / 100) if data.tax_rate > 0 else 0
     total_amount = subtotal + tax_amount
+
+    # Guard against zero or negative totals to prevent $0 PWYW links
+    if total_amount is None or total_amount <= 0:
+        raise HTTPException(status_code=400, detail="Invoice total must be greater than 0")
     
     # Generate invoice number
     invoice_number = generate_invoice_number(current_user.id, db)
@@ -282,6 +286,10 @@ async def generate_payment_link(
     if invoice.status == "paid":
         raise HTTPException(status_code=400, detail="Invoice already paid")
     
+    # Guard against zero-amount invoices to avoid $0 PWYW checkouts
+    if invoice.total_amount is None or invoice.total_amount <= 0:
+        raise HTTPException(status_code=400, detail="Invoice amount must be greater than 0 to generate payment link")
+    
     if not DODO_PAYMENTS_API_KEY:
         raise HTTPException(status_code=500, detail="Payment system not configured")
     
@@ -314,10 +322,10 @@ async def generate_payment_link(
         # For pay-what-you-want products, we can set a custom amount
         session_data = {
             "product_cart": [{
-                "product_id": product_id, 
+                "product_id": product_id,
                 "quantity": 1,
-                # Set custom amount for pay-what-you-want product
-                "custom_amount": int(invoice.total_amount * 100)  # Convert to cents
+                # Dynamic amount in lowest currency unit (e.g., cents)
+                "amount": int(round(invoice.total_amount * 100))
             }],
             "customer": {
                 "email": client.email or "",
