@@ -222,10 +222,12 @@ async def generate_contract_html(
     if not any([business_config.rate_per_sqft, business_config.rate_per_room, business_config.hourly_rate, business_config.flat_rate]):
         logger.warning(f"⚠️ ALL PRICING FIELDS ARE NULL for user_id: {business_config.user_id} - user needs to update pricing in Settings")
     
-    # Debug logging for signatures
-    logger.info(f"🖊️ Generating PDF - Client signature present: {bool(client_signature)}, Provider signature present: {bool(provider_signature)}")
+    # Debug logging for signatures - INPUT
+    logger.info(f"🖊️ [INPUT] Generating PDF - Client signature present: {bool(client_signature)}, Provider signature present: {bool(provider_signature)}")
     if client_signature:
-        logger.info(f"📝 Client signature format: {client_signature[:50]}..." if len(client_signature) > 50 else f"📝 Client signature: {client_signature}")
+        logger.info(f"📝 [INPUT] Client signature format: {client_signature[:50]}..." if len(client_signature) > 50 else f"📝 Client signature: {client_signature}")
+    if provider_signature:
+        logger.info(f"📝 [INPUT] Provider signature format: {provider_signature[:50]}..." if len(provider_signature) > 50 else f"📝 Provider signature: {provider_signature}")
     
     # Get branding
     business_name = business_config.business_name or "Cleaning Service"
@@ -335,6 +337,14 @@ async def generate_contract_html(
     # Build inclusions/exclusions HTML
     inclusions_html = "".join([f"<li>{item}</li>" for item in inclusions]) if inclusions else "<li>Standard cleaning services</li>"
     exclusions_html = "".join([f"<li>{item}</li>" for item in exclusions]) if exclusions else "<li>None specified</li>"
+    
+    # CRITICAL DEBUG: Log final signature values before template rendering
+    logger.info(f"🖊️ [BEFORE TEMPLATE] Provider signature_url: {'SET (' + str(len(signature_url)) + ' chars)' if signature_url else 'NOT SET (None)'}")
+    logger.info(f"🖊️ [BEFORE TEMPLATE] Client client_signature: {'SET (' + str(len(client_signature)) + ' chars)' if client_signature else 'NOT SET (None)'}")
+    if signature_url:
+        logger.info(f"🖊️ [BEFORE TEMPLATE] Provider sig preview: {signature_url[:100]}...")
+    if client_signature:
+        logger.info(f"🖊️ [BEFORE TEMPLATE] Client sig preview: {client_signature[:100]}...")
     
     html = f"""
 <!DOCTYPE html>

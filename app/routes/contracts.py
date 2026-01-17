@@ -361,7 +361,7 @@ async def sign_contract_as_provider(
     # BACKGROUND JOBS: Move slow operations to async workers
     try:
         from arq import create_pool
-        from .config import REDIS_URL
+        from ..config import REDIS_URL
         
         # Create ARQ connection pool
         redis_pool = await create_pool(REDIS_URL)
