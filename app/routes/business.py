@@ -483,3 +483,84 @@ def get_public_addons(firebase_uid: str, db: Session = Depends(get_db)):
         "addonWindows": config.addon_windows,
         "addonCarpets": config.addon_carpets,
     }
+
+@router.get("/{firebase_uid}/public-info")
+def get_public_business_info(firebase_uid: str, db: Session = Depends(get_db)):
+    """
+    Get public business information including working hours and schedules (for business-aware calendar)
+    No authentication required - accessed via client forms and scheduling components.
+    """
+    logger.info(f"📥 Getting public business info for firebase_uid: {firebase_uid}")
+    
+    # Validate firebase_uid format to prevent injection
+    if not firebase_uid or len(firebase_uid) > 128 or not firebase_uid.replace('-', '').replace('_', '').isalnum():
+        raise HTTPException(status_code=400, detail="Invalid business identifier")
+    
+    # Find user by firebase_uid
+    user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
+    if not user:
+        logger.warning(f"❌ User not found for firebase_uid: {firebase_uid}")
+        raise HTTPException(status_code=404, detail="Business not found")
+    
+    # Get business config
+    config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
+    if not config:
+        logger.warning(f"❌ Business config not found for user_id: {user.id}")
+        raise HTTPException(status_code=404, detail="Business configuration not found")
+    
+    # Parse working hours and days with defaults
+    working_hours = {"start": "9:00", "end": "17:00"}  # Default 9 AM - 5 PM
+    working_days = ["monday", "tuesday", "wednesday", "thursday", "friday"]  # Default weekdays
+    day_schedules = {}
+    off_work_periods = []
+    
+    # Use the stored working_hours, working_days, day_schedules, and off_work_periods
+    if config.working_hours:
+        try:
+            if isinstance(config.working_hours, dict):
+                working_hours = config.working_hours
+            elif isinstance(config.working_hours, str):
+                import json
+                working_hours = json.loads(config.working_hours)
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to parse working_hours for {firebase_uid}: {e}")
+    
+    if config.working_days:
+        try:
+            if isinstance(config.working_days, list):
+                working_days = config.working_days
+            elif isinstance(config.working_days, str):
+                import json
+                working_days = json.loads(config.working_days)
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to parse working_days for {firebase_uid}: {e}")
+    
+    if config.day_schedules:
+        try:
+            if isinstance(config.day_schedules, dict):
+                day_schedules = config.day_schedules
+            elif isinstance(config.day_schedules, str):
+                import json
+                day_schedules = json.loads(config.day_schedules)
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to parse day_schedules for {firebase_uid}: {e}")
+    
+    if config.off_work_periods:
+        try:
+            if isinstance(config.off_work_periods, list):
+                off_work_periods = config.off_work_periods
+            elif isinstance(config.off_work_periods, str):
+                import json
+                off_work_periods = json.loads(config.off_work_periods)
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to parse off_work_periods for {firebase_uid}: {e}")
+    
+    logger.info(f"✅ Public business info retrieved for firebase_uid: {firebase_uid}")
+    
+    return {
+        "business_name": config.business_name or "Business",
+        "working_hours": working_hours,
+        "working_days": working_days,
+        "day_schedules": day_schedules,
+        "off_work_periods": off_work_periods,
+    }
