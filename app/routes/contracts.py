@@ -286,19 +286,10 @@ async def sign_contract_as_provider(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """
-    Provider signs the contract - OPTIMIZED FOR SPEED
+    """Provider signs the contract and sends notification to client"""
+    logger.info(f"🖊️ Provider signing contract {contract_id}")
     
-    Performance improvements:
-    - PDF regeneration moved to background job (saves 5-30 seconds)
-    - Email sending moved to background job (saves 1-5 seconds)
-    - Client count increment moved to background job
-    - Only essential database updates in main request
-    - Response time: ~100-500ms instead of 5-30 seconds
-    """
-    logger.info(f"🖊️ Provider signing contract {contract_id} (FAST MODE)")
-    
-    # Get contract and verify ownership (with index: idx_contracts_user_id)
+    # Get contract and verify ownership
     contract = db.query(Contract).filter(
         Contract.id == contract_id,
         Contract.user_id == current_user.id
@@ -306,6 +297,9 @@ async def sign_contract_as_provider(
     
     if not contract:
         raise HTTPException(status_code=404, detail="Contract not found")
+    
+    # Log contract signature status for debugging
+    logger.info(f"📋 Contract {contract_id} signature status: client_signature={bool(contract.client_signature)}, client_signature_timestamp={contract.client_signature_timestamp}")
     
     # Verify contract has client signature (check both signature and timestamp)
     if not contract.client_signature and not contract.client_signature_timestamp:
@@ -316,13 +310,13 @@ async def sign_contract_as_provider(
         logger.warning(f"⚠️ Contract {contract_id} already signed by provider, skipping duplicate")
         raise HTTPException(status_code=400, detail="Contract already signed by provider")
     
-    # Get client (with index: idx_clients_id)
+    # Get client and business info
     client = db.query(Client).filter(Client.id == contract.client_id).first()
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
     
-    # Get business config (with index: idx_business_configs_user_id)
     business_config = db.query(BusinessConfig).filter(BusinessConfig.user_id == current_user.id).first()
+    business_name = business_config.business_name if business_config else "Cleaning Service"
     
     # Determine which signature to use
     signature_to_use = data.signature_data
@@ -332,7 +326,7 @@ async def sign_contract_as_provider(
             default_sig_url = generate_presigned_url(business_config.signature_url)
             # Download and convert to base64
             import httpx
-            async with httpx.AsyncClient(timeout=5.0) as http_client:  # 5 second timeout
+            async with httpx.AsyncClient() as http_client:
                 response = await http_client.get(default_sig_url)
                 if response.status_code == 200:
                     import base64
@@ -343,8 +337,8 @@ async def sign_contract_as_provider(
         except Exception as e:
             logger.warning(f"⚠️ Failed to fetch default signature: {e}, using provided signature")
     
-    # CRITICAL: Only update essential fields for immediate response
-    contract.provider_signature = signature_to_use
+    # Update contract with provider signature
+    contract.provider_signature = signature_to_use  # Store the signature image
     contract.signed_at = datetime.utcnow()
     contract.signature_timestamp = datetime.utcnow()
     contract.signature_ip = request.client.host if request.client else None
@@ -352,63 +346,103 @@ async def sign_contract_as_provider(
     contract.status = "signed"  # Fully signed by both parties
     contract.start_date = datetime.utcnow()  # Set start date to signing date
     
-    # Commit immediately for fast response
     db.commit()
     db.refresh(contract)
     
-    logger.info(f"✅ Contract {contract_id} signed by provider in database (FAST)")
+    # Increment client count now that contract is fully signed
+    from ..plan_limits import increment_client_count
+    increment_client_count(current_user, db)
+    logger.info(f"📊 Client count incremented for user {current_user.id}: {current_user.clients_this_month}")
     
-    # BACKGROUND JOBS: Move slow operations to async workers
+    # Regenerate PDF with provider signature
+    logger.info(f"📄 Regenerating contract PDF with provider signature")
     try:
-        from arq import create_pool
-        from ..config import REDIS_URL
+        import hashlib
+        from .contracts_pdf import generate_contract_html, html_to_pdf, calculate_quote
+        from .upload import get_r2_client, R2_BUCKET_NAME
         
-        # Create ARQ connection pool
-        redis_pool = await create_pool(REDIS_URL)
+        # Get form data for regeneration
+        form_data = client.form_data if client.form_data else {}
+        quote = calculate_quote(business_config, form_data)
         
-        # Queue PDF regeneration job (5-30 seconds → background)
-        await redis_pool.enqueue_job(
-            'regenerate_contract_pdf_job',
-            contract_id,
-            current_user.id,
-            "provider"
+        # Generate HTML with both signatures - use contract's created_at for consistent dates
+        html = await generate_contract_html(
+            business_config,
+            client,
+            form_data,
+            quote,
+            client_signature=contract.client_signature,
+            provider_signature=signature_to_use,
+            contract_created_at=contract.created_at
         )
-        logger.info(f"📄 PDF regeneration queued for contract {contract_id}")
         
-        # Queue email sending job (1-5 seconds → background)
-        await redis_pool.enqueue_job(
-            'send_contract_emails_job',
-            contract_id,
-            current_user.id,
-            "provider_signed"
-        )
-        logger.info(f"📧 Email notifications queued for contract {contract_id}")
+        # Convert to PDF
+        pdf_bytes = await html_to_pdf(html)
+        pdf_hash = hashlib.sha256(pdf_bytes).hexdigest()
         
-        # Queue client count increment (database write → background)
-        await redis_pool.enqueue_job(
-            'increment_client_count_job',
-            current_user.id
-        )
-        logger.info(f"📊 Client count increment queued for user {current_user.id}")
+        # Upload to R2
+        r2 = get_r2_client()
+        pdf_key = f"contracts/{current_user.id}/{contract.id}_signed.pdf"
+        r2.put_object(Bucket=R2_BUCKET_NAME, Key=pdf_key, Body=pdf_bytes, ContentType="application/pdf")
         
-        await redis_pool.close()
+        # Update contract with new PDF
+        contract.pdf_key = pdf_key
+        contract.pdf_hash = pdf_hash
+        db.commit()
         
+        logger.info(f"✅ Contract PDF regenerated with provider signature: {pdf_key}")
     except Exception as e:
-        logger.error(f"⚠️ Failed to queue background jobs: {e}")
-        # Continue with response even if background jobs fail
-        # Fallback: increment client count synchronously as critical operation
-        try:
-            from ..plan_limits import increment_client_count
-            increment_client_count(current_user, db)
-            logger.info(f"📊 Client count incremented synchronously as fallback")
-        except Exception as fallback_error:
-            logger.error(f"❌ Fallback client count increment failed: {fallback_error}")
+        logger.error(f"Failed to regenerate PDF with provider signature: {e}")
+        # Continue even if PDF regeneration fails
     
-    logger.info(f"🚀 Contract {contract_id} signing completed in FAST MODE")
-    
-    # Return immediate response with current PDF (will be updated by background job)
+    # Prepare email data
     pdf_url = get_pdf_url(contract.pdf_key) if contract.pdf_key else None
+    service_type = contract.contract_type or "Cleaning Service"
+    start_date = contract.start_date.strftime("%B %d, %Y") if contract.start_date else None
+    property_address = client.address if hasattr(client, 'address') else None
+    business_phone = business_config.business_phone if business_config and hasattr(business_config, 'business_phone') else None
     
+    # Send notification email to client
+    if client.email:
+        try:
+            await send_contract_fully_executed_email(
+                to=client.email,
+                client_name=client.contact_name or client.business_name,
+                business_name=business_name,
+                contract_title=contract.title,
+                contract_id=contract.id,
+                service_type=service_type,
+                start_date=start_date,
+                total_value=contract.total_value,
+                property_address=property_address,
+                business_phone=business_phone,
+                contract_pdf_url=pdf_url,
+                contract_public_id=contract.public_id
+            )
+            logger.info(f"✅ Sent fully executed contract email to {client.email}")
+        except Exception as e:
+            logger.error(f"Failed to send client email: {e}")
+            # Don't fail the signing if email fails
+    
+    # Send confirmation email to provider
+    if current_user.email:
+        try:
+            await send_provider_contract_signed_confirmation(
+                to=current_user.email,
+                provider_name=current_user.full_name or "Provider",
+                contract_id=contract.id,
+                client_name=client.business_name,
+                property_address=property_address,
+                contract_pdf_url=pdf_url
+            )
+            logger.info(f"✅ Sent provider confirmation email to {current_user.email}")
+        except Exception as e:
+            logger.error(f"Failed to send provider email: {e}")
+            # Don't fail the signing if email fails
+    
+    logger.info(f"✅ Contract {contract_id} fully signed")
+    
+    pdf_url = get_pdf_url(contract.pdf_key)
     return ContractResponse(
         id=contract.id,
         public_id=contract.public_id,
@@ -432,104 +466,6 @@ async def sign_contract_as_provider(
         clientSignatureTimestamp=contract.client_signature_timestamp,
         createdAt=contract.created_at
     )
-
-
-@router.post("/{contract_id}/generate-payment-link")
-async def generate_contract_payment_link(
-    contract_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Generate Dodo Payments checkout link for contract using adhoc product with pay-what-you-want"""
-    from dodopayments import AsyncDodoPayments
-    from ..config import DODO_PAYMENTS_API_KEY, DODO_PAYMENTS_ENVIRONMENT, FRONTEND_URL, DODO_ADHOC_PRODUCT_ID
-    
-    logger.info(f"💳 Generating payment link for contract {contract_id}")
-    
-    contract = db.query(Contract).filter(
-        Contract.id == contract_id,
-        Contract.user_id == current_user.id
-    ).first()
-    
-    if not contract:
-        raise HTTPException(status_code=404, detail="Contract not found")
-    
-    if not contract.total_value or contract.total_value <= 0:
-        raise HTTPException(status_code=400, detail="Contract must have a valid total value")
-    
-    if not DODO_PAYMENTS_API_KEY:
-        raise HTTPException(status_code=500, detail="Payment system not configured")
-    
-    if not DODO_ADHOC_PRODUCT_ID:
-        raise HTTPException(status_code=500, detail="Adhoc product not configured")
-    
-    client = db.query(Client).filter(Client.id == contract.client_id).first()
-    if not client:
-        raise HTTPException(status_code=404, detail="Client not found")
-    
-    business_config = db.query(BusinessConfig).filter(
-        BusinessConfig.user_id == current_user.id
-    ).first()
-    business_name = business_config.business_name if business_config else "Cleaning Service"
-    
-    # Initialize Dodo client
-    dodo_client = AsyncDodoPayments(
-        bearer_token=DODO_PAYMENTS_API_KEY,
-        environment=DODO_PAYMENTS_ENVIRONMENT or "test_mode",
-    )
-    
-    try:
-        # Use the adhoc product for pay-what-you-want
-        product_id = DODO_ADHOC_PRODUCT_ID
-        logger.info(f"Using adhoc product: {product_id}")
-        
-        # Create checkout session with custom amount
-        return_url = f"{FRONTEND_URL}/contracts/payment/success/{contract.id}"
-        
-        session_data = {
-            "product_cart": [{
-                "product_id": product_id, 
-                "quantity": 1,
-                # Set custom amount for pay-what-you-want product
-                "custom_amount": int(contract.total_value * 100)  # Convert to cents
-            }],
-            "customer": {
-                "email": client.email or "",
-                "name": client.contact_name or client.business_name or "",
-            },
-            "metadata": {
-                "contract_id": str(contract.id),
-                "contract_number": f"CLN-{contract.created_at.strftime('%Y%m%d')}-{contract.id:04d}",
-                "provider_user_id": str(current_user.id),
-                "client_id": str(client.id),
-                "business_name": business_name,
-                "contract_title": contract.title,
-                "contract_description": contract.description or f"Service agreement from {business_name}",
-            },
-            "return_url": return_url,
-        }
-        
-        logger.info(f"Creating checkout session with data: {session_data}")
-        session = await dodo_client.checkout_sessions.create(**session_data)
-        
-        checkout_url = getattr(session, "checkout_url", None) or session.get("checkout_url")
-        session_id = getattr(session, "session_id", None) or session.get("session_id")
-        
-        if not checkout_url:
-            raise HTTPException(status_code=502, detail="Failed to create payment link")
-        
-        logger.info(f"✅ Payment link generated for contract {contract_id}: {checkout_url}")
-        
-        return {
-            "payment_link": checkout_url,
-            "session_id": session_id,
-            "product_id": product_id,
-            "amount": contract.total_value
-        }
-        
-    except Exception as e:
-        logger.error(f"❌ Failed to create payment link for contract {contract_id}: {e}")
-        raise HTTPException(status_code=400, detail=f"Failed to create payment link: {str(e)}")
 
 
 @router.delete("/{contract_id}")
