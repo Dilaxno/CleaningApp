@@ -27,14 +27,11 @@ class PaymentNotificationResponse(BaseModel):
 
 @router.get("/payment-notifications", response_model=PaymentNotificationResponse)
 async def get_payment_notifications(
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get unread payment notifications count and recent payments"""
-    user = db.query(User).filter(User.firebase_uid == current_user["uid"]).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
+    user = current_user
     # Get recent payments since last check
     last_check = user.last_payment_check or datetime(2020, 1, 1)  # Default to old date if never checked
     
@@ -63,14 +60,11 @@ async def get_payment_notifications(
 
 @router.post("/mark-payments-read")
 async def mark_payments_read(
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Mark payment notifications as read"""
-    user = db.query(User).filter(User.firebase_uid == current_user["uid"]).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
+    user = current_user
     user.unread_payments_count = 0
     user.last_payment_check = datetime.utcnow()
     db.commit()
@@ -80,14 +74,11 @@ async def mark_payments_read(
 
 @router.get("/preferences")
 async def get_notification_preferences(
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get user's notification preferences"""
-    user = db.query(User).filter(User.firebase_uid == current_user["uid"]).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
+    user = current_user
     return {
         "notify_new_clients": user.notify_new_clients if hasattr(user, 'notify_new_clients') else True,
         "notify_contract_signed": user.notify_contract_signed if hasattr(user, 'notify_contract_signed') else True,
@@ -101,14 +92,11 @@ async def get_notification_preferences(
 @router.put("/preferences")
 async def update_notification_preferences(
     preferences: NotificationPreferences,
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Update user's notification preferences"""
-    user = db.query(User).filter(User.firebase_uid == current_user["uid"]).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
+    user = current_user
     # Update preferences
     user.notify_new_clients = preferences.notify_new_clients
     user.notify_contract_signed = preferences.notify_contract_signed
