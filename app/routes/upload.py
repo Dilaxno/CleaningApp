@@ -74,6 +74,7 @@ async def upload_logo(
 ):
     """Upload business logo to R2 (private)."""
     logger.info(f"📤 Uploading logo for firebase_uid: {firebase_uid}")
+    logger.info(f"📄 File details: name='{file.filename}', type='{file.content_type}', size={file.size if hasattr(file, 'size') else 'unknown'}")
 
     # Validate firebase_uid format to prevent path traversal
     if not firebase_uid or len(firebase_uid) > 128 or not firebase_uid.replace('-', '').replace('_', '').isalnum():
@@ -102,10 +103,27 @@ async def upload_logo(
 
     # Validate filename to prevent path traversal
     if file.filename:
-        import os
-        safe_filename = os.path.basename(file.filename)
-        if safe_filename != file.filename or '..' in file.filename:
-            raise HTTPException(status_code=400, detail="Invalid filename")
+        logger.info(f"🔍 Validating filename: '{file.filename}'")
+        
+        # Check for path traversal attempts and dangerous characters
+        dangerous_chars = ['..', '/', '\\', '<', '>', ':', '"', '|', '?', '*']
+        for char in dangerous_chars:
+            if char in file.filename:
+                logger.warning(f"❌ Dangerous character '{char}' detected in filename: '{file.filename}'")
+                raise HTTPException(status_code=400, detail=f"Invalid filename - contains dangerous character '{char}'")
+        
+        # Ensure filename has a valid extension
+        valid_extensions = ('.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg')
+        if not file.filename.lower().endswith(valid_extensions):
+            logger.warning(f"❌ Invalid extension in filename: '{file.filename}'")
+            raise HTTPException(status_code=400, detail="Invalid filename - must have a valid image extension")
+        
+        # Check filename length (reasonable limit)
+        if len(file.filename) > 255:
+            logger.warning(f"❌ Filename too long: '{file.filename}' ({len(file.filename)} chars)")
+            raise HTTPException(status_code=400, detail="Filename too long - maximum 255 characters")
+        
+        logger.info(f"✅ Filename validation passed: '{file.filename}'")
 
     # Read file contents
     contents = await file.read()
