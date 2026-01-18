@@ -393,41 +393,7 @@ async def approve_schedule(
         # Note: Contract status stays as 'signed' - 'scheduled' is a client status, not contract status
          
         db.commit()
-
-        # Auto-create invoice from the confirmed schedule and email it to the client
-        # Only if provider chose automatic payment handling during onboarding
-        try:
-            # Check provider's payment handling preference
-            from ..models import BusinessConfig
-            business_config = db.query(BusinessConfig).filter(
-                BusinessConfig.user_id == current_user.id
-            ).first()
-            
-            # Only auto-create and send invoice if payment_handling is "automatic"
-            if business_config and business_config.payment_handling == "automatic":
-                logger.info(f"📄 Provider uses automatic payment handling - creating invoice for schedule {schedule_id}")
-                
-                # Local import to avoid circular imports at module load
-                from ..routes.invoices import auto_create_invoice_from_schedule, send_invoice_to_client
-
-                inv_res = await auto_create_invoice_from_schedule(schedule_id, current_user, db)
-                invoice_id = inv_res.get("invoice_id") if isinstance(inv_res, dict) else None
-                invoice_status = inv_res.get("status") if isinstance(inv_res, dict) else None
-
-                if invoice_id and invoice_status != "sent":
-                    try:
-                        await send_invoice_to_client(invoice_id, current_user, db)
-                        logger.info(f"✅ Auto invoice created and sent for schedule {schedule_id} (invoice_id={invoice_id})")
-                    except Exception as e:
-                        logger.error(f"❌ Failed to send invoice email for schedule {schedule_id}: {e}")
-                else:
-                    logger.info(f"ℹ️ Skipping invoice send for schedule {schedule_id} (invoice_id={invoice_id}, status={invoice_status})")
-            else:
-                payment_mode = business_config.payment_handling if business_config else "not set"
-                logger.info(f"ℹ️ Skipping auto-invoice for schedule {schedule_id} - payment handling is '{payment_mode}' (manual invoicing)")
-                
-        except Exception as e:
-            logger.error(f"⚠️ Auto-invoice workflow failed for schedule {schedule_id}: {e}")
+        logger.info(f"✅ Schedule {schedule_id} confirmed - provider will handle payments manually")
 
         return {"message": "Schedule accepted", "schedule_id": schedule_id}
     
@@ -605,43 +571,7 @@ async def client_accept_proposal(
     # Note: Contract status stays as 'signed' - 'scheduled' is a client status, not contract status
     
     db.commit()
-
-    # Auto-create invoice from the confirmed schedule and email it to the client (public flow)
-    # Only if provider chose automatic payment handling during onboarding
-    try:
-        # Check provider's payment handling preference
-        from ..models import BusinessConfig
-        business_config = db.query(BusinessConfig).filter(
-            BusinessConfig.user_id == schedule.user_id
-        ).first()
-        
-        # Only auto-create and send invoice if payment_handling is "automatic"
-        if business_config and business_config.payment_handling == "automatic":
-            logger.info(f"📄 Provider uses automatic payment handling - creating invoice for schedule {schedule_id} (public flow)")
-            
-            # Import lazily to avoid circular imports
-            from ..routes.invoices import auto_create_invoice_from_schedule, send_invoice_to_client
-
-            # Impersonate provider as current_user for authorization checks in invoice routes
-            provider_user = db.query(User).filter(User.id == schedule.user_id).first()
-            inv_res = await auto_create_invoice_from_schedule(schedule_id, provider_user, db)
-            invoice_id = inv_res.get("invoice_id") if isinstance(inv_res, dict) else None
-            invoice_status = inv_res.get("status") if isinstance(inv_res, dict) else None
-
-            if invoice_id and invoice_status != "sent":
-                try:
-                    await send_invoice_to_client(invoice_id, provider_user, db)
-                    logger.info(f"✅ Auto invoice created and sent (public accept) for schedule {schedule_id} (invoice_id={invoice_id})")
-                except Exception as e:
-                    logger.error(f"❌ Failed to send invoice email (public accept) for schedule {schedule_id}: {e}")
-            else:
-                logger.info(f"ℹ️ Skipping invoice send (public accept) for schedule {schedule_id} (invoice_id={invoice_id}, status={invoice_status})")
-        else:
-            payment_mode = business_config.payment_handling if business_config else "not set"
-            logger.info(f"ℹ️ Skipping auto-invoice for schedule {schedule_id} (public flow) - payment handling is '{payment_mode}' (manual invoicing)")
-            
-    except Exception as e:
-        logger.error(f"⚠️ Auto-invoice workflow failed (public accept) for schedule {schedule_id}: {e}")
+    logger.info(f"✅ Schedule {schedule_id} confirmed (public flow) - provider will handle payments manually")
     
     # Send confirmation email to provider
     if user and user.email:
