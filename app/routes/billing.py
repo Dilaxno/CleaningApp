@@ -533,6 +533,10 @@ async def _handle_client_invoice_payment(data: Dict, db: Session):
             logger.info(f"Invoice {invoice_id} already marked as paid")
             return
         
+        # Get related entities first
+        client = db.query(Client).filter(Client.id == invoice.client_id).first()
+        user = db.query(User).filter(User.id == invoice.user_id).first()
+        
         # Update invoice status
         invoice.status = "paid"
         invoice.paid_at = datetime.utcnow()
@@ -544,10 +548,6 @@ async def _handle_client_invoice_payment(data: Dict, db: Session):
         
         db.commit()
         logger.info(f"✅ Invoice {invoice_id} marked as paid, unread counter updated")
-        
-        # Get related entities for notifications
-        client = db.query(Client).filter(Client.id == invoice.client_id).first()
-        user = db.query(User).filter(User.id == invoice.user_id).first()
         business_config = db.query(BusinessConfig).filter(
             BusinessConfig.user_id == invoice.user_id
         ).first()
