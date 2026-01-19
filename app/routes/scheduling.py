@@ -78,12 +78,23 @@ async def get_scheduling_info_by_client(
     elif user:
         business_name = user.full_name or "Service Provider"
     
+    # Check if provider has Calendly integration
+    from ..models import CalendlyIntegration
+    has_calendly = db.query(CalendlyIntegration).filter(
+        CalendlyIntegration.user_id == client.user_id
+    ).first() is not None
+    
+    # Check if meetings are required
+    meetings_required = business_config.meetings_required if business_config else False
+    
     return {
         "business_name": business_name,
         "logo_url": logo_url,
         "estimated_duration": estimated_duration,
         "working_hours": working_hours,
-        "working_days": working_days
+        "working_days": working_days,
+        "meetings_required": meetings_required,
+        "has_calendly": has_calendly
     }
 
 
