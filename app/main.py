@@ -21,8 +21,6 @@ from .routes.scheduling import router as scheduling_router
 from .routes.calendly import router as calendly_router
 from .routes.calendly_webhooks import router as calendly_webhooks_router
 from .routes.scheduling_calendly import router as scheduling_calendly_router
-from .routes.google_calendar import router as google_calendar_router
-from .routes.scheduling_google_calendar import router as scheduling_google_calendar_router
 from .routes.status_automation import router as status_router
 from .routes.trial import router as trial_router
 from .routes.verification import router as verification_router
@@ -145,8 +143,6 @@ app.include_router(email_router)
 app.include_router(calendly_router)
 app.include_router(calendly_webhooks_router)
 app.include_router(scheduling_calendly_router)
-app.include_router(google_calendar_router)
-app.include_router(scheduling_google_calendar_router)
 app.include_router(status_router)
 app.include_router(trial_router)
 app.include_router(notifications_router)

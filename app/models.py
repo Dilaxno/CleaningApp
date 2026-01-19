@@ -68,7 +68,6 @@ class User(Base):
     contracts = relationship("Contract", back_populates="user")
     schedules = relationship("Schedule", back_populates="user")
     calendly_integration = relationship("CalendlyIntegration", back_populates="user", uselist=False)
-    google_calendar_integration = relationship("GoogleCalendarIntegration", back_populates="user", uselist=False)
 
 
 class BusinessConfig(Base):
@@ -260,9 +259,6 @@ class Schedule(Base):
     calendly_event_id = Column(String(255), nullable=True)  # Calendly event UUID
     calendly_invitee_uri = Column(String(500), nullable=True)  # Invitee URI for tracking
     calendly_booking_method = Column(String(50), nullable=True)  # 'client_selected', 'provider_created', 'synced'
-    
-    # Google Calendar integration fields
-    google_calendar_event_id = Column(String(500), nullable=True, index=True)  # Google Calendar event ID
     location = Column(String(500), nullable=True)  # Event location (separate from address)
     
     created_at = Column(DateTime, server_default=func.now())
@@ -301,31 +297,6 @@ class CalendlyIntegration(Base):
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
     
     user = relationship("User", back_populates="calendly_integration")
-
-
-class GoogleCalendarIntegration(Base):
-    __tablename__ = "google_calendar_integrations"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
-    
-    # OAuth tokens
-    access_token = Column(Text, nullable=False)
-    refresh_token = Column(Text, nullable=False)
-    token_expires_at = Column(DateTime, nullable=False)
-    
-    # Google user info
-    google_user_email = Column(String(255), nullable=True)
-    google_calendar_id = Column(String(500), nullable=True)  # Primary calendar ID
-    
-    # Settings
-    auto_sync_enabled = Column(Boolean, default=True)
-    default_appointment_duration = Column(Integer, default=60)  # Minutes
-    
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-    
-    user = relationship("User", back_populates="google_calendar_integration")
 
 
 class SchedulingProposal(Base):

@@ -126,7 +126,6 @@ async def get_schedules(
             calendlyEventUri=s.calendly_event_uri,
             calendlyEventId=s.calendly_event_id,
             calendlyBookingMethod=s.calendly_booking_method,
-            googleCalendarEventId=s.google_calendar_event_id,
             createdAt=s.created_at
         ))
     return result
@@ -288,9 +287,6 @@ async def approve_schedule(
     db: Session = Depends(get_db)
 ):
     """Accept or request change for a pending schedule"""
-    from ..models import GoogleCalendarIntegration
-    from ..services.google_calendar_service import GoogleCalendarService
-    from ..routes.google_calendar import _ensure_fresh_token
     from .. import email_service
     
     schedule = db.query(Schedule).filter(
@@ -312,77 +308,8 @@ async def approve_schedule(
             schedule.proposed_start_time = None
             schedule.proposed_end_time = None
         
-        # Accept the appointment and add to Google Calendar
-        integration = db.query(GoogleCalendarIntegration).filter(
-            GoogleCalendarIntegration.user_id == current_user.id
-        ).first()
-        
-        if integration:
-            try:
-                # Ensure token is fresh
-                access_token = await _ensure_fresh_token(integration, db)
-                
-                # Create Google Calendar event
-                google_calendar_service = GoogleCalendarService()
-                
-                # Combine date and time for datetime object
-                start_datetime = schedule.scheduled_date
-                end_datetime = schedule.scheduled_date
-                
-                if schedule.start_time and schedule.end_time:
-                    from datetime import time
-                    start_parts = schedule.start_time.split(":")
-                    end_parts = schedule.end_time.split(":")
-                    start_datetime = start_datetime.replace(
-                        hour=int(start_parts[0]), 
-                        minute=int(start_parts[1])
-                    )
-                    end_datetime = end_datetime.replace(
-                        hour=int(end_parts[0]), 
-                        minute=int(end_parts[1])
-                    )
-                
-                client = db.query(Client).filter(Client.id == schedule.client_id).first()
-                
-                event = await google_calendar_service.create_event(
-                    access_token=access_token,
-                    calendar_id=integration.google_calendar_id,
-                    summary=schedule.title,
-                    description=schedule.description,
-                    start_time=start_datetime,
-                    end_time=end_datetime,
-                    attendee_email=client.email if client else None,
-                    location=schedule.location
-                )
-                
-                # Update schedule with Google Calendar event ID
-                schedule.google_calendar_event_id = event.get("id")
-                schedule.approval_status = "accepted"
-                
-                logger.info(f"✅ Added schedule {schedule_id} to Google Calendar")
-                
-                # Send confirmation email to client
-                if client and client.email:
-                    try:
-                        await email_service.send_appointment_confirmation(
-                            client_email=client.email,
-                            client_name=client.business_name or client.contact_name,
-                            provider_name=current_user.full_name or current_user.email,
-                            appointment_time=start_datetime,
-                            location=schedule.location,
-                            event_link=event.get("htmlLink")
-                        )
-                        logger.info(f"✅ Sent confirmation email to client {client.email}")
-                    except Exception as e:
-                        logger.error(f"⚠️ Failed to send confirmation email: {str(e)}")
-                
-            except Exception as e:
-                logger.error(f"⚠️ Failed to add to Google Calendar: {str(e)}")
-                # Still mark as accepted even if calendar sync fails
-                schedule.approval_status = "accepted"
-        else:
-            # No Google Calendar integration, just mark as accepted
-            schedule.approval_status = "accepted"
+        # Accept the appointment
+        schedule.approval_status = "accepted"
         
         # Update client status to 'scheduled'
         client = db.query(Client).filter(Client.id == schedule.client_id).first()
