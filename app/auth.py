@@ -179,15 +179,29 @@ async def get_current_user(
         # Find or create user in our database
         user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
         if not user:
-            # Check if email is already taken by another Firebase account
+            # Check if email is already registered with a different Firebase UID
+            # This happens when user signs up with email/password then later uses Google auth
             if email:
                 existing_user = db.query(User).filter(User.email == email).first()
                 if existing_user:
-                    logger.error(f"❌ Email {email} already registered with different Firebase account")
-                    raise HTTPException(
-                        status_code=409,
-                        detail=f"This email is already registered. Please sign in with your existing account or use a different email."
-                    )
+                    logger.info(f"🔄 Migrating user {email} from Firebase UID {existing_user.firebase_uid} to {firebase_uid}")
+                    # Update the Firebase UID to the new one (e.g., Google auth UID)
+                    existing_user.firebase_uid = firebase_uid
+                    # Update name if provided and not already set
+                    if name and not existing_user.full_name:
+                        existing_user.full_name = name
+                    try:
+                        db.commit()
+                        db.refresh(existing_user)
+                        logger.info(f"✅ User migrated successfully to new Firebase UID")
+                        return existing_user
+                    except Exception as e:
+                        db.rollback()
+                        logger.error(f"❌ Failed to migrate user: {str(e)}")
+                        raise HTTPException(
+                            status_code=500,
+                            detail="Failed to update user authentication method"
+                        )
             
             logger.info(f"🆕 Creating new user: {email}")
             user = User(
