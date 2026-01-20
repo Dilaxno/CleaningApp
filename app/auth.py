@@ -179,6 +179,16 @@ async def get_current_user(
         # Find or create user in our database
         user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
         if not user:
+            # Check if email is already taken by another Firebase account
+            if email:
+                existing_user = db.query(User).filter(User.email == email).first()
+                if existing_user:
+                    logger.error(f"❌ Email {email} already registered with different Firebase account")
+                    raise HTTPException(
+                        status_code=409,
+                        detail=f"This email is already registered. Please sign in with your existing account or use a different email."
+                    )
+            
             logger.info(f"🆕 Creating new user: {email}")
             user = User(
                 firebase_uid=firebase_uid,
@@ -187,8 +197,19 @@ async def get_current_user(
                 plan=None,  # No default plan - user must select during onboarding
             )
             db.add(user)
-            db.commit()
-            db.refresh(user)
+            try:
+                db.commit()
+                db.refresh(user)
+            except Exception as e:
+                db.rollback()
+                # Handle race condition where email was taken between check and insert
+                if "duplicate key" in str(e).lower() or "unique constraint" in str(e).lower():
+                    logger.error(f"❌ Email {email} was taken by another account (race condition)")
+                    raise HTTPException(
+                        status_code=409,
+                        detail="This email is already registered. Please sign in with your existing account."
+                    )
+                raise
         
         return user
     except HTTPException:
