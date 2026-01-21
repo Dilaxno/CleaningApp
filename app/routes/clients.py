@@ -13,7 +13,6 @@ from ..database import get_db
 from ..models import User, Client, BusinessConfig
 from ..auth import get_current_user
 from ..rate_limiter import create_rate_limiter, rate_limit_dependency, get_redis_client
-from ..turnstile import verify_turnstile
 
 logger = logging.getLogger(__name__)
 
@@ -443,7 +442,6 @@ class PublicClientCreate(BaseModel):
     notes: Optional[str] = None
     formData: Optional[dict] = None  # Store all form fields as JSON
     clientSignature: Optional[str] = None  # Base64 signature from client
-    turnstileToken: Optional[str] = None  # Cloudflare Turnstile token for bot prevention
     quoteAccepted: Optional[bool] = False  # Whether client accepted the quote
     
     @field_validator('phone')
@@ -479,7 +477,6 @@ class PublicSubmitResponse(BaseModel):
     contractPdfUrl: Optional[str] = None
     jobId: Optional[str] = None
     message: str
-    requiresCaptcha: bool = False
 
 
 @router.post("/public/quote-preview", response_model=QuotePreviewResponse)
@@ -584,7 +581,6 @@ async def submit_public_form(
     """
     Public endpoint for clients to submit intake forms.
     Rate limited: 5 per minute per IP, 15 per minute globally.
-    Requires Cloudflare Turnstile CAPTCHA after 3 submissions per IP in 24 hours.
     Contract generation is queued asynchronously to prevent timeouts.
     No authentication required - this is accessed via shareable link.
     """
@@ -601,36 +597,11 @@ async def submit_public_form(
     
     logger.info(f"📥 Public form submission for owner UID: {data.ownerUid} from IP: {client_ip}")
     
-    # Check submission count for this IP (24 hour window)
+    # Increment submission count (24 hour expiry) for monitoring
     redis_client = get_redis_client()
     ip_submission_key = f"submissions:ip:{client_ip}"
     submission_count = redis_client.get(ip_submission_key)
     submission_count = int(submission_count) if submission_count else 0
-    
-    # Require CAPTCHA after 3 submissions in 24 hours
-    CAPTCHA_THRESHOLD = 3
-    requires_captcha = submission_count >= CAPTCHA_THRESHOLD
-    
-    if requires_captcha:
-        if not data.turnstileToken:
-            logger.warning(f"🤖 CAPTCHA required for IP {client_ip} - {submission_count} submissions")
-            return PublicSubmitResponse(
-                client=None,
-                contractPdfUrl=None,
-                jobId=None,
-                message="CAPTCHA verification required",
-                requiresCaptcha=True
-            )
-        
-        # Verify Turnstile token
-        is_valid = await verify_turnstile(data.turnstileToken, client_ip)
-        if not is_valid:
-            logger.warning(f"❌ Invalid CAPTCHA for IP {client_ip}")
-            raise HTTPException(status_code=400, detail="Invalid CAPTCHA verification")
-        
-        logger.info(f"✅ CAPTCHA verified for IP {client_ip}")
-    
-    # Increment submission count (24 hour expiry)
     redis_client.incr(ip_submission_key)
     redis_client.expire(ip_submission_key, 86400)  # 24 hours
     
@@ -793,8 +764,7 @@ async def submit_public_form(
         ),
         contractPdfUrl=None,  # Will be available via job status endpoint
         jobId=job_id,
-        message="Form submitted successfully - Contract generation in progress" if job_id else "Form submitted successfully",
-        requiresCaptcha=False
+        message="Form submitted successfully - Contract generation in progress" if job_id else "Form submitted successfully"
     )
 
 
