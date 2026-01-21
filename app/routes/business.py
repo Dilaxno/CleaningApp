@@ -446,6 +446,7 @@ def get_public_branding(firebase_uid: str, db: Session = Depends(get_db)):
     return {
         "businessName": config.business_name,
         "logoUrl": logo_presigned_url,
+        "plan": user.plan,  # Include plan for conditional badge display
     }
 
 

@@ -123,7 +123,70 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
         base_price = config.minimum_charge
         logger.info(f"📊 Applied minimum charge: ${base_price}")
     
-    # Apply frequency discount
+    # Calculate add-ons
+    addon_total = 0.0
+    addon_details = []
+    selected_addons = form_data.get("selectedAddons", [])
+    addon_quantities = form_data.get("addonQuantities", {})
+    
+    logger.info(f"📊 Processing add-ons - selected: {selected_addons}, quantities: {addon_quantities}")
+    
+    if selected_addons:
+        # Process standard add-ons
+        if "addon_windows" in selected_addons and config.addon_windows:
+            quantity = addon_quantities.get("addon_windows", 1)
+            addon_price = config.addon_windows * quantity
+            addon_total += addon_price
+            addon_details.append({
+                "name": "Window Cleaning",
+                "quantity": quantity,
+                "unit_price": config.addon_windows,
+                "total_price": addon_price,
+                "pricing_metric": "per window"
+            })
+            logger.info(f"📊 Added window cleaning: {quantity} windows × ${config.addon_windows} = ${addon_price}")
+        
+        if "addon_carpets" in selected_addons and config.addon_carpets:
+            quantity = addon_quantities.get("addon_carpets", 1)
+            addon_price = config.addon_carpets * quantity
+            addon_total += addon_price
+            addon_details.append({
+                "name": "Carpet Cleaning",
+                "quantity": quantity,
+                "unit_price": config.addon_carpets,
+                "total_price": addon_price,
+                "pricing_metric": "per sq ft"
+            })
+            logger.info(f"📊 Added carpet cleaning: {quantity} sq ft × ${config.addon_carpets} = ${addon_price}")
+        
+        # Process custom add-ons
+        if config.custom_addons:
+            for custom_addon in config.custom_addons:
+                addon_id = custom_addon.get("id") or f"custom_{custom_addon.get('name', '')}"
+                if addon_id in selected_addons:
+                    unit_price = float(custom_addon.get("price", 0))
+                    pricing_metric = custom_addon.get("pricingMetric", "per service")
+                    
+                    # For "per service" or "flat rate", quantity is always 1
+                    if pricing_metric in ["per service", "flat rate"]:
+                        quantity = 1
+                    else:
+                        quantity = addon_quantities.get(addon_id, 1)
+                    
+                    addon_price = unit_price * quantity
+                    addon_total += addon_price
+                    addon_details.append({
+                        "name": custom_addon.get("name", "Custom Add-on"),
+                        "quantity": quantity,
+                        "unit_price": unit_price,
+                        "total_price": addon_price,
+                        "pricing_metric": pricing_metric
+                    })
+                    logger.info(f"📊 Added custom add-on '{custom_addon.get('name')}': {quantity} × ${unit_price} = ${addon_price}")
+    
+    logger.info(f"📊 Total add-ons: ${addon_total}")
+    
+    # Apply frequency discount to base price only (not add-ons)
     discount_percent = 0
     if frequency == "Weekly" and config.discount_weekly:
         discount_percent = config.discount_weekly
@@ -133,7 +196,8 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
         discount_percent = config.discount_long_term
     
     discount_amount = base_price * (discount_percent / 100) if discount_percent else 0
-    final_price = base_price - discount_amount
+    discounted_base_price = base_price - discount_amount
+    final_price = discounted_base_price + addon_total
     
     # Determine number of cleaners
     cleaners = config.cleaners_small_job or 1
@@ -184,12 +248,14 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
     # If still no price, set a flag for "quote pending"
     quote_pending = base_price == 0 and final_price == 0
     
-    logger.info(f"📊 Final quote - base: ${base_price}, discount: ${discount_amount}, final: ${final_price}, hours: {estimated_hours}, pending: {quote_pending}")
+    logger.info(f"📊 Final quote - base: ${base_price}, discount: ${discount_amount}, addons: ${addon_total}, final: ${final_price}, hours: {estimated_hours}, pending: {quote_pending}")
     
     return {
         "base_price": round(base_price, 2),
         "discount_percent": discount_percent,
         "discount_amount": round(discount_amount, 2),
+        "addon_amount": round(addon_total, 2),
+        "addon_details": addon_details,
         "final_price": round(final_price, 2),
         "estimated_hours": round(estimated_hours, 1),
         "cleaners": cleaners,
@@ -758,20 +824,20 @@ async def generate_contract_html(
             This Agreement will begin on the date of acceptance and will remain in effect until all services have been completed.
         </p>
         
-        <h4 style="margin-top: 16px; margin-bottom: 8px; color: #E2E8F0; font-size: 11pt;">Payment Terms</h4>
+        <h4 style="margin-top: 16px; margin-bottom: 8px; color: #000000; font-size: 11pt;">Payment Terms</h4>
         <ul class="bullet-list">
             <li><strong>Payment Due:</strong> Payment is due within {payment_due_days} days of service completion</li>
             <li><strong>Late Fee:</strong> A {late_fee}% late fee will be applied to any balance not paid by the due date</li>
             <li><strong>Accepted Methods:</strong> Payment may be made via check, bank transfer, or other agreed-upon methods</li>
         </ul>
         
-        <h4 style="margin-top: 16px; margin-bottom: 8px; color: #E2E8F0; font-size: 11pt;">Cancellation Policy</h4>
+        <h4 style="margin-top: 16px; margin-bottom: 8px; color: #000000; font-size: 11pt;">Cancellation Policy</h4>
         <ul class="bullet-list">
             <li><strong>Notice Required:</strong> {cancellation_window}-hour advance notice is required for cancellations</li>
             <li><strong>Late Cancellation:</strong> Cancellations made with less than {cancellation_window} hours notice may be subject to a cancellation fee</li>
         </ul>
         
-        <h4 style="margin-top: 16px; margin-bottom: 8px; color: #E2E8F0; font-size: 11pt;">General Terms</h4>
+        <h4 style="margin-top: 16px; margin-bottom: 8px; color: #000000; font-size: 11pt;">General Terms</h4>
         <ul class="bullet-list">
             <li><strong>Access:</strong> Client agrees to provide necessary access to the property</li>
             <li><strong>Liability:</strong> Service provider maintains appropriate insurance coverage</li>
