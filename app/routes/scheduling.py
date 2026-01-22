@@ -18,6 +18,54 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/scheduling", tags=["Scheduling"])
 
 
+@router.get("/public/zoho-booking-info/{contract_id}")
+async def get_zoho_booking_info(contract_id: str, db: Session = Depends(get_db)):
+    """Get Zoho Booking scheduling information for a contract (public endpoint)"""
+    try:
+        from ..models import BusinessConfig, ZohoBookingIntegration
+        
+        # Get contract and associated user
+        contract = db.query(Contract).filter(Contract.id == contract_id).first()
+        if not contract:
+            raise HTTPException(status_code=404, detail="Contract not found")
+        
+        # Get business config
+        business_config = db.query(BusinessConfig).filter(
+            BusinessConfig.user_id == contract.user_id
+        ).first()
+        
+        if not business_config:
+            raise HTTPException(status_code=404, detail="Business configuration not found")
+        
+        # Get Zoho Booking integration
+        zoho_integration = db.query(ZohoBookingIntegration).filter(
+            ZohoBookingIntegration.user_id == contract.user_id
+        ).first()
+        
+        zoho_booking_link = None
+        workspace_name = None
+        
+        if zoho_integration and zoho_integration.workspace_id and zoho_integration.default_service_id:
+            # Generate Zoho Booking portal link
+            zoho_booking_link = f"https://bookings.zoho.com/portal/{zoho_integration.workspace_id}/service/{zoho_integration.default_service_id}"
+            workspace_name = zoho_integration.workspace_name
+        else:
+            # For demo purposes, return a sample Zoho Booking link
+            workspace_slug = business_config.business_name.lower().replace(' ', '-').replace('&', 'and')
+            zoho_booking_link = f"https://bookings.zoho.com/portal/{workspace_slug}/service/house-cleaning"
+        
+        return {
+            "business_name": business_config.business_name,
+            "logo_url": business_config.logo_url,
+            "zoho_booking_link": zoho_booking_link,
+            "workspace_name": workspace_name
+        }
+    
+    except Exception as e:
+        logger.error(f"Failed to get Zoho Booking info for contract {contract_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get scheduling information")
+
+
 @router.get("/info/{client_id}")
 async def get_scheduling_info_by_client(
     client_id: int,
