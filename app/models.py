@@ -68,7 +68,6 @@ class User(Base):
     contracts = relationship("Contract", back_populates="user")
     schedules = relationship("Schedule", back_populates="user")
     calendly_integration = relationship("CalendlyIntegration", back_populates="user", uselist=False)
-    zoho_booking_integration = relationship("ZohoBookingIntegration", back_populates="user", uselist=False)
 
 
 class BusinessConfig(Base):
@@ -298,40 +297,6 @@ class CalendlyIntegration(Base):
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
     
     user = relationship("User", back_populates="calendly_integration")
-
-
-class ZohoBookingIntegration(Base):
-    __tablename__ = "zoho_booking_integrations"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
-    
-    # OAuth tokens
-    access_token = Column(Text, nullable=False)
-    refresh_token = Column(Text, nullable=False)
-    token_expires_at = Column(DateTime, nullable=False)
-    
-    # Zoho user info
-    zoho_user_id = Column(String(255), nullable=False)
-    zoho_user_email = Column(String(255), nullable=True)
-    zoho_org_id = Column(String(255), nullable=True)
-    
-    # Zoho Booking workspace info
-    workspace_id = Column(String(255), nullable=True)
-    workspace_name = Column(String(255), nullable=True)
-    
-    # Default service for cleaning appointments
-    default_service_id = Column(String(255), nullable=True)
-    default_service_name = Column(String(255), nullable=True)
-    
-    # Settings
-    auto_sync_enabled = Column(Boolean, default=True)
-    webhook_subscription_id = Column(String(255), nullable=True)
-    
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-    
-    user = relationship("User", back_populates="zoho_booking_integration")
 
 
 class SchedulingProposal(Base):
