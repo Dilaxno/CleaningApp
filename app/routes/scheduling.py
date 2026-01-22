@@ -44,24 +44,50 @@ async def get_scheduling_info_by_client(
         BusinessConfig.user_id == client.user_id
     ).first()
     
-    # Calculate estimated duration from client's form_data
-    estimated_duration = 60  # Default 60 minutes
+    # Calculate estimated duration from contract quote or client's form_data
+    estimated_duration = 120  # Default 2 hours in minutes
     
     if client.form_data:
         form_data = client.form_data
-        property_size = form_data.get('propertySize') or form_data.get('property_size')
-        if property_size and business_config and business_config.cleaning_time_per_sqft:
-            estimated_duration = max(60, int(property_size) * business_config.cleaning_time_per_sqft // 100)
+        
+        # Try to get estimated hours from contract if available
+        # First check if there's a contract for this client
+        from .models import Contract
+        contract = db.query(Contract).filter(
+            Contract.client_id == client_id,
+            Contract.status.in_(["new", "sent", "signed"])
+        ).order_by(Contract.created_at.desc()).first()
+        
+        if contract and business_config:
+            # Recalculate quote to get estimated hours
+            from .contracts_pdf import calculate_quote
+            try:
+                quote = calculate_quote(business_config, form_data)
+                if quote.get('estimated_hours'):
+                    estimated_duration = int(quote['estimated_hours'] * 60)  # Convert hours to minutes
+                    logger.info(f"📊 Using contract estimated duration: {estimated_duration} minutes ({quote['estimated_hours']} hours)")
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to calculate quote for duration: {e}")
+        
+        # Fallback to property size calculation if quote calculation failed
+        if estimated_duration == 120:  # Still default
+            property_size = form_data.get('propertySize') or form_data.get('property_size')
+            if property_size and business_config and business_config.cleaning_time_per_sqft:
+                estimated_duration = max(60, int(property_size) * business_config.cleaning_time_per_sqft // 100)
+                logger.info(f"📊 Using property size estimated duration: {estimated_duration} minutes")
     
     # Get working hours from business config
     working_hours = {"start": "09:00", "end": "17:00"}
     working_days = ["monday", "tuesday", "wednesday", "thursday", "friday"]
+    buffer_time = 30  # Default 30 minutes between appointments
     
     if business_config:
         if business_config.working_hours:
             working_hours = business_config.working_hours
         if business_config.working_days:
             working_days = business_config.working_days
+        if business_config.buffer_time:
+            buffer_time = business_config.buffer_time
     
     # Get business branding
     business_name = "Service Provider"
@@ -93,6 +119,7 @@ async def get_scheduling_info_by_client(
         "estimated_duration": estimated_duration,
         "working_hours": working_hours,
         "working_days": working_days,
+        "buffer_time": buffer_time,
         "meetings_required": meetings_required,
         "has_calendly": has_calendly
     }
@@ -571,16 +598,28 @@ async def get_public_scheduling_info(
         BusinessConfig.user_id == contract.user_id
     ).first()
     
-    # Calculate estimated duration from contract or business config
-    estimated_duration = 60  # Default 60 minutes
+    # Calculate estimated duration from contract quote or client's form_data
+    estimated_duration = 120  # Default 2 hours in minutes
     
-    # Try to get from client's form_data (property size based calculation)
-    if client.form_data:
+    # Try to get from client's form_data and recalculate quote
+    if client.form_data and business_config:
         form_data = client.form_data
-        property_size = form_data.get('propertySize') or form_data.get('property_size')
-        if property_size and business_config and business_config.cleaning_time_per_sqft:
-            # Calculate based on sqft
-            estimated_duration = max(60, int(property_size) * business_config.cleaning_time_per_sqft // 100)
+        
+        # Recalculate quote to get estimated hours
+        from .contracts_pdf import calculate_quote
+        try:
+            quote = calculate_quote(business_config, form_data)
+            if quote.get('estimated_hours'):
+                estimated_duration = int(quote['estimated_hours'] * 60)  # Convert hours to minutes
+                logger.info(f"📊 Using contract estimated duration: {estimated_duration} minutes ({quote['estimated_hours']} hours)")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to calculate quote for duration: {e}")
+            
+            # Fallback to property size calculation
+            property_size = form_data.get('propertySize') or form_data.get('property_size')
+            if property_size and business_config.cleaning_time_per_sqft:
+                estimated_duration = max(60, int(property_size) * business_config.cleaning_time_per_sqft // 100)
+                logger.info(f"📊 Using property size estimated duration: {estimated_duration} minutes")
     
     # Get working hours from business config
     working_hours = {
@@ -590,6 +629,7 @@ async def get_public_scheduling_info(
     working_days = ["monday", "tuesday", "wednesday", "thursday", "friday"]
     day_schedules = None
     off_work_periods = None
+    buffer_time = 30  # Default 30 minutes between appointments
     
     if business_config:
         if business_config.working_hours:
@@ -600,6 +640,8 @@ async def get_public_scheduling_info(
             day_schedules = business_config.day_schedules
         if business_config.off_work_periods:
             off_work_periods = business_config.off_work_periods
+        if business_config.buffer_time:
+            buffer_time = business_config.buffer_time
     
     # Get business branding
     business_name = "Service Provider"
@@ -628,6 +670,7 @@ async def get_public_scheduling_info(
         "working_days": working_days,
         "day_schedules": day_schedules,
         "off_work_periods": off_work_periods,
+        "buffer_time": buffer_time,
         "status": contract.status
     }
 
@@ -674,13 +717,27 @@ async def create_direct_booking(
         BusinessConfig.user_id == contract.user_id
     ).first()
     
-    # Calculate duration
-    estimated_duration = 60
-    if client.form_data:
+    # Calculate duration from contract quote or client's form_data
+    estimated_duration = 120  # Default 2 hours in minutes
+    
+    if client.form_data and business_config:
         form_data = client.form_data
-        property_size = form_data.get('propertySize') or form_data.get('property_size')
-        if property_size and business_config and business_config.cleaning_time_per_sqft:
-            estimated_duration = max(60, int(property_size) * business_config.cleaning_time_per_sqft // 100)
+        
+        # Try to get estimated hours from contract quote
+        from .contracts_pdf import calculate_quote
+        try:
+            quote = calculate_quote(business_config, form_data)
+            if quote.get('estimated_hours'):
+                estimated_duration = int(quote['estimated_hours'] * 60)  # Convert hours to minutes
+                logger.info(f"📊 Using contract estimated duration: {estimated_duration} minutes ({quote['estimated_hours']} hours)")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to calculate quote for duration: {e}")
+            
+            # Fallback to property size calculation
+            property_size = form_data.get('propertySize') or form_data.get('property_size')
+            if property_size and business_config.cleaning_time_per_sqft:
+                estimated_duration = max(60, int(property_size) * business_config.cleaning_time_per_sqft // 100)
+                logger.info(f"📊 Using property size estimated duration: {estimated_duration} minutes")
     
     # Calculate end time
     start_hour, start_min = map(int, data.selected_time.split(':'))

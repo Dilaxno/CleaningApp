@@ -847,6 +847,7 @@ async def generate_contract_html(
                     <td style="text-align: right;">{"Quote Pending" if quote.get('quote_pending') else f"USD ${quote['base_price']:,.2f}"}</td>
                 </tr>
                 {"<tr><td>Frequency Discount</td><td>" + str(quote['discount_percent']) + "% off for " + frequency.lower() + " service</td><td style='text-align: right; color: #10B981;'>-USD $" + f"{quote['discount_amount']:,.2f}" + "</td></tr>" if quote['discount_amount'] > 0 else ""}
+                {"".join([f"<tr><td>{addon['name']}</td><td>{addon['quantity']} × ${addon['unit_price']:,.2f} {addon['pricing_metric']}</td><td style='text-align: right;'>USD ${addon['total_price']:,.2f}</td></tr>" for addon in quote.get('addon_details', [])]) if quote.get('addon_details') else ""}
                 <tr class="total-row">
                     <td><strong>{"Total" if frequency in ["One-time", "one-time"] else "Total Per Visit"}</strong></td>
                     <td>{"Service provider will provide quote" if quote.get('quote_pending') else f"Estimated {quote['estimated_hours']} hours, {quote['cleaners']} cleaner(s)"}</td>
@@ -1101,15 +1102,22 @@ async def generate_contract_pdf(
         contract.pdf_key = pdf_key
         db.commit()
         
-        # Generate presigned URL for immediate access
-        presigned_url = generate_presigned_url(pdf_key, expiration=3600)
+        # Generate backend URL instead of presigned R2 URL to avoid CORS issues
+        from ..config import FRONTEND_URL
+        # Determine the backend base URL based on the frontend URL
+        if "localhost" in FRONTEND_URL:
+            backend_base = FRONTEND_URL.replace("localhost:5173", "localhost:8000").replace("localhost:5174", "localhost:8000")
+        else:
+            backend_base = "https://api.cleanenroll.com"
+        
+        backend_pdf_url = f"{backend_base}/contracts/pdf/public/{contract.public_id}"
         
         logger.info(f"✅ Contract PDF generated and stored, contract_id: {contract.id}, key: {pdf_key}")
         
         return {
             "contractId": contract.id,
             "pdfKey": pdf_key,
-            "pdfUrl": presigned_url,
+            "pdfUrl": backend_pdf_url,
             "message": "Contract generated successfully"
         }
         
@@ -1126,7 +1134,7 @@ async def get_contract_pdf(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get a presigned URL for a contract PDF"""
+    """Get a backend URL for a contract PDF (avoids CORS issues)"""
     contract = db.query(Contract).filter(
         Contract.id == contract_id,
         Contract.user_id == current_user.id
@@ -1139,9 +1147,18 @@ async def get_contract_pdf(
         raise HTTPException(status_code=404, detail="No PDF available for this contract")
     
     try:
-        presigned_url = generate_presigned_url(contract.pdf_key, expiration=3600)
+        # Generate backend URL instead of presigned R2 URL to avoid CORS issues
+        from ..config import FRONTEND_URL
+        # Determine the backend base URL based on the frontend URL
+        if "localhost" in FRONTEND_URL:
+            backend_base = FRONTEND_URL.replace("localhost:5173", "localhost:8000").replace("localhost:5174", "localhost:8000")
+        else:
+            backend_base = "https://api.cleanenroll.com"
+        
+        backend_pdf_url = f"{backend_base}/contracts/pdf/public/{contract.public_id}"
+        
         return {
-            "url": presigned_url,
+            "url": backend_pdf_url,
             "contractId": contract.id,
             "title": contract.title
         }
@@ -1184,12 +1201,63 @@ async def download_contract_pdf(
             content=pdf_bytes,
             media_type="application/pdf",
             headers={
-                "Content-Disposition": f"attachment; filename=contract-{contract.id}.pdf"
+                "Content-Disposition": f"attachment; filename=contract-{contract.id}.pdf",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET",
+                "Access-Control-Allow-Headers": "*"
             }
         )
     except Exception as e:
         logger.error(f"❌ Failed to download PDF: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to download PDF")
+
+
+@router.get("/pdf/public/{contract_public_id}")
+async def view_contract_pdf_public(
+    contract_public_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    _ip: None = Depends(rate_limit_download_per_ip)
+):
+    """
+    View a contract PDF publicly using the contract's public ID
+    Rate limited: 5 downloads per minute per IP, 3 downloads per minute per contract
+    """
+    # Validate UUID format
+    from .contracts import validate_uuid
+    if not validate_uuid(contract_public_id):
+        raise HTTPException(status_code=400, detail="Invalid contract ID format")
+    
+    contract = db.query(Contract).filter(Contract.public_id == contract_public_id).first()
+    
+    if not contract:
+        raise HTTPException(status_code=404, detail="Contract not found")
+    
+    if not contract.pdf_key:
+        raise HTTPException(status_code=404, detail="No PDF available for this contract")
+    
+    # Apply per-contract rate limit
+    await rate_limit_per_contract(request, contract.id)
+    
+    try:
+        r2 = get_r2_client()
+        response = r2.get_object(Bucket=R2_BUCKET_NAME, Key=contract.pdf_key)
+        pdf_bytes = response['Body'].read()
+        
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f"inline; filename=contract-{contract.id}.pdf",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET",
+                "Access-Control-Allow-Headers": "*",
+                "Cache-Control": "public, max-age=3600"
+            }
+        )
+    except Exception as e:
+        logger.error(f"❌ Failed to serve PDF: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to load PDF")
 
 
 @router.get("/preview/{client_id}")

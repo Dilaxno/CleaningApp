@@ -82,12 +82,19 @@ class ProviderSignatureRequest(BaseModel):
     use_default_signature: bool = False  # If true, use provider's default signature from onboarding
 
 
-def get_pdf_url(pdf_key: Optional[str]) -> Optional[str]:
-    """Generate presigned URL for PDF if key exists"""
-    if not pdf_key:
+def get_pdf_url(pdf_key: Optional[str], contract_public_id: Optional[str] = None) -> Optional[str]:
+    """Generate backend URL for PDF if key exists (avoids CORS issues)"""
+    if not pdf_key or not contract_public_id:
         return None
     try:
-        return generate_presigned_url(pdf_key, expiration=3600)
+        from ..config import FRONTEND_URL
+        # Determine the backend base URL based on the frontend URL
+        if "localhost" in FRONTEND_URL:
+            backend_base = FRONTEND_URL.replace("localhost:5173", "localhost:8000").replace("localhost:5174", "localhost:8000")
+        else:
+            backend_base = "https://api.cleanenroll.com"
+        
+        return f"{backend_base}/contracts/pdf/public/{contract_public_id}"
     except Exception:
         return None
 
@@ -112,7 +119,7 @@ async def get_contracts(
     result = []
     for c in contracts:
         client = db.query(Client).filter(Client.id == c.client_id).first()
-        pdf_url = get_pdf_url(c.pdf_key)
+        pdf_url = get_pdf_url(c.pdf_key, c.public_id)
         result.append(ContractResponse(
             id=c.id,
             public_id=c.public_id,
@@ -252,7 +259,7 @@ async def update_contract(
     db.refresh(contract)
     
     client = db.query(Client).filter(Client.id == contract.client_id).first()
-    pdf_url = get_pdf_url(contract.pdf_key)
+    pdf_url = get_pdf_url(contract.pdf_key, contract.public_id)
     return ContractResponse(
         id=contract.id,
         public_id=contract.public_id,
@@ -396,7 +403,7 @@ async def sign_contract_as_provider(
         # Continue even if PDF regeneration fails
     
     # Prepare email data
-    pdf_url = get_pdf_url(contract.pdf_key) if contract.pdf_key else None
+    pdf_url = get_pdf_url(contract.pdf_key, contract.public_id) if contract.pdf_key else None
     service_type = contract.contract_type or "Cleaning Service"
     start_date = contract.start_date.strftime("%B %d, %Y") if contract.start_date else None
     property_address = client.address if hasattr(client, 'address') else None
@@ -442,7 +449,7 @@ async def sign_contract_as_provider(
     
     logger.info(f"✅ Contract {contract_id} fully signed")
     
-    pdf_url = get_pdf_url(contract.pdf_key)
+    pdf_url = get_pdf_url(contract.pdf_key, contract.public_id)
     return ContractResponse(
         id=contract.id,
         public_id=contract.public_id,

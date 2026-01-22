@@ -483,6 +483,62 @@ async def get_public_invoice(
     }
 
 
+def calculate_addon_amount_from_contract(contract: Contract, business_config: BusinessConfig) -> float:
+    """Calculate addon amount from contract's client form data"""
+    if not contract or not contract.client or not contract.client.form_data:
+        return 0.0
+    
+    form_data = contract.client.form_data
+    selected_addons = form_data.get("selectedAddons", [])
+    addon_quantities = form_data.get("addonQuantities", {})
+    
+    if not selected_addons:
+        return 0.0
+    
+    addon_total = 0.0
+    
+    # Process standard add-ons
+    if "addon_windows" in selected_addons and business_config.addon_windows:
+        quantity = addon_quantities.get("addon_windows", 1)
+        addon_total += business_config.addon_windows * quantity
+    
+    # Size-based carpet cleaning addons
+    if "addon_carpet_small" in selected_addons and business_config.addon_carpet_small:
+        quantity = addon_quantities.get("addon_carpet_small", 1)
+        addon_total += business_config.addon_carpet_small * quantity
+    
+    if "addon_carpet_medium" in selected_addons and business_config.addon_carpet_medium:
+        quantity = addon_quantities.get("addon_carpet_medium", 1)
+        addon_total += business_config.addon_carpet_medium * quantity
+    
+    if "addon_carpet_large" in selected_addons and business_config.addon_carpet_large:
+        quantity = addon_quantities.get("addon_carpet_large", 1)
+        addon_total += business_config.addon_carpet_large * quantity
+    
+    # Legacy carpet addon for backward compatibility
+    if "addon_carpets" in selected_addons and business_config.addon_carpets:
+        quantity = addon_quantities.get("addon_carpets", 1)
+        addon_total += business_config.addon_carpets * quantity
+    
+    # Process custom add-ons
+    if business_config.custom_addons:
+        for custom_addon in business_config.custom_addons:
+            addon_id = custom_addon.get("id") or f"custom_{custom_addon.get('name', '')}"
+            if addon_id in selected_addons:
+                unit_price = float(custom_addon.get("price", 0))
+                pricing_metric = custom_addon.get("pricingMetric", "per service")
+                
+                # For "per service" or "flat rate", quantity is always 1
+                if pricing_metric in ["per service", "flat rate"]:
+                    quantity = 1
+                else:
+                    quantity = addon_quantities.get(addon_id, 1)
+                
+                addon_total += unit_price * quantity
+    
+    return addon_total
+
+
 @router.post("/auto-create-from-schedule/{schedule_id}")
 async def auto_create_invoice_from_schedule(
     schedule_id: int,
@@ -538,9 +594,15 @@ async def auto_create_invoice_from_schedule(
     service_type = client.frequency or "one-time"
     is_recurring = service_type in ["weekly", "bi-weekly", "monthly"]
     
+    # Calculate addon amount from contract
+    addon_amount = 0.0
+    if contract and business_config:
+        addon_amount = calculate_addon_amount_from_contract(contract, business_config)
+        logger.info(f"📊 Calculated addon amount: ${addon_amount}")
+    
     # Calculate frequency discount
     frequency_discount = calculate_frequency_discount(base_amount, service_type, business_config)
-    total_amount = base_amount - frequency_discount
+    total_amount = base_amount - frequency_discount + addon_amount
     
     # Generate invoice number
     invoice_number = generate_invoice_number(current_user.id, db)
@@ -563,7 +625,7 @@ async def auto_create_invoice_from_schedule(
         service_type=service_type,
         base_amount=base_amount,
         frequency_discount=frequency_discount,
-        addon_amount=0,
+        addon_amount=addon_amount,
         tax_amount=0,
         total_amount=total_amount,
         is_recurring=is_recurring,

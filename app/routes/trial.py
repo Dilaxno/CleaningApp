@@ -269,14 +269,20 @@ async def generate_trial_contract(
         
         logger.info(f"✅ Trial contract generated: ID={trial_record_id}, Session={session_id}, IP={ip_address}")
         
-        # Generate presigned URL for viewing
-        from .upload import generate_presigned_url
-        pdf_url = generate_presigned_url(pdf_key, expiration=3600)  # 1 hour expiry
+        # Generate backend URL instead of presigned R2 URL to avoid CORS issues
+        from ..config import FRONTEND_URL
+        # Determine the backend base URL based on the frontend URL
+        if "localhost" in FRONTEND_URL:
+            backend_base = FRONTEND_URL.replace("localhost:5173", "localhost:8000").replace("localhost:5174", "localhost:8000")
+        else:
+            backend_base = "https://api.cleanenroll.com"
+        
+        backend_pdf_url = f"{backend_base}/trial/pdf/public/{trial_id}"
         
         return {
             "success": True,
             "trialId": trial_id,
-            "pdfUrl": pdf_url,
+            "pdfUrl": backend_pdf_url,
             "quote": {
                 "basePrice": quote['base_price'],
                 "finalPrice": quote['final_price'],
@@ -298,8 +304,61 @@ async def get_trial_contract_pdf(
     trial_id: str,
     db: Session = Depends(get_db)
 ):
-    """Get presigned URL for trial contract PDF"""
+    """Get backend URL for trial contract PDF (avoids CORS issues)"""
     try:
+        query = text("""
+            SELECT pdf_key FROM trial_contracts 
+            WHERE pdf_key LIKE :pattern
+            LIMIT 1
+        """)
+        
+        result = db.execute(query, {"pattern": f"trial-contracts/{trial_id}.pdf"}).fetchone()
+        
+        if not result:
+            raise HTTPException(status_code=404, detail="Trial contract not found")
+        
+        # Generate backend URL instead of presigned R2 URL to avoid CORS issues
+        from ..config import FRONTEND_URL
+        # Determine the backend base URL based on the frontend URL
+        if "localhost" in FRONTEND_URL:
+            backend_base = FRONTEND_URL.replace("localhost:5173", "localhost:8000").replace("localhost:5174", "localhost:8000")
+        else:
+            backend_base = "https://api.cleanenroll.com"
+        
+        backend_pdf_url = f"{backend_base}/trial/pdf/public/{trial_id}"
+        
+        return {"url": backend_pdf_url}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving trial contract: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve contract")
+
+
+@router.get("/pdf/public/{trial_id}")
+async def view_trial_contract_pdf_public(
+    trial_id: str,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    View a trial contract PDF publicly using the trial ID
+    Rate limited: 5 downloads per minute per IP
+    """
+    from ..rate_limiter import create_rate_limiter, rate_limit_dependency
+    
+    # Apply rate limit
+    await rate_limit_dependency(
+        request=request,
+        limit=5,
+        window_seconds=60,
+        key_prefix="trial_pdf_download_ip",
+        use_ip=True
+    )
+    
+    try:
+        from sqlalchemy import text
         query = text("""
             SELECT pdf_key FROM trial_contracts 
             WHERE pdf_key LIKE :pattern
@@ -313,14 +372,25 @@ async def get_trial_contract_pdf(
         
         pdf_key = result[0]
         
-        # Generate presigned URL
-        from .upload import generate_presigned_url
-        pdf_url = generate_presigned_url(pdf_key, expiration=3600)
+        from .upload import get_r2_client
+        from ..config import R2_BUCKET_NAME
         
-        return {"url": pdf_url}
+        r2 = get_r2_client()
+        response = r2.get_object(Bucket=R2_BUCKET_NAME, Key=pdf_key)
+        pdf_bytes = response['Body'].read()
         
-    except HTTPException:
-        raise
+        from fastapi.responses import Response
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f"inline; filename=trial-contract-{trial_id}.pdf",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET",
+                "Access-Control-Allow-Headers": "*",
+                "Cache-Control": "public, max-age=3600"
+            }
+        )
     except Exception as e:
-        logger.error(f"Error retrieving trial contract: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve contract")
+        logger.error(f"❌ Failed to serve trial PDF: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to load PDF")

@@ -963,14 +963,21 @@ async def sign_contract(
     
     logger.info(f"✅ Contract signed by client: contract_id={contract.id}")
     
-    # Generate presigned URL for the new signed PDF
+    # Generate backend URL for the new signed PDF (avoids CORS issues)
     signed_pdf_url = None
     if contract.pdf_key:
         try:
-            signed_pdf_url = generate_presigned_url(contract.pdf_key, expiration=604800)  # 7 days
-            logger.info(f"✅ Generated presigned URL for signed contract PDF")
+            from ..config import FRONTEND_URL
+            # Determine the backend base URL based on the frontend URL
+            if "localhost" in FRONTEND_URL:
+                backend_base = FRONTEND_URL.replace("localhost:5173", "localhost:8000").replace("localhost:5174", "localhost:8000")
+            else:
+                backend_base = "https://api.cleanenroll.com"
+            
+            signed_pdf_url = f"{backend_base}/contracts/pdf/public/{contract.public_id}"
+            logger.info(f"✅ Generated backend URL for signed contract PDF")
         except Exception as url_err:
-            logger.warning(f"⚠️ Failed to generate presigned URL: {url_err}")
+            logger.warning(f"⚠️ Failed to generate backend URL: {url_err}")
     
     # Send notification to business owner
     try:
