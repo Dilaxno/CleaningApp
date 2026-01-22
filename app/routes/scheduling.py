@@ -125,6 +125,73 @@ async def get_scheduling_info_by_client(
     }
 
 
+@router.get("/client/{client_id}/latest")
+async def get_client_latest_appointment(
+    client_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Get the latest appointment details for a client
+    Used for the appointment success page
+    """
+    try:
+        # Get the latest schedule for this client
+        from ..models import Schedule, Contract, BusinessConfig
+        
+        schedule = db.query(Schedule).filter(
+            Schedule.client_id == client_id
+        ).order_by(Schedule.created_at.desc()).first()
+        
+        if not schedule:
+            raise HTTPException(status_code=404, detail="No appointments found for this client")
+        
+        # Get client info
+        client = db.query(Client).filter(Client.id == client_id).first()
+        if not client:
+            raise HTTPException(status_code=404, detail="Client not found")
+        
+        # Get business info
+        user = db.query(User).filter(User.id == client.user_id).first()
+        business_config = db.query(BusinessConfig).filter(BusinessConfig.user_id == client.user_id).first()
+        
+        business_name = business_config.business_name if business_config and business_config.business_name else (user.full_name if user else "Service Provider")
+        
+        # Get contract PDF URL if available
+        contract = db.query(Contract).filter(
+            Contract.client_id == client_id,
+            Contract.pdf_key.isnot(None)
+        ).order_by(Contract.created_at.desc()).first()
+        
+        contract_pdf_url = None
+        if contract and contract.public_id:
+            # Generate backend PDF URL
+            from ..config import FRONTEND_URL
+            if "localhost" in FRONTEND_URL:
+                backend_base = FRONTEND_URL.replace("localhost:5173", "localhost:8000").replace("localhost:5174", "localhost:8000")
+            else:
+                backend_base = "https://api.cleanenroll.com"
+            
+            contract_pdf_url = f"{backend_base}/contracts/pdf/public/{contract.public_id}"
+        
+        # Format the response
+        return {
+            "scheduledDate": schedule.scheduled_date.isoformat() if schedule.scheduled_date else None,
+            "scheduledTime": schedule.start_time,
+            "businessName": business_name,
+            "clientName": client.contact_name or client.business_name,
+            "contractPdfUrl": contract_pdf_url,
+            "estimatedDuration": schedule.estimated_duration or 120,  # Default 2 hours
+            "serviceType": schedule.service_type or "Cleaning Service",
+            "status": schedule.status
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to get client appointment details: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve appointment details")
+
+
 class ClientBookingRequest(BaseModel):
     client_id: int
     start_time: str  # ISO format
@@ -806,11 +873,23 @@ async def create_direct_booking(
     except Exception as e:
         logger.error(f"Failed to send booking confirmation email: {e}")
     
+    # Generate contract PDF URL if available
+    contract_pdf_url = None
+    if contract.pdf_key and contract.public_id:
+        from ..config import FRONTEND_URL
+        if "localhost" in FRONTEND_URL:
+            backend_base = FRONTEND_URL.replace("localhost:5173", "localhost:8000").replace("localhost:5174", "localhost:8000")
+        else:
+            backend_base = "https://api.cleanenroll.com"
+        
+        contract_pdf_url = f"{backend_base}/contracts/pdf/public/{contract.public_id}"
+    
     return {
         "message": "Booking confirmed",
         "schedule_id": schedule.id,
         "scheduled_date": data.selected_date,
         "start_time": start_time_display,
         "end_time": end_time_display,
-        "duration_minutes": estimated_duration
+        "duration_minutes": estimated_duration,
+        "contract_pdf_url": contract_pdf_url
     }
