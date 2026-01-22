@@ -52,7 +52,7 @@ async def get_scheduling_info_by_client(
         
         # Try to get estimated hours from contract if available
         # First check if there's a contract for this client
-        from .models import Contract
+        from ..models import Contract
         contract = db.query(Contract).filter(
             Contract.client_id == client_id,
             Contract.status.in_(["new", "sent", "signed"])

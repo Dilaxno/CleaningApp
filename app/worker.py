@@ -104,9 +104,15 @@ async def generate_contract_pdf_task(ctx, client_id: int, owner_uid: str, form_d
         )
         
         # Generate presigned URL (7 days)
-        pdf_url = generate_presigned_url(pdf_key, expiration=604800)
+        # Generate backend URL instead of presigned R2 URL to avoid CORS issues
+        from .config import FRONTEND_URL
+        # Determine the backend base URL based on the frontend URL
+        if "localhost" in FRONTEND_URL:
+            backend_base = FRONTEND_URL.replace("localhost:5173", "localhost:8000").replace("localhost:5174", "localhost:8000")
+        else:
+            backend_base = "https://api.cleanenroll.com"
         
-        # Create contract record
+        # Create contract record first to get public_id
         contract = Contract(
             user_id=user.id,
             client_id=client.id,
@@ -124,11 +130,14 @@ async def generate_contract_pdf_task(ctx, client_id: int, owner_uid: str, form_d
         db.commit()
         db.refresh(contract)
         
+        # Generate backend PDF URL using public_id
+        backend_pdf_url = f"{backend_base}/contracts/pdf/public/{contract.public_id}"
+        
         logger.info(f"✅ Contract created: ID={contract.id}, PDF uploaded to R2")
         
         return {
             "contract_id": contract.id,
-            "pdf_url": pdf_url,
+            "pdf_url": backend_pdf_url,
             "status": "completed"
         }
         
