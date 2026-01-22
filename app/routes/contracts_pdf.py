@@ -431,6 +431,11 @@ async def generate_contract_html(
     property_size = form_data.get("squareFootage", "N/A")
     property_type = client.property_type or "Commercial"
     
+    # Special requests from client form
+    special_requests = form_data.get("specialRequests", "").strip() if form_data.get("specialRequests") else None
+    if special_requests == "":
+        special_requests = None
+    
     # Service details (frequency already extracted above for start_date logic)
     # Combine standard and custom inclusions/exclusions
     standard_inclusions = business_config.standard_inclusions or []
@@ -827,9 +832,12 @@ async def generate_contract_html(
         </div>
     </div>
 
-    <!-- 4. Payment and Pricing -->
+    <!-- 4. Special Requests & Notes -->
+    {"<div class='section'><div class='section-title'><span class='section-number'>4.</span>Special Requests & Client Notes</div><div class='info-box' style='background: #FEF3C7; border-left: 4px solid #F59E0B; margin-top: 12px;'><h4 style='color: #92400E; margin-bottom: 8px;'>⚠️ Important Client Requirements</h4><p style='color: #92400E; font-size: 10pt; line-height: 1.6; white-space: pre-wrap;'>" + special_requests + "</p></div></div>" if special_requests else ""}
+
+    <!-- 5. Payment and Pricing -->
     <div class="section">
-        <div class="section-title"><span class="section-number">4.</span>Payment and Pricing</div>
+        <div class="section-title"><span class="section-number">5.</span>Payment and Pricing</div>
         <p class="section-content" style="margin-bottom: 12px;">
             The Client will pay the Service Provider the total agreed sum, outlined in the pricing below, for 
             the completion of the scope of work outlined in this Agreement.
@@ -859,9 +867,9 @@ async def generate_contract_html(
         <p class="terms-note">Payment due within {payment_due_days} days of service completion. A {late_fee}% late fee applies after due date.</p>
     </div>
 
-    <!-- 5. Terms and Conditions -->
+    <!-- 6. Terms and Conditions -->
     <div class="section">
-        <div class="section-title"><span class="section-number">5.</span>Terms and Conditions</div>
+        <div class="section-title"><span class="section-number">6.</span>Terms and Conditions</div>
         <p class="section-content">
             This Agreement will begin on the date of acceptance and will remain in effect until all services have been completed.
         </p>
@@ -887,9 +895,9 @@ async def generate_contract_html(
         <p class="terms-note">{'For recurring services, billing begins immediately upon signing, and the first cleaning will be scheduled separately based on your availability.' if is_recurring else 'For one-time services, the Service Start Date aligns with your scheduled service appointment.'}</p>
     </div>
 
-    <!-- 6. Legal Provisions -->
+    <!-- 7. Legal Provisions -->
     <div class="section">
-        <div class="section-title"><span class="section-number">6.</span>Legal Provisions</div>
+        <div class="section-title"><span class="section-number">7.</span>Legal Provisions</div>
         <ul class="bullet-list">
             <li><strong>Governing Law:</strong> This Agreement shall be governed by the laws of the state in which the Service Provider operates.</li>
             <li><strong>Severability:</strong> If any provision is found invalid, the remaining provisions continue in full force.</li>
