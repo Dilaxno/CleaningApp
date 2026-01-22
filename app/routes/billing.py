@@ -263,7 +263,7 @@ async def create_checkout_session(
             ],
             customer=customer,
             # Optional trial config example:
-            # subscription_data={"trial_period_days": 7},
+            # subscription_data={"trial_period_days": 3},
             metadata=metadata,
             return_url=return_url,
         )
