@@ -37,8 +37,11 @@ def get_redis_client() -> redis.Redis:
                 redis_client = redis.from_url(
                     redis_url,
                     decode_responses=True,
-                    socket_connect_timeout=5,
-                    socket_timeout=5
+                    socket_connect_timeout=15,      # Increased from 5 seconds
+                    socket_timeout=30,              # Increased from 5 seconds
+                    retry_on_timeout=True,          # Retry on timeout
+                    health_check_interval=30,       # Health check every 30 seconds
+                    max_connections=20,             # Connection pooling
                 )
                 # Test connection
                 info = redis_client.ping()
@@ -71,8 +74,11 @@ def get_redis_client() -> redis.Redis:
                     db=redis_db,
                     ssl=redis_ssl,
                     decode_responses=True,
-                    socket_connect_timeout=5,
-                    socket_timeout=5
+                    socket_connect_timeout=15,      # Increased from 5 seconds
+                    socket_timeout=30,              # Increased from 5 seconds
+                    retry_on_timeout=True,          # Retry on timeout
+                    health_check_interval=30,       # Health check every 30 seconds
+                    max_connections=20,             # Connection pooling
                 )
                 # Test connection
                 redis_client.ping()

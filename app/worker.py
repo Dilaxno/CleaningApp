@@ -31,7 +31,9 @@ def get_redis_settings() -> RedisSettings:
             host=parsed.hostname or 'localhost',
             port=parsed.port or 6379,
             password=parsed.password,
-            ssl=parsed.scheme == 'rediss'
+            ssl=parsed.scheme == 'rediss',
+            conn_timeout=15,                # Connection timeout
+            conn_retry_delay=1,             # Retry delay in seconds
         )
     else:
         # Use individual settings
@@ -39,7 +41,9 @@ def get_redis_settings() -> RedisSettings:
             host=os.getenv("REDIS_HOST", "localhost"),
             port=int(os.getenv("REDIS_PORT", "6379")),
             password=os.getenv("REDIS_PASSWORD"),
-            ssl=os.getenv("REDIS_SSL", "false").lower() == "true"
+            ssl=os.getenv("REDIS_SSL", "false").lower() == "true",
+            conn_timeout=15,                # Connection timeout
+            conn_retry_delay=1,             # Retry delay in seconds
         )
 
 

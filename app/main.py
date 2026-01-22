@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -162,6 +163,41 @@ def root():
 @app.get("/health")
 def health():
     return {"status": "healthy"}
+
+
+@app.get("/health/redis")
+async def redis_health_check():
+    """Check Redis connectivity for monitoring"""
+    try:
+        from .rate_limiter import get_redis_client
+        redis_client = get_redis_client()
+        
+        # Test basic connectivity
+        start_time = time.time()
+        redis_client.ping()
+        response_time = (time.time() - start_time) * 1000  # Convert to milliseconds
+        
+        # Get Redis info
+        info = redis_client.info()
+        
+        return {
+            "status": "healthy",
+            "redis": {
+                "connected": True,
+                "response_time_ms": round(response_time, 2),
+                "version": info.get("redis_version", "unknown"),
+                "used_memory_human": info.get("used_memory_human", "unknown"),
+                "connected_clients": info.get("connected_clients", 0)
+            }
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy", 
+            "redis": {
+                "connected": False,
+                "error": str(e)
+            }
+        }
 
 
 @app.get("/csrf-token")
