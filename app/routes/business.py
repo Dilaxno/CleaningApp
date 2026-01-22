@@ -48,7 +48,10 @@ class BusinessConfigCreate(BaseModel):
     discountMonthly: Optional[str] = None
     discountLongTerm: Optional[str] = None
     addonWindows: Optional[str] = None
-    addonCarpets: Optional[str] = None
+    addonCarpets: Optional[str] = None  # Legacy - deprecated
+    addonCarpetSmall: Optional[str] = None
+    addonCarpetMedium: Optional[str] = None
+    addonCarpetLarge: Optional[str] = None
     paymentDueDays: Optional[str] = None
     lateFeePercent: Optional[str] = None
     standardInclusions: Optional[List[str]] = None
@@ -156,6 +159,9 @@ def get_current_user_business_config(current_user: User = Depends(get_current_us
         "customInclusions": config.custom_inclusions,
         "customExclusions": config.custom_exclusions,
         "preferredUnits": config.preferred_units,
+        "addonCarpetSmall": config.addon_carpet_small,
+        "addonCarpetMedium": config.addon_carpet_medium,
+        "addonCarpetLarge": config.addon_carpet_large,
     }
 
 
@@ -256,6 +262,12 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 existing.addon_windows = to_float(data.addonWindows)
             if is_provided(data.addonCarpets):
                 existing.addon_carpets = to_float(data.addonCarpets)
+            if is_provided(data.addonCarpetSmall):
+                existing.addon_carpet_small = to_float(data.addonCarpetSmall)
+            if is_provided(data.addonCarpetMedium):
+                existing.addon_carpet_medium = to_float(data.addonCarpetMedium)
+            if is_provided(data.addonCarpetLarge):
+                existing.addon_carpet_large = to_float(data.addonCarpetLarge)
             if is_provided(data.paymentDueDays):
                 existing.payment_due_days = to_int(data.paymentDueDays) or 15
             if is_provided(data.lateFeePercent):
@@ -307,7 +319,10 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 discount_monthly=to_float(data.discountMonthly),
                 discount_long_term=to_float(data.discountLongTerm),
                 addon_windows=to_float(data.addonWindows),
-                addon_carpets=to_float(data.addonCarpets),
+                addon_carpets=to_float(data.addonCarpets),  # Legacy
+                addon_carpet_small=to_float(data.addonCarpetSmall),
+                addon_carpet_medium=to_float(data.addonCarpetMedium),
+                addon_carpet_large=to_float(data.addonCarpetLarge),
                 payment_due_days=to_int(data.paymentDueDays) or 15,
                 late_fee_percent=to_float(data.lateFeePercent) or 1.5,
                 standard_inclusions=data.standardInclusions,
@@ -404,6 +419,9 @@ def get_business_config(firebase_uid: str, db: Session = Depends(get_db)):
         "customInclusions": config.custom_inclusions,
         "customExclusions": config.custom_exclusions,
         "preferredUnits": config.preferred_units,
+        "addonCarpetSmall": config.addon_carpet_small,
+        "addonCarpetMedium": config.addon_carpet_medium,
+        "addonCarpetLarge": config.addon_carpet_large,
     }
 
 
@@ -475,14 +493,20 @@ def get_public_addons(firebase_uid: str, db: Session = Depends(get_db)):
         return {
             "customAddons": [],
             "addonWindows": None,
-            "addonCarpets": None,
+            "addonCarpets": None,  # Legacy - deprecated
+            "addonCarpetSmall": None,
+            "addonCarpetMedium": None,
+            "addonCarpetLarge": None,
         }
 
     logger.info(f"✅ Returning public addons for user_id: {user.id}")
     return {
         "customAddons": config.custom_addons or [],
         "addonWindows": config.addon_windows,
-        "addonCarpets": config.addon_carpets,
+        "addonCarpets": config.addon_carpets,  # Legacy - deprecated
+        "addonCarpetSmall": config.addon_carpet_small,
+        "addonCarpetMedium": config.addon_carpet_medium,
+        "addonCarpetLarge": config.addon_carpet_large,
     }
 
 @router.get("/{firebase_uid}/public-info")

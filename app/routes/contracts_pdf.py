@@ -146,6 +146,47 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
             })
             logger.info(f"📊 Added window cleaning: {quantity} windows × ${config.addon_windows} = ${addon_price}")
         
+        # Size-based carpet cleaning addons
+        if "addon_carpet_small" in selected_addons and config.addon_carpet_small:
+            quantity = addon_quantities.get("addon_carpet_small", 1)
+            addon_price = config.addon_carpet_small * quantity
+            addon_total += addon_price
+            addon_details.append({
+                "name": "Small Carpet Cleaning",
+                "quantity": quantity,
+                "unit_price": config.addon_carpet_small,
+                "total_price": addon_price,
+                "pricing_metric": "per carpet"
+            })
+            logger.info(f"📊 Added small carpet cleaning: {quantity} carpets × ${config.addon_carpet_small} = ${addon_price}")
+        
+        if "addon_carpet_medium" in selected_addons and config.addon_carpet_medium:
+            quantity = addon_quantities.get("addon_carpet_medium", 1)
+            addon_price = config.addon_carpet_medium * quantity
+            addon_total += addon_price
+            addon_details.append({
+                "name": "Medium Carpet Cleaning",
+                "quantity": quantity,
+                "unit_price": config.addon_carpet_medium,
+                "total_price": addon_price,
+                "pricing_metric": "per carpet"
+            })
+            logger.info(f"📊 Added medium carpet cleaning: {quantity} carpets × ${config.addon_carpet_medium} = ${addon_price}")
+        
+        if "addon_carpet_large" in selected_addons and config.addon_carpet_large:
+            quantity = addon_quantities.get("addon_carpet_large", 1)
+            addon_price = config.addon_carpet_large * quantity
+            addon_total += addon_price
+            addon_details.append({
+                "name": "Large Carpet Cleaning",
+                "quantity": quantity,
+                "unit_price": config.addon_carpet_large,
+                "total_price": addon_price,
+                "pricing_metric": "per carpet"
+            })
+            logger.info(f"📊 Added large carpet cleaning: {quantity} carpets × ${config.addon_carpet_large} = ${addon_price}")
+        
+        # Legacy carpet addon for backward compatibility
         if "addon_carpets" in selected_addons and config.addon_carpets:
             quantity = addon_quantities.get("addon_carpets", 1)
             addon_price = config.addon_carpets * quantity
