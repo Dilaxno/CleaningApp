@@ -113,6 +113,7 @@ class ClientResponse(BaseModel):
     frequency: Optional[str]
     status: str
     notes: Optional[str]
+    form_data: Optional[dict] = None  # Include form_data for detailed view
 
     class Config:
         from_attributes = True
@@ -144,6 +145,37 @@ async def get_clients(
         )
         for c in clients
     ]
+
+
+@router.get("/{client_id}", response_model=ClientResponse)
+async def get_client(
+    client_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get a specific client with detailed information including form_data"""
+    client = db.query(Client).filter(
+        Client.id == client_id,
+        Client.user_id == current_user.id
+    ).first()
+    
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    
+    return ClientResponse(
+        id=client.id,
+        public_id=client.public_id,
+        businessName=client.business_name,
+        contactName=client.contact_name,
+        email=client.email,
+        phone=client.phone,
+        propertyType=client.property_type,
+        propertySize=client.property_size,
+        frequency=client.frequency,
+        status=client.status,
+        notes=client.notes,
+        form_data=client.form_data
+    )
 
 
 @router.post("", response_model=ClientResponse)

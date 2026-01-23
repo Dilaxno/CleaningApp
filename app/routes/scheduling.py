@@ -180,7 +180,7 @@ async def get_client_latest_appointment(
             "businessName": business_name,
             "clientName": client.contact_name or client.business_name,
             "contractPdfUrl": contract_pdf_url,
-            "estimatedDuration": schedule.estimated_duration or 120,  # Default 2 hours
+            "estimatedDuration": schedule.duration_minutes or 120,  # Default 2 hours
             "serviceType": schedule.service_type or "Cleaning Service",
             "status": schedule.status
         }

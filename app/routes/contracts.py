@@ -1,6 +1,6 @@
 import logging
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional, List
@@ -102,10 +102,16 @@ def get_pdf_url(pdf_key: Optional[str], contract_public_id: Optional[str] = None
 @router.get("", response_model=List[ContractResponse])
 async def get_contracts(
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    client_id: Optional[int] = Query(None, description="Filter contracts by client ID")
 ):
-    """Get all contracts for the current user"""
-    contracts = db.query(Contract).filter(Contract.user_id == current_user.id).order_by(Contract.created_at.desc()).all()
+    """Get all contracts for the current user, optionally filtered by client_id"""
+    query = db.query(Contract).filter(Contract.user_id == current_user.id)
+    
+    if client_id:
+        query = query.filter(Contract.client_id == client_id)
+    
+    contracts = query.order_by(Contract.created_at.desc()).all()
     
     # Get provider's default signature from business config
     business_config = db.query(BusinessConfig).filter(BusinessConfig.user_id == current_user.id).first()
