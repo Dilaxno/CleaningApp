@@ -45,7 +45,7 @@ async def get_scheduling_info_by_client(
     ).first()
     
     # Calculate estimated duration from contract quote or client's form_data
-    estimated_duration = 120  # Default 2 hours in minutes
+    estimated_duration = 150  # Default 2.5 hours in minutes (realistic for standard cleaning)
     
     if client.form_data:
         form_data = client.form_data
@@ -70,7 +70,7 @@ async def get_scheduling_info_by_client(
                 logger.warning(f"⚠️ Failed to calculate quote for duration: {e}")
         
         # Fallback to property size calculation if quote calculation failed
-        if estimated_duration == 120:  # Still default
+        if estimated_duration == 150:  # Still default
             property_size = form_data.get('propertySize') or form_data.get('property_size')
             if property_size and business_config and business_config.cleaning_time_per_sqft:
                 estimated_duration = max(60, int(property_size) * business_config.cleaning_time_per_sqft // 100)
@@ -666,7 +666,7 @@ async def get_public_scheduling_info(
     ).first()
     
     # Calculate estimated duration from contract quote or client's form_data
-    estimated_duration = 120  # Default 2 hours in minutes
+    estimated_duration = 150  # Default 2.5 hours in minutes (realistic for standard cleaning)
     
     # Try to get from client's form_data and recalculate quote
     if client.form_data and business_config:
@@ -785,7 +785,7 @@ async def create_direct_booking(
     ).first()
     
     # Calculate duration from contract quote or client's form_data
-    estimated_duration = 120  # Default 2 hours in minutes
+    estimated_duration = 150  # Default 2.5 hours in minutes (realistic for standard cleaning)
     
     if client.form_data and business_config:
         form_data = client.form_data

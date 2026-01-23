@@ -71,25 +71,48 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
         if config.cleaning_time_per_sqft:
             estimated_hours = (property_size / 1000) * (config.cleaning_time_per_sqft / 60)
         elif property_size > 0:
-            # Default: ~2 hours per 1000 sqft
-            estimated_hours = max(1, property_size / 500)
+            # Realistic cleaning time: 1-4 hours based on property size
+            if property_size <= 800:
+                estimated_hours = 1.5  # Small apartment/condo: 1.5 hours
+            elif property_size <= 1500:
+                estimated_hours = 2.5  # Medium home: 2.5 hours
+            elif property_size <= 2500:
+                estimated_hours = 3.5  # Large home: 3.5 hours
+            else:
+                estimated_hours = 4.0  # Very large home: max 4 hours
     elif pricing_model == "room" and config.rate_per_room:
         base_price = num_rooms * config.rate_per_room
-        # Estimate ~30 min per room, or estimate from property size if no rooms specified
+        # Estimate ~30 min per room, with realistic caps
         if num_rooms > 0:
-            estimated_hours = num_rooms * 0.5
+            estimated_hours = min(4.0, num_rooms * 0.5)  # Cap at 4 hours max
         elif property_size > 0:
-            # Fallback: estimate rooms from size (~200 sqft per room) then calculate hours
-            estimated_rooms = max(1, property_size / 200)
-            estimated_hours = estimated_rooms * 0.5
+            # Realistic room estimation and time calculation
+            if property_size <= 800:
+                estimated_hours = 1.5  # Small apartment: 1.5 hours
+            elif property_size <= 1500:
+                estimated_hours = 2.5  # Medium home: 2.5 hours
+            elif property_size <= 2500:
+                estimated_hours = 3.5  # Large home: 3.5 hours
+            else:
+                estimated_hours = 4.0  # Very large home: max 4 hours
         else:
             estimated_hours = 2  # Default minimum
     elif pricing_model == "hourly" and config.hourly_rate:
-        # Estimate hours based on size
+        # Estimate hours based on size with realistic caps
         if config.cleaning_time_per_sqft and property_size:
             estimated_hours = (property_size / 1000) * (config.cleaning_time_per_sqft / 60)
         else:
-            estimated_hours = max(2, property_size / 500)  # Default estimate
+            # Realistic time estimates based on property size
+            if property_size <= 800:
+                estimated_hours = 1.5  # Small apartment: 1.5 hours
+            elif property_size <= 1500:
+                estimated_hours = 2.5  # Medium home: 2.5 hours
+            elif property_size <= 2500:
+                estimated_hours = 3.5  # Large home: 3.5 hours
+            elif property_size > 2500:
+                estimated_hours = 4.0  # Very large home: max 4 hours
+            else:
+                estimated_hours = 2.0  # Default: 2 hours
         base_price = estimated_hours * config.hourly_rate
     elif pricing_model == "flat" and config.flat_rate:
         base_price = config.flat_rate
@@ -104,18 +127,37 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
             estimated_hours = 2
             logger.info(f"📊 Using flat_rate fallback: ${base_price}")
         elif config.hourly_rate and config.hourly_rate > 0:
-            estimated_hours = max(2, property_size / 500) if property_size > 0 else 2
+            # Realistic time estimates for fallback
+            if property_size > 0:
+                if property_size <= 800:
+                    estimated_hours = 1.5
+                elif property_size <= 1500:
+                    estimated_hours = 2.5
+                elif property_size <= 2500:
+                    estimated_hours = 3.5
+                else:
+                    estimated_hours = 4.0
+            else:
+                estimated_hours = 2.0  # Default when no property size
             base_price = estimated_hours * config.hourly_rate
             logger.info(f"📊 Using hourly_rate fallback: ${base_price}")
         elif config.rate_per_sqft and config.rate_per_sqft > 0 and property_size > 0:
             base_price = property_size * config.rate_per_sqft
-            estimated_hours = max(1, property_size / 500)
+            # Realistic time estimates based on property size
+            if property_size <= 800:
+                estimated_hours = 1.5
+            elif property_size <= 1500:
+                estimated_hours = 2.5
+            elif property_size <= 2500:
+                estimated_hours = 3.5
+            else:
+                estimated_hours = 4.0
             logger.info(f"📊 Using rate_per_sqft fallback: ${base_price}")
         elif config.rate_per_room and config.rate_per_room > 0:
-            # Estimate rooms from property size if not provided
-            rooms = num_rooms if num_rooms > 0 else max(1, property_size / 200) if property_size > 0 else 5
+            # Realistic room and time estimates
+            rooms = num_rooms if num_rooms > 0 else max(1, property_size / 300) if property_size > 0 else 4  # ~300 sqft per room average
             base_price = rooms * config.rate_per_room
-            estimated_hours = rooms * 0.5
+            estimated_hours = min(4.0, rooms * 0.5)  # Cap at 4 hours, 30 min per room
             logger.info(f"📊 Using rate_per_room fallback: ${base_price}")
     
     # Apply minimum charge
