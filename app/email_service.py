@@ -1477,9 +1477,81 @@ async def send_payment_thank_you_email(
     )
 
 
-async def send_pending_booking_notification(
-    provider_email: str,
-    provider_name: str,
+async def send_contract_cancelled_email(
+    client_email: str,
+    client_name: str,
+    contract_title: str,
+    business_name: str,
+    business_config=None
+) -> dict:
+    """Send contract cancellation notification to client"""
+    
+    subject = f"Contract Cancelled - {contract_title}"
+    
+    content = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9fafb;">
+        <div style="background-color: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            <!-- Header -->
+            <div style="text-align: center; margin-bottom: 30px;">
+                <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #ef4444, #dc2626); border-radius: 50%; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center;">
+                    <span style="color: white; font-size: 24px;">✕</span>
+                </div>
+                <h1 style="color: #1f2937; margin: 0; font-size: 24px; font-weight: 600;">Contract Cancelled</h1>
+            </div>
+            
+            <!-- Content -->
+            <div style="margin-bottom: 30px;">
+                <p style="color: #374151; font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
+                    Dear {client_name},
+                </p>
+                
+                <p style="color: #374151; font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
+                    We're writing to inform you that your service contract has been cancelled:
+                </p>
+                
+                <div style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                    <h3 style="color: #dc2626; margin: 0 0 10px 0; font-size: 18px;">Contract Details</h3>
+                    <p style="color: #7f1d1d; margin: 5px 0;"><strong>Contract:</strong> {contract_title}</p>
+                    <p style="color: #7f1d1d; margin: 5px 0;"><strong>Service Provider:</strong> {business_name}</p>
+                    <p style="color: #7f1d1d; margin: 5px 0;"><strong>Status:</strong> Cancelled</p>
+                </div>
+                
+                <p style="color: #374151; font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
+                    If you have any questions about this cancellation or would like to discuss future services, 
+                    please don't hesitate to contact us.
+                </p>
+                
+                <p style="color: #374151; font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
+                    Thank you for your understanding.
+                </p>
+            </div>
+            
+            <!-- Footer -->
+            <div style="border-top: 1px solid #e5e7eb; padding-top: 20px; text-align: center;">
+                <p style="color: #6b7280; font-size: 14px; margin: 0;">
+                    Best regards,<br>
+                    <strong>{business_name}</strong>
+                </p>
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <div style="text-align: center; margin-top: 20px;">
+            <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+                This is an automated notification from CleanEnroll
+            </p>
+        </div>
+    </div>
+    """
+    
+    return await send_email(
+        to=client_email,
+        subject=subject,
+        html_content=content,
+        business_config=business_config
+    )
+
+
     client_name: str,
     scheduled_date: str,
     start_time: str,

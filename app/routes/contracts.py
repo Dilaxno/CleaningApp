@@ -250,6 +250,37 @@ async def update_contract(
             )
         
         contract.status = data.status
+        
+        # Send email notification for contract cancellation
+        if data.status == "cancelled":
+            try:
+                client = db.query(Client).filter(Client.id == contract.client_id).first()
+                if client and client.email:
+                    # Update client status to cancelled as well
+                    client.status = "cancelled"
+                    
+                    # Get business config for email customization
+                    business_config = db.query(BusinessConfig).filter(
+                        BusinessConfig.user_id == current_user.id
+                    ).first()
+                    
+                    business_name = business_config.business_name if business_config and business_config.business_name else "CleanEnroll"
+                    
+                    from ..email_service import send_contract_cancelled_email
+                    await send_contract_cancelled_email(
+                        client_email=client.email,
+                        client_name=client.contact_name or client.business_name,
+                        contract_title=contract.title,
+                        business_name=business_name,
+                        business_config=business_config
+                    )
+                    logger.info(f"📧 Contract cancellation email sent to {client.email}")
+                    logger.info(f"👤 Client {client.id} status updated to cancelled")
+                else:
+                    logger.warning(f"⚠️ No email found for client {contract.client_id}, skipping cancellation notification")
+            except Exception as e:
+                logger.error(f"❌ Failed to send contract cancellation email: {e}")
+                # Don't fail the request if email fails
     if data.startDate is not None:
         contract.start_date = data.startDate
     if data.endDate is not None:
