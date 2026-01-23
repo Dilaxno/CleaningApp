@@ -18,9 +18,9 @@
 **Fix:** Added validation for all path parameters (alphanumeric, max length)
 
 ### 4. Missing Rate Limiting on Public Endpoints (MEDIUM)
-**Files:** `routes/waitlist.py`, `routes/trial.py`, `routes/clients.py`
+**Files:** `routes/trial.py`, `routes/clients.py`
 **Issue:** Public endpoints vulnerable to abuse/DOS
-**Fix:** Added rate limiting (5/min waitlist, 3/hr trial, 10/hr signing)
+**Fix:** Added rate limiting (3/hr trial, 10/hr signing)
 
 ### 5. File Upload Security (MEDIUM)
 **File:** `routes/upload.py`

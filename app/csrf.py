@@ -44,7 +44,6 @@ EXEMPT_PATHS: List[str] = [
     "/security",  # Security settings (authenticated via JWT)
     "/notifications",  # Notifications (authenticated via JWT)
     "/trial/",  # Trial endpoints (already rate-limited)
-    "/waitlist/",  # Waitlist signup (already rate-limited)
     "/health",  # Health check
     "/docs",  # API docs
     "/openapi.json",  # OpenAPI spec
