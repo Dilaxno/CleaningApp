@@ -31,18 +31,24 @@ def get_csp_policy() -> str:
     Generate Content-Security-Policy header value.
     
     This is configured for an API that serves JSON responses.
-    Adjusted to allow framing from frontend domains.
+    Adjusted to allow framing from frontend domains and Firebase authentication.
     """
     # Get frontend origins for frame-ancestors
     frontend_origins = FRONTEND_ORIGINS.split(",")
     frame_ancestors = " ".join(frontend_origins)
     
-    # For API backends, we use a restrictive CSP but allow framing from frontend
+    # For API backends, we use a restrictive CSP but allow necessary functionality
     directives = [
-        "default-src 'none'",  # Block everything by default
+        "default-src 'self'",  # Allow same-origin by default for API functionality
         f"frame-ancestors {frame_ancestors}",  # Allow embedding from frontend domains
+        "script-src 'self' https://apis.google.com https://accounts.google.com https://www.gstatic.com https://*.googleapis.com",  # Allow Google/Firebase auth scripts
+        "style-src 'self' https://accounts.google.com https://fonts.googleapis.com",  # Allow Google auth styles
+        "font-src 'self' https://fonts.gstatic.com",  # Allow Google fonts
+        "img-src 'self' data: https: https://www.google.com https://accounts.google.com",  # Allow Google auth images
+        "frame-src 'self' https://accounts.google.com https://*.firebaseapp.com",  # Allow Google/Firebase auth frames
+        "connect-src 'self' https://accounts.google.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.googleapis.com https://*.firebaseapp.com",  # Allow Firebase connections
         "base-uri 'none'",  # Prevent base tag injection
-        "form-action 'none'",  # Prevent form submissions
+        "form-action 'self'",  # Allow form submissions to same origin
     ]
     
     policy = "; ".join(directives)
