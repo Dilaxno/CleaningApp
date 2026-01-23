@@ -22,7 +22,8 @@ logger = logging.getLogger(__name__)
 
 # Environment-based configuration
 IS_PRODUCTION = os.getenv("ENVIRONMENT", "development").lower() == "production"
-FRONTEND_ORIGINS = os.getenv("FRONTEND_ORIGINS", "https://cleanenroll.com,https://www.cleanenroll.com")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+FRONTEND_ORIGINS = os.getenv("FRONTEND_ORIGINS", f"{FRONTEND_URL},https://cleanenroll.com,https://www.cleanenroll.com")
 
 
 def get_csp_policy() -> str:
@@ -30,18 +31,23 @@ def get_csp_policy() -> str:
     Generate Content-Security-Policy header value.
     
     This is configured for an API that serves JSON responses.
-    Adjust if your API serves HTML pages.
+    Adjusted to allow framing from frontend domains.
     """
-    # For API-only backends, we use a restrictive CSP
-    # Frontend apps should have their own CSP configured
+    # Get frontend origins for frame-ancestors
+    frontend_origins = FRONTEND_ORIGINS.split(",")
+    frame_ancestors = " ".join(frontend_origins)
+    
+    # For API backends, we use a restrictive CSP but allow framing from frontend
     directives = [
         "default-src 'none'",  # Block everything by default
-        "frame-ancestors 'none'",  # Prevent embedding (like X-Frame-Options)
+        f"frame-ancestors {frame_ancestors}",  # Allow embedding from frontend domains
         "base-uri 'none'",  # Prevent base tag injection
         "form-action 'none'",  # Prevent form submissions
     ]
     
-    return "; ".join(directives)
+    policy = "; ".join(directives)
+    logger.info(f"🔒 Generated CSP policy: {policy}")
+    return policy
 
 
 def get_permissions_policy() -> str:
@@ -93,10 +99,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         if any(path.startswith(excluded) for excluded in self.exclude_paths):
             return response
         
-        # X-Frame-Options: Prevent clickjacking
-        # DENY = never allow framing
-        # SAMEORIGIN = only allow same origin framing
-        response.headers["X-Frame-Options"] = "DENY"
+        # X-Frame-Options: Allow framing from same origin
+        # SAMEORIGIN allows framing from the same origin (frontend can embed API responses)
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
         
         # X-Content-Type-Options: Prevent MIME type sniffing
         # Browsers should trust the Content-Type header
@@ -150,7 +155,7 @@ def get_security_headers_dict() -> dict:
     Useful for adding headers to specific responses.
     """
     headers = {
-        "X-Frame-Options": "DENY",
+        "X-Frame-Options": "SAMEORIGIN",
         "X-Content-Type-Options": "nosniff",
         "X-XSS-Protection": "1; mode=block",
         "Referrer-Policy": "strict-origin-when-cross-origin",
