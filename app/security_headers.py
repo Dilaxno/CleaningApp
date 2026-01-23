@@ -41,9 +41,9 @@ def get_csp_policy() -> str:
     directives = [
         "default-src 'self'",  # Allow same-origin by default for API functionality
         f"frame-ancestors {frame_ancestors}",  # Allow embedding from frontend domains
-        "script-src 'self' https://apis.google.com https://accounts.google.com https://www.gstatic.com https://*.googleapis.com",  # Allow Google/Firebase auth scripts
-        "style-src 'self' https://accounts.google.com https://fonts.googleapis.com",  # Allow Google auth styles
-        "font-src 'self' https://fonts.gstatic.com",  # Allow Google fonts
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com https://accounts.google.com https://www.gstatic.com https://*.googleapis.com https://static.cloudflareinsights.com https://challenges.cloudflare.com https://player.vimeo.com data:",  # Allow Google/Firebase auth scripts, Cloudflare, and data URIs
+        "style-src 'self' 'unsafe-inline' https://accounts.google.com https://fonts.googleapis.com",  # Allow Google auth styles and inline styles
+        "font-src 'self' https://fonts.gstatic.com https://r2cdn.perplexity.ai",  # Allow Google fonts and Perplexity fonts
         "img-src 'self' data: https: https://www.google.com https://accounts.google.com",  # Allow Google auth images
         "frame-src 'self' https://accounts.google.com https://*.firebaseapp.com",  # Allow Google/Firebase auth frames
         "connect-src 'self' https://accounts.google.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.googleapis.com https://*.firebaseapp.com",  # Allow Firebase connections
