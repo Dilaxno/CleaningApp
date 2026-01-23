@@ -49,6 +49,7 @@ class UserUpdate(BaseModel):
     profilePictureUrl: Optional[str] = None
     accountType: Optional[str] = None
     hearAbout: Optional[str] = None
+    plan: Optional[str] = None
 
 
 class UserResponse(BaseModel):
@@ -214,6 +215,9 @@ def update_user(
             current_user.account_type = data.accountType
         if data.hearAbout is not None:
             current_user.hear_about = data.hearAbout
+        if data.plan is not None:
+            current_user.plan = data.plan
+            logger.info(f"📋 User plan updated to: {data.plan}")
 
         db.commit()
         db.refresh(current_user)
