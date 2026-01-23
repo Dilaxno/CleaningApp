@@ -1552,6 +1552,9 @@ async def send_contract_cancelled_email(
     )
 
 
+async def send_pending_booking_notification(
+    provider_email: str,
+    provider_name: str,
     client_name: str,
     scheduled_date: str,
     start_time: str,
@@ -1565,19 +1568,19 @@ async def send_contract_cancelled_email(
     <p>Hi {provider_name},</p>
     <p><strong>{client_name}</strong> has requested a cleaning appointment and is awaiting your approval.</p>
     
-    <div style="background: {THEME['background']}; border-radius: 12px; padding: 24px; margin: 24px 0;">
+    <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0;">
         <div style="margin-bottom: 16px;">
-            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">📅 Requested Date</div>
-            <div style="font-size: 16px; color: {THEME['text_primary']}; font-weight: 600;">{scheduled_date}</div>
+            <div style="color: #64748b; font-size: 13px; margin-bottom: 6px;">📅 Requested Date</div>
+            <div style="font-size: 16px; color: #1e293b; font-weight: 600;">{scheduled_date}</div>
         </div>
         <div style="margin-bottom: 16px;">
-            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">⏰ Time</div>
-            <div style="font-size: 16px; color: {THEME['text_primary']}; font-weight: 600;">{start_time} - {end_time}</div>
+            <div style="color: #64748b; font-size: 13px; margin-bottom: 6px;">⏰ Time</div>
+            <div style="font-size: 16px; color: #1e293b; font-weight: 600;">{start_time} - {end_time}</div>
         </div>
-        {f'<div style="margin-bottom: 16px;"><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 6px;">📍 Location</div><div style="font-size: 15px; color: {THEME["text_primary"]};">{property_address}</div></div>' if property_address else ''}
+        {f'<div style="margin-bottom: 16px;"><div style="color: #64748b; font-size: 13px; margin-bottom: 6px;">📍 Location</div><div style="font-size: 15px; color: #1e293b;">{property_address}</div></div>' if property_address else ''}
         <div>
-            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">👤 Client</div>
-            <div style="font-size: 15px; color: {THEME['text_primary']};">{client_name}</div>
+            <div style="color: #64748b; font-size: 13px; margin-bottom: 6px;">👤 Client</div>
+            <div style="font-size: 15px; color: #1e293b;">{client_name}</div>
         </div>
     </div>
     
@@ -1587,7 +1590,7 @@ async def send_contract_cancelled_email(
         </p>
     </div>
     
-    <p style="color: {THEME['text_muted']}; font-size: 14px;">
+    <p style="color: #64748b; font-size: 14px;">
         Visit your Schedule page to review and respond to this booking request.
     </p>
     """
@@ -1600,5 +1603,6 @@ async def send_contract_cancelled_email(
         content_html=content,
         cta_url=f"{FRONTEND_URL}/dashboard/schedule",
         cta_label="Review Request",
-        is_user_email=True
+        is_user_email=True,
+        business_config=None
     )
