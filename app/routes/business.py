@@ -38,7 +38,12 @@ class BusinessConfigCreate(BaseModel):
     hourlyRate: Optional[str] = None
     flatRate: Optional[str] = None
     minimumCharge: Optional[str] = None
+    # Legacy field - kept for backward compatibility
     cleaningTimePerSqft: Optional[str] = None
+    # New three-category time estimation system
+    timeSmallJob: Optional[str] = None
+    timeMediumJob: Optional[str] = None
+    timeLargeJob: Optional[str] = None
     cleanersSmallJob: Optional[str] = None
     cleanersLargeJob: Optional[str] = None
     bufferTime: Optional[str] = None
@@ -142,6 +147,9 @@ def get_current_user_business_config(current_user: User = Depends(get_current_us
         "flatRate": config.flat_rate,
         "minimumCharge": config.minimum_charge,
         "cleaningTimePerSqft": config.cleaning_time_per_sqft,
+        "timeSmallJob": config.time_small_job,
+        "timeMediumJob": config.time_medium_job,
+        "timeLargeJob": config.time_large_job,
         "cleanersSmallJob": config.cleaners_small_job,
         "cleanersLargeJob": config.cleaners_large_job,
         "bufferTime": config.buffer_time,
@@ -242,6 +250,13 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 existing.minimum_charge = to_float(data.minimumCharge)
             if is_provided(data.cleaningTimePerSqft):
                 existing.cleaning_time_per_sqft = to_int(data.cleaningTimePerSqft)
+            # New three-category time estimation system
+            if is_provided(data.timeSmallJob):
+                existing.time_small_job = to_float(data.timeSmallJob)
+            if is_provided(data.timeMediumJob):
+                existing.time_medium_job = to_float(data.timeMediumJob)
+            if is_provided(data.timeLargeJob):
+                existing.time_large_job = to_float(data.timeLargeJob)
             if is_provided(data.cleanersSmallJob):
                 existing.cleaners_small_job = to_int(data.cleanersSmallJob) or 1
             if is_provided(data.cleanersLargeJob):
@@ -310,6 +325,10 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 flat_rate=to_float(data.flatRate),
                 minimum_charge=to_float(data.minimumCharge),
                 cleaning_time_per_sqft=to_int(data.cleaningTimePerSqft),
+                # New three-category time estimation system
+                time_small_job=to_float(data.timeSmallJob),
+                time_medium_job=to_float(data.timeMediumJob),
+                time_large_job=to_float(data.timeLargeJob),
                 cleaners_small_job=to_int(data.cleanersSmallJob) or 1,
                 cleaners_large_job=to_int(data.cleanersLargeJob) or 2,
                 buffer_time=to_int(data.bufferTime) or 30,
@@ -402,6 +421,9 @@ def get_business_config(firebase_uid: str, db: Session = Depends(get_db)):
         "flatRate": config.flat_rate,
         "minimumCharge": config.minimum_charge,
         "cleaningTimePerSqft": config.cleaning_time_per_sqft,
+        "timeSmallJob": config.time_small_job,
+        "timeMediumJob": config.time_medium_job,
+        "timeLargeJob": config.time_large_job,
         "cleanersSmallJob": config.cleaners_small_job,
         "cleanersLargeJob": config.cleaners_large_job,
         "bufferTime": config.buffer_time,

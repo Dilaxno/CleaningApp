@@ -154,7 +154,12 @@ async def generate_trial_contract(
             'hourly_rate': None,
             'flat_rate': None,
             'minimum_charge': 75,
+            # Legacy field - kept for backward compatibility
             'cleaning_time_per_sqft': 90,
+            # New three-category time estimation system
+            'time_small_job': 1.5,  # 1.5 hours for small jobs
+            'time_medium_job': 2.5,  # 2.5 hours for medium jobs
+            'time_large_job': 4.0,   # 4 hours for large jobs
             'cleaners_small_job': 1,
             'cleaners_large_job': 2,
             'buffer_time': 30,

@@ -48,6 +48,42 @@ class ContractGenerateRequest(BaseModel):
     clientSignature: Optional[str] = None  # Base64 signature from client
 
 
+def calculate_estimated_hours(config: BusinessConfig, property_size: int) -> float:
+    """Calculate estimated hours using the new three-category system or fallback to legacy"""
+    
+    # Try new three-category system first
+    if config.time_small_job or config.time_medium_job or config.time_large_job:
+        if property_size < 1000 and config.time_small_job:
+            return config.time_small_job
+        elif 1500 <= property_size <= 2500 and config.time_medium_job:
+            return config.time_medium_job
+        elif property_size > 2500 and config.time_large_job:
+            return config.time_large_job
+        else:
+            # Interpolate or use closest available category
+            if property_size < 1000:
+                return config.time_small_job or config.time_medium_job or config.time_large_job or 1.5
+            elif property_size >= 2500:
+                return config.time_large_job or config.time_medium_job or config.time_small_job or 4.0
+            else:  # 1000-1499 or 2501+ without exact match
+                return config.time_medium_job or config.time_small_job or config.time_large_job or 2.5
+    
+    # Fallback to legacy system
+    elif config.cleaning_time_per_sqft and property_size:
+        return (property_size / 1000) * (config.cleaning_time_per_sqft / 60)
+    
+    # Final fallback to realistic estimates
+    else:
+        if property_size <= 800:
+            return 1.5  # Small apartment/condo: 1.5 hours
+        elif property_size <= 1500:
+            return 2.5  # Medium home: 2.5 hours
+        elif property_size <= 2500:
+            return 3.5  # Large home: 3.5 hours
+        else:
+            return 4.0  # Very large home: max 4 hours
+
+
 def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
     """Calculate quote based on business config and form data"""
     import logging
@@ -67,56 +103,20 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
     # Calculate base price based on pricing model
     if pricing_model == "sqft" and config.rate_per_sqft:
         base_price = property_size * config.rate_per_sqft
-        # Estimate time: cleaning_time_per_sqft is minutes per 1000 sqft
-        if config.cleaning_time_per_sqft:
-            estimated_hours = (property_size / 1000) * (config.cleaning_time_per_sqft / 60)
-        elif property_size > 0:
-            # Realistic cleaning time: 1-4 hours based on property size
-            if property_size <= 800:
-                estimated_hours = 1.5  # Small apartment/condo: 1.5 hours
-            elif property_size <= 1500:
-                estimated_hours = 2.5  # Medium home: 2.5 hours
-            elif property_size <= 2500:
-                estimated_hours = 3.5  # Large home: 3.5 hours
-            else:
-                estimated_hours = 4.0  # Very large home: max 4 hours
+        # Use new three-category time estimation system
+        estimated_hours = calculate_estimated_hours(config, property_size)
     elif pricing_model == "room" and config.rate_per_room:
         base_price = num_rooms * config.rate_per_room
-        # Estimate ~30 min per room, with realistic caps
-        if num_rooms > 0:
-            estimated_hours = min(4.0, num_rooms * 0.5)  # Cap at 4 hours max
-        elif property_size > 0:
-            # Realistic room estimation and time calculation
-            if property_size <= 800:
-                estimated_hours = 1.5  # Small apartment: 1.5 hours
-            elif property_size <= 1500:
-                estimated_hours = 2.5  # Medium home: 2.5 hours
-            elif property_size <= 2500:
-                estimated_hours = 3.5  # Large home: 3.5 hours
-            else:
-                estimated_hours = 4.0  # Very large home: max 4 hours
-        else:
-            estimated_hours = 2  # Default minimum
+        # Use new three-category time estimation system
+        estimated_hours = calculate_estimated_hours(config, property_size)
     elif pricing_model == "hourly" and config.hourly_rate:
-        # Estimate hours based on size with realistic caps
-        if config.cleaning_time_per_sqft and property_size:
-            estimated_hours = (property_size / 1000) * (config.cleaning_time_per_sqft / 60)
-        else:
-            # Realistic time estimates based on property size
-            if property_size <= 800:
-                estimated_hours = 1.5  # Small apartment: 1.5 hours
-            elif property_size <= 1500:
-                estimated_hours = 2.5  # Medium home: 2.5 hours
-            elif property_size <= 2500:
-                estimated_hours = 3.5  # Large home: 3.5 hours
-            elif property_size > 2500:
-                estimated_hours = 4.0  # Very large home: max 4 hours
-            else:
-                estimated_hours = 2.0  # Default: 2 hours
+        # Use new three-category time estimation system
+        estimated_hours = calculate_estimated_hours(config, property_size)
         base_price = estimated_hours * config.hourly_rate
     elif pricing_model == "flat" and config.flat_rate:
         base_price = config.flat_rate
-        estimated_hours = 2  # Default estimate for flat rate
+        # Use new three-category time estimation system
+        estimated_hours = calculate_estimated_hours(config, property_size)
     
     # If no pricing model matched or base_price is still 0, try fallbacks
     if base_price == 0:
@@ -906,6 +906,11 @@ async def generate_contract_html(
                 {f"<tr><td style='padding-top: 20px;'><strong>Contract Term</strong></td><td style='padding-top: 20px;'>{quote['term_duration']} {quote['term_unit']} ({quote['service_occurrences']} visits)</td><td style='text-align: right; padding-top: 20px;'></td></tr><tr class='total-row'><td><strong>Total Contract Value</strong></td><td>For entire {quote['term_duration']} {quote['term_unit'].lower()} term</td><td style='text-align: right;'><strong>USD ${quote['total_term_rate']:,.2f}</strong></td></tr>" if quote.get('total_term_rate') and not quote.get('quote_pending') else ""}
             </tbody>
         </table>
+        
+        {f'''<div style="background: #FEF3C7; border: 1px solid #F59E0B; border-radius: 6px; padding: 12px; margin-top: 16px; font-size: 9pt; color: #92400E;">
+            <strong>⚠️ Time Estimate Disclaimer:</strong> The estimated {quote['estimated_hours']} hours is based on similar jobs for this service provider and property size. Actual cleaning time may be shorter or longer depending on specific conditions, level of cleaning required, and property layout. This estimate is provided for planning purposes only.
+        </div>''' if not quote.get('quote_pending') else ""}
+        
         <p class="terms-note">Payment due within {payment_due_days} days of service completion. A {late_fee}% late fee applies after due date.</p>
     </div>
 

@@ -72,8 +72,18 @@ async def get_scheduling_info_by_client(
         # Fallback to property size calculation if quote calculation failed
         if estimated_duration == 150:  # Still default
             property_size = form_data.get('propertySize') or form_data.get('property_size')
-            if property_size and business_config and business_config.cleaning_time_per_sqft:
-                estimated_duration = max(60, int(property_size) * business_config.cleaning_time_per_sqft // 100)
+            if property_size and business_config:
+                # Try new three-category system first
+                property_size_int = int(property_size)
+                if property_size_int < 1000 and business_config.time_small_job:
+                    estimated_duration = int(business_config.time_small_job * 60)
+                elif 1500 <= property_size_int <= 2500 and business_config.time_medium_job:
+                    estimated_duration = int(business_config.time_medium_job * 60)
+                elif property_size_int > 2500 and business_config.time_large_job:
+                    estimated_duration = int(business_config.time_large_job * 60)
+                # Fallback to legacy system
+                elif business_config.cleaning_time_per_sqft:
+                    estimated_duration = max(60, int(property_size_int) * business_config.cleaning_time_per_sqft // 100)
                 logger.info(f"📊 Using property size estimated duration: {estimated_duration} minutes")
     
     # Get working hours from business config
@@ -684,8 +694,18 @@ async def get_public_scheduling_info(
             
             # Fallback to property size calculation
             property_size = form_data.get('propertySize') or form_data.get('property_size')
-            if property_size and business_config.cleaning_time_per_sqft:
-                estimated_duration = max(60, int(property_size) * business_config.cleaning_time_per_sqft // 100)
+            if property_size and business_config:
+                # Try new three-category system first
+                property_size_int = int(property_size)
+                if property_size_int < 1000 and business_config.time_small_job:
+                    estimated_duration = int(business_config.time_small_job * 60)
+                elif 1500 <= property_size_int <= 2500 and business_config.time_medium_job:
+                    estimated_duration = int(business_config.time_medium_job * 60)
+                elif property_size_int > 2500 and business_config.time_large_job:
+                    estimated_duration = int(business_config.time_large_job * 60)
+                # Fallback to legacy system
+                elif business_config.cleaning_time_per_sqft:
+                    estimated_duration = max(60, int(property_size_int) * business_config.cleaning_time_per_sqft // 100)
                 logger.info(f"📊 Using property size estimated duration: {estimated_duration} minutes")
     
     # Get working hours from business config
@@ -802,8 +822,18 @@ async def create_direct_booking(
             
             # Fallback to property size calculation
             property_size = form_data.get('propertySize') or form_data.get('property_size')
-            if property_size and business_config.cleaning_time_per_sqft:
-                estimated_duration = max(60, int(property_size) * business_config.cleaning_time_per_sqft // 100)
+            if property_size and business_config:
+                # Try new three-category system first
+                property_size_int = int(property_size)
+                if property_size_int < 1000 and business_config.time_small_job:
+                    estimated_duration = int(business_config.time_small_job * 60)
+                elif 1500 <= property_size_int <= 2500 and business_config.time_medium_job:
+                    estimated_duration = int(business_config.time_medium_job * 60)
+                elif property_size_int > 2500 and business_config.time_large_job:
+                    estimated_duration = int(business_config.time_large_job * 60)
+                # Fallback to legacy system
+                elif business_config.cleaning_time_per_sqft:
+                    estimated_duration = max(60, int(property_size_int) * business_config.cleaning_time_per_sqft // 100)
                 logger.info(f"📊 Using property size estimated duration: {estimated_duration} minutes")
     
     # Calculate end time

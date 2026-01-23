@@ -99,7 +99,12 @@ class BusinessConfig(Base):
     hourly_rate = Column(Float, nullable=True)
     flat_rate = Column(Float, nullable=True)
     minimum_charge = Column(Float, nullable=True)
+    # Legacy field - kept for backward compatibility
     cleaning_time_per_sqft = Column(Integer, nullable=True)
+    # New three-category time estimation system
+    time_small_job = Column(Float, nullable=True)  # Hours for jobs under 1,000 sqft
+    time_medium_job = Column(Float, nullable=True)  # Hours for jobs 1,500-2,500 sqft
+    time_large_job = Column(Float, nullable=True)  # Hours for jobs 2,500+ sqft
     cleaners_small_job = Column(Integer, default=1)
     cleaners_large_job = Column(Integer, default=2)
     buffer_time = Column(Integer, default=30)
