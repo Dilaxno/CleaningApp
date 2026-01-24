@@ -89,6 +89,8 @@ async def get_scheduling_info_by_client(
     # Get working hours from business config
     working_hours = {"start": "09:00", "end": "17:00"}
     working_days = ["monday", "tuesday", "wednesday", "thursday", "friday"]
+    day_schedules = None
+    off_work_periods = None
     buffer_time = 30  # Default 30 minutes between appointments
     
     if business_config:
@@ -96,6 +98,10 @@ async def get_scheduling_info_by_client(
             working_hours = business_config.working_hours
         if business_config.working_days:
             working_days = business_config.working_days
+        if business_config.day_schedules:
+            day_schedules = business_config.day_schedules
+        if business_config.off_work_periods:
+            off_work_periods = business_config.off_work_periods
         if business_config.buffer_time:
             buffer_time = business_config.buffer_time
     
@@ -129,6 +135,8 @@ async def get_scheduling_info_by_client(
         "estimated_duration": estimated_duration,
         "working_hours": working_hours,
         "working_days": working_days,
+        "day_schedules": day_schedules,
+        "off_work_periods": off_work_periods,
         "buffer_time": buffer_time,
         "meetings_required": meetings_required,
         "has_calendly": has_calendly
