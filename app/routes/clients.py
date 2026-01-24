@@ -495,6 +495,8 @@ class QuotePreviewResponse(BaseModel):
     basePrice: float
     discountPercent: float
     discountAmount: float
+    addonAmount: float = 0
+    addonDetails: List[dict] = []
     finalPrice: float
     estimatedHours: float
     cleaners: int
@@ -543,6 +545,8 @@ async def get_quote_preview(
             basePrice=0,
             discountPercent=0,
             discountAmount=0,
+            addonAmount=0,
+            addonDetails=[],
             finalPrice=0,
             estimatedHours=0,
             cleaners=1,
@@ -592,6 +596,8 @@ async def get_quote_preview(
         basePrice=quote['base_price'],
         discountPercent=quote['discount_percent'],
         discountAmount=quote['discount_amount'],
+        addonAmount=quote.get('addon_amount', 0),
+        addonDetails=quote.get('addon_details', []),
         finalPrice=quote['final_price'],
         estimatedHours=quote['estimated_hours'],
         cleaners=quote['cleaners'],

@@ -293,7 +293,11 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
     total_term_rate = None
     service_occurrences = None
     
-    if term_duration and frequency != "One-time":
+    # Check if this is a one-time service (no contract duration needed)
+    one_time_frequencies = ["One-time", "One-time deep clean", "Per turnover", "On-demand", "As needed"]
+    is_one_time = frequency in one_time_frequencies
+    
+    if term_duration and not is_one_time:
         try:
             duration_value = int(term_duration)
             # Convert term to months
@@ -448,7 +452,8 @@ async def generate_contract_html(
     
     # Smart start date logic based on service type
     frequency = quote["frequency"]
-    is_recurring = frequency not in ["One-time", "one-time"]
+    one_time_frequencies = ["One-time", "One-time deep clean", "Per turnover", "On-demand", "As needed", "one-time"]
+    is_recurring = frequency not in one_time_frequencies
     
     if is_recurring:
         # Recurring contracts: billing starts on signing date
@@ -899,7 +904,7 @@ async def generate_contract_html(
                 {"<tr><td>Frequency Discount</td><td>" + str(quote['discount_percent']) + "% off for " + frequency.lower() + " service</td><td style='text-align: right; color: #10B981;'>-USD $" + f"{quote['discount_amount']:,.2f}" + "</td></tr>" if quote['discount_amount'] > 0 else ""}
                 {"".join([f"<tr><td>{addon['name']}</td><td>{addon['quantity']} × ${addon['unit_price']:,.2f} {addon['pricing_metric']}</td><td style='text-align: right;'>USD ${addon['total_price']:,.2f}</td></tr>" for addon in quote.get('addon_details', [])]) if quote.get('addon_details') else ""}
                 <tr class="total-row">
-                    <td><strong>{"Total" if frequency in ["One-time", "one-time"] else "Total Per Visit"}</strong></td>
+                    <td><strong>{"Total" if frequency in ["One-time", "One-time deep clean", "Per turnover", "On-demand", "As needed", "one-time"] else "Total Per Visit"}</strong></td>
                     <td>{"Service provider will provide quote" if quote.get('quote_pending') else f"Estimated {quote['estimated_hours']} hours, {quote['cleaners']} cleaner(s)"}</td>
                     <td style="text-align: right;"><strong>{"Quote Pending" if quote.get('quote_pending') else f"USD ${quote['final_price']:,.2f}"}</strong></td>
                 </tr>
@@ -1143,7 +1148,7 @@ async def generate_contract_pdf(
             client_id=client.id,
             title=f"Service Agreement - {client.business_name}",
             description=f"Auto-generated contract for {quote['frequency']} cleaning service",
-            contract_type="recurring" if quote['frequency'] != "One-time" else "one-time",
+            contract_type="recurring" if quote['frequency'] not in ["One-time", "One-time deep clean", "Per turnover", "On-demand", "As needed", "one-time"] else "one-time",
             status="new",
             total_value=quote['final_price'],
             payment_terms=f"Net {config.payment_due_days or 15} days",

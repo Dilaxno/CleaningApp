@@ -592,7 +592,8 @@ async def auto_create_invoice_from_schedule(
     
     # Determine service type from client frequency
     service_type = client.frequency or "one-time"
-    is_recurring = service_type in ["weekly", "bi-weekly", "monthly"]
+    one_time_frequencies = ["one-time", "One-time", "One-time deep clean", "Per turnover", "On-demand", "As needed"]
+    is_recurring = service_type not in one_time_frequencies
     
     # Calculate addon amount from contract
     addon_amount = 0.0
