@@ -344,6 +344,9 @@ async def sign_contract_as_provider(
     
     # Log contract signature status for debugging
     logger.info(f"📋 Contract {contract_id} signature status: client_signature={bool(contract.client_signature)}, client_signature_timestamp={contract.client_signature_timestamp}")
+    if contract.client_signature:
+        logger.info(f"📋 Client signature format: {contract.client_signature[:100]}...")
+        logger.info(f"📋 Client signature is base64: {contract.client_signature.startswith('data:image')}")
     
     # Verify contract has client signature (check both signature and timestamp)
     if not contract.client_signature and not contract.client_signature_timestamp:
@@ -408,6 +411,11 @@ async def sign_contract_as_provider(
         # Get form data for regeneration
         form_data = client.form_data if client.form_data else {}
         quote = calculate_quote(business_config, form_data)
+        
+        # Debug the signatures being passed to HTML generation
+        logger.info(f"🖊️ [PROVIDER SIGN] About to generate HTML with:")
+        logger.info(f"🖊️ [PROVIDER SIGN] Client signature: {'SET (' + str(len(contract.client_signature)) + ' chars)' if contract.client_signature else 'NOT SET'}")
+        logger.info(f"🖊️ [PROVIDER SIGN] Provider signature: {'SET (' + str(len(signature_to_use)) + ' chars)' if signature_to_use else 'NOT SET'}")
         
         # Generate HTML with both signatures - use contract's created_at for consistent dates
         html = await generate_contract_html(

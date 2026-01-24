@@ -436,14 +436,20 @@ async def generate_contract_html(
     if client_signature:
         if client_signature.startswith("data:image"):
             # Already base64, use as-is
-            pass
+            logger.info("✅ Client signature is already base64 format")
         elif client_signature.startswith("http"):
             # Download from URL
+            logger.info(f"📥 Downloading client signature from URL: {client_signature[:100]}...")
             client_signature_b64 = await download_image_as_base64(client_signature)
             if client_signature_b64:
                 client_signature = client_signature_b64
                 logger.info("✅ Client signature downloaded and converted to base64")
+            else:
+                logger.warning("⚠️ Failed to download client signature from URL")
         # else: assume it's already in correct format
+        logger.info(f"📝 Final client signature format: {client_signature[:50]}...")
+    else:
+        logger.info("ℹ️ No client signature provided")
     
     # Contract details - use passed date or current date for new contracts
     base_date = contract_created_at or datetime.now()
@@ -502,8 +508,25 @@ async def generate_contract_html(
     logger.info(f"🖊️ [BEFORE TEMPLATE] Client client_signature: {'SET (' + str(len(client_signature)) + ' chars)' if client_signature else 'NOT SET (None)'}")
     if signature_url:
         logger.info(f"🖊️ [BEFORE TEMPLATE] Provider sig preview: {signature_url[:100]}...")
+        logger.info(f"🖊️ [BEFORE TEMPLATE] Provider sig is base64: {signature_url.startswith('data:image')}")
     if client_signature:
         logger.info(f"🖊️ [BEFORE TEMPLATE] Client sig preview: {client_signature[:100]}...")
+        logger.info(f"🖊️ [BEFORE TEMPLATE] Client sig is base64: {client_signature.startswith('data:image')}")
+    
+    # Prepare signature HTML fragments
+    provider_signature_html = ""
+    if signature_url:
+        provider_signature_html = f"<img src='{signature_url}' alt='Provider Signature'>"
+        logger.info(f"🖊️ [TEMPLATE] Provider signature HTML prepared: {len(provider_signature_html)} chars")
+    else:
+        logger.info("🖊️ [TEMPLATE] No provider signature - HTML will be empty")
+    
+    client_signature_html = ""
+    if client_signature:
+        client_signature_html = f"<img src='{client_signature}' alt='Client Signature'>"
+        logger.info(f"🖊️ [TEMPLATE] Client signature HTML prepared: {len(client_signature_html)} chars")
+    else:
+        logger.info("🖊️ [TEMPLATE] No client signature - HTML will be empty")
     
     html = f"""
 <!DOCTYPE html>
@@ -963,7 +986,7 @@ async def generate_contract_html(
         <div class="signature-box">
             <h4>Service Provider</h4>
             <div class="signature-line">
-                {"<img src='" + signature_url + "' alt='Provider Signature'>" if signature_url else ""}
+                {provider_signature_html}
             </div>
             <div class="signature-name">{business_name}</div>
             <div class="signature-role">Authorized Representative</div>
@@ -971,7 +994,7 @@ async def generate_contract_html(
         <div class="signature-box">
             <h4>Client</h4>
             <div class="signature-line">
-                {"<img src='" + client_signature + "' alt='Client Signature'>" if client_signature else ""}
+                {client_signature_html}
             </div>
             <div class="signature-name">{client_name}</div>
             <div class="signature-role">Client Representative</div>
