@@ -213,7 +213,7 @@ BASE_TEMPLATE = """
           box-sizing: border-box;
         }
         img.logo { 
-          max-width: 120px !important;
+          max-width: 160px !important;
           height: auto !important;
         }
         h1 {
@@ -250,7 +250,7 @@ BASE_TEMPLATE = """
       <!-- Logo -->
       <div style="text-align:center; margin-bottom:8px;">
         <a href="https://cleanenroll.com" target="_blank" style="text-decoration:none;">
-          <img class="logo" src="{{ logo_url }}" width="140" alt="CleanEnroll" 
+          <img class="logo" src="{{ logo_url }}" width="180" alt="CleanEnroll" 
                style="display:block; height:auto; border:0; margin:0 auto;" />
         </a>
       </div>
