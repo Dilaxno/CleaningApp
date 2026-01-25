@@ -1090,7 +1090,7 @@ async def html_to_pdf(html: str) -> bytes:
                 input=html_b64,
                 capture_output=True,
                 text=True,
-                timeout=120,  # 120 second timeout for slow systems
+                timeout=30,  # 30 second timeout (optimized Playwright)
                 creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
             )
             

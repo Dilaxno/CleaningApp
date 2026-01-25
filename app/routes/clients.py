@@ -894,142 +894,56 @@ async def sign_contract(
         client.status = "new_lead"
         logger.info(f"✅ Client status updated from pending_signature to new_lead: client_id={client.id}")
     
-    # Upload client signature to R2 for PDF rendering
-    client_signature_url = None
-    if data.signature and data.signature.startswith("data:image"):
-        try:
-            import base64
-            import uuid
-            # Extract base64 data from data URL
-            header, encoded = data.signature.split(",", 1)
-            signature_bytes = base64.b64decode(encoded)
-            
-            # Upload to R2
-            signature_key = f"signatures/clients/{user.firebase_uid}/{uuid.uuid4()}.png"
-            r2_client = get_r2_client()
-            r2_client.put_object(
-                Bucket=R2_BUCKET_NAME,
-                Key=signature_key,
-                Body=signature_bytes,
-                ContentType="image/png"
-            )
-            
-            # Generate presigned URL (7 days max for R2)
-            client_signature_url = generate_presigned_url(signature_key, expiration=604800)  # 7 days
-            logger.info(f"✅ Client signature uploaded to R2: {signature_key}")
-        except Exception as sig_err:
-            logger.warning(f"⚠️ Failed to upload client signature to R2: {sig_err}")
-    
-    # Regenerate PDF with client signature
+    # Queue PDF regeneration as background job (don't block the response!)
+    logger.info(f"📄 Queueing PDF regeneration for contract {contract.id}")
     try:
-        config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
+        from arq import create_pool
+        from ..worker import get_redis_settings
         
-        if config and client.form_data:
-            form_data = client.form_data
-            
-            # Log old PDF key
-            old_pdf_key = contract.pdf_key
-            logger.info(f"📄 Old PDF key: {old_pdf_key}")
-            
-            # Calculate quote for regeneration
-            from .contracts_pdf import calculate_quote
-            quote = calculate_quote(config, form_data)
-            
-            # Get provider signature URL if exists
-            provider_signature_url = None
-            if contract.provider_signature and contract.provider_signature.startswith("data:image"):
-                # Provider signature is base64, need to upload it too if not already done
-                provider_signature_url = contract.provider_signature
-            
-            # Generate HTML with signature URLs - use contract's created_at for consistent dates
-            html = await generate_contract_html(
-                config, 
-                client, 
-                form_data, 
-                quote,
-                client_signature=client_signature_url or data.signature,  # Use URL if available
-                provider_signature=provider_signature_url,
-                contract_created_at=contract.created_at
-            )
-            
-            # Verify signature URL is in HTML
-            if client_signature_url and client_signature_url in html:
-                logger.info("✅ Client signature URL IS in generated HTML")
-            elif data.signature in html:
-                logger.info("✅ Client signature (base64) IS in generated HTML")
-            else:
-                logger.warning("⚠️ Client signature NOT found in generated HTML!")
-            
-            # Generate PDF
-            pdf_bytes = await html_to_pdf(html)
-            
-            # Calculate new PDF hash
-            pdf_hash = hashlib.sha256(pdf_bytes).hexdigest()
-            
-            # Upload updated PDF to R2
-            pdf_key = f"contracts/{user.firebase_uid}/{client.id}-signed-{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
-            
-            try:
-                r2_client = get_r2_client()
-                r2_client.put_object(
-                    Bucket=R2_BUCKET_NAME,
-                    Key=pdf_key,
-                    Body=pdf_bytes,
-                    ContentType="application/pdf"
-                )
-                
-                contract.pdf_key = pdf_key
-                contract.pdf_hash = pdf_hash
-                
-                logger.info(f"✅ Signed contract PDF uploaded: {pdf_key}")
-                logger.info(f"📝 Updated contract.pdf_key from {old_pdf_key} to {pdf_key}")
-            except Exception as upload_err:
-                logger.warning(f"⚠️ Failed to upload signed PDF: {upload_err}")
-                
-    except Exception as pdf_err:
-        logger.warning(f"⚠️ Failed to regenerate signed PDF: {pdf_err}")
+        redis_settings = get_redis_settings()
+        pool = await create_pool(redis_settings)
+        
+        job = await pool.enqueue_job(
+            'regenerate_contract_pdf_task',
+            contract.id
+        )
+        
+        logger.info(f"✅ PDF regeneration queued: job_id={job.job_id}")
+    except Exception as queue_err:
+        logger.error(f"⚠️ Failed to queue PDF regeneration: {queue_err}")
+        # Don't fail the signature if queueing fails
     
     db.commit()
     db.refresh(contract)
     
     logger.info(f"✅ Contract signed by client: contract_id={contract.id}")
     
-    # Generate backend URL for the new signed PDF (avoids CORS issues)
-    signed_pdf_url = None
-    if contract.pdf_key:
-        try:
-            from ..config import FRONTEND_URL
-            # Determine the backend base URL based on the frontend URL
-            if "localhost" in FRONTEND_URL:
-                backend_base = FRONTEND_URL.replace("localhost:5173", "localhost:8000").replace("localhost:5174", "localhost:8000")
-            else:
-                backend_base = "https://api.cleanenroll.com"
-            
-            signed_pdf_url = f"{backend_base}/contracts/pdf/public/{contract.public_id}"
-            logger.info(f"✅ Generated backend URL for signed contract PDF")
-        except Exception as url_err:
-            logger.warning(f"⚠️ Failed to generate backend URL: {url_err}")
-    
-    # Send notification to business owner
+    # Send notification to business owner (async, don't block)
     try:
         config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
         business_name = config.business_name if config else "Your Business"
         
         if user.email:
-            await send_contract_signed_notification(
+            # Fire and forget - don't await
+            import asyncio
+            asyncio.create_task(
+                send_contract_signed_notification(
                 to=user.email,
                 business_name=business_name,
                 client_name=client.contact_name or client.business_name,
                 contract_title=contract.title,
+                )
             )
-            logger.info(f"📧 Contract signed notification sent to: {user.email}")
+            logger.info(f"📧 Contract signed notification queued for: {user.email}")
     except Exception as email_err:
         logger.warning(f"⚠️ Failed to send contract signed notification: {email_err}")
     
+    # Return immediately - PDF is being generated in background
     return {
         "success": True,
-        "message": "Contract signed successfully. Awaiting service provider signature.",
-        "signedPdfUrl": signed_pdf_url
+        "message": "Contract signed successfully. PDF is being generated.",
+        "contract_id": contract.id,
+        "contract_public_id": str(contract.public_id)
     }
 
 
