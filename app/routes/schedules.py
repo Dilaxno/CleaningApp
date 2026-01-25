@@ -321,6 +321,21 @@ async def approve_schedule(
          
         db.commit()
         logger.info(f"✅ Schedule {schedule_id} confirmed - provider will handle payments manually")
+        
+        # Send confirmation email to client
+        if client and client.email:
+            try:
+                await email_service.send_appointment_confirmed_to_client(
+                    client_email=client.email,
+                    client_name=client.business_name or client.contact_name or "Client",
+                    provider_name=current_user.full_name or current_user.email,
+                    confirmed_date=schedule.scheduled_date,
+                    confirmed_start_time=schedule.start_time,
+                    confirmed_end_time=schedule.end_time
+                )
+                logger.info(f"✅ Sent confirmation email to client {client.email}")
+            except Exception as e:
+                logger.error(f"⚠️ Failed to send confirmation email: {str(e)}")
 
         return {"message": "Schedule accepted", "schedule_id": schedule_id}
     
