@@ -12,6 +12,8 @@ from .upload import generate_presigned_url
 
 logger = logging.getLogger(__name__)
 
+router = APIRouter()
+
 
 class BusinessConfigCreate(BaseModel):
     firebaseUid: str
@@ -628,7 +630,9 @@ def get_public_business_info(firebase_uid: str, db: Session = Depends(get_db)):
                 f"⚠️ Failed to parse off_work_periods for {firebase_uid}: {e}"
             )
         except Exception as e:
-            logger.warning(f"⚠️ Failed to parse off_work_periods for {firebase_uid}: {e}")
+            logger.warning(
+                f"⚠️ Failed to parse off_work_periods for {firebase_uid}: {e}"
+            )
     return {
         "business_name": config.business_name or "Business",
         "working_hours": working_hours,
