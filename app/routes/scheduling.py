@@ -753,6 +753,31 @@ async def get_public_scheduling_info(
     elif user:
         business_name = user.full_name or "Service Provider"
     
+    # Check if provider has Calendly and requires consultations
+    from ..models import CalendlyIntegration
+    calendly_integration = db.query(CalendlyIntegration).filter(
+        CalendlyIntegration.user_id == contract.user_id
+    ).first()
+    
+    consultation_required = False
+    consultation_booking_url = None
+    
+    if calendly_integration and business_config and business_config.meetings_required:
+        consultation_required = True
+        # Generate Calendly booking URL with client prefill
+        if calendly_integration.default_event_type_url:
+            from ..services.calendly_service import CalendlyService
+            calendly_service = CalendlyService()
+            prefill_data = {
+                "name": client.contact_name or client.business_name,
+                "email": client.email,
+                "phone": client.phone
+            }
+            consultation_booking_url = calendly_service.generate_scheduling_link(
+                calendly_integration.default_event_type_url,
+                prefill_data
+            )
+    
     return {
         "contract_id": contract.id,
         "contract_public_id": contract.public_id,
@@ -766,7 +791,9 @@ async def get_public_scheduling_info(
         "day_schedules": day_schedules,
         "off_work_periods": off_work_periods,
         "buffer_time": buffer_time,
-        "status": contract.status
+        "status": contract.status,
+        "consultation_required": consultation_required,
+        "consultation_booking_url": consultation_booking_url
     }
 
 

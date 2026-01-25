@@ -108,10 +108,32 @@ async def calendly_oauth_callback(
             logger.info(f"✅ Created new Calendly integration for user {current_user.id}")
         
         db.commit()
+        db.refresh(integration)
+        
+        # Auto-select first event type as default
+        try:
+            event_types_data = await calendly_service.list_event_types(
+                token_data["access_token"],
+                user_info["resource"]["uri"]
+            )
+            
+            event_types = event_types_data.get("collection", [])
+            if event_types:
+                # Set first event type as default
+                first_event = event_types[0]
+                integration.default_event_type_uri = first_event.get("uri")
+                integration.default_event_type_name = first_event.get("name")
+                integration.default_event_type_url = first_event.get("scheduling_url")
+                db.commit()
+                logger.info(f"✅ Auto-selected default event type: {first_event.get('name')}")
+        except Exception as event_err:
+            logger.warning(f"⚠️ Failed to auto-select event type: {event_err}")
+            # Don't fail the connection if event type selection fails
         
         return {
             "message": "Calendly connected successfully",
-            "email": user_info["resource"]["email"]
+            "email": user_info["resource"]["email"],
+            "default_event_set": integration.default_event_type_uri is not None
         }
     
     except Exception as e:
@@ -333,3 +355,39 @@ async def get_client_scheduling_link(
         "event_type_name": integration.default_event_type_name,
         "client_name": client.business_name
     }
+
+
+@router.delete("/events/{event_uuid}")
+async def cancel_calendly_event(
+    event_uuid: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Cancel a Calendly event (consultation)"""
+    integration = db.query(CalendlyIntegration).filter(
+        CalendlyIntegration.user_id == current_user.id
+    ).first()
+    
+    if not integration:
+        raise HTTPException(status_code=404, detail="Calendly not connected")
+    
+    # Ensure token is fresh
+    access_token = await _ensure_fresh_token(integration, db)
+    
+    try:
+        # Cancel the event via Calendly API
+        await calendly_service.cancel_event(
+            access_token,
+            event_uuid,
+            reason="Cancelled by provider"
+        )
+        
+        logger.info(f"✅ Cancelled Calendly event {event_uuid} for user {current_user.id}")
+        
+        return {"message": "Consultation cancelled successfully"}
+    except Exception as e:
+        logger.error(f"❌ Failed to cancel Calendly event {event_uuid}: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Failed to cancel consultation: {str(e)}"
+        )
