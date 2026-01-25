@@ -48,7 +48,7 @@ class ContractGenerateRequest(BaseModel):
 
 def calculate_estimated_hours(config: BusinessConfig, property_size: int) -> float:
     """Calculate estimated hours using the new three-category system or fallback to legacy"""
-    
+
     # Try new three-category system first
     if config.time_small_job or config.time_medium_job or config.time_large_job:
         if property_size < 1000 and config.time_small_job:
@@ -65,11 +65,11 @@ def calculate_estimated_hours(config: BusinessConfig, property_size: int) -> flo
                 return config.time_large_job or config.time_medium_job or config.time_small_job or 4.0
             else:  # 1000-1499 or 2501+ without exact match
                 return config.time_medium_job or config.time_small_job or config.time_large_job or 2.5
-    
+
     # Fallback to legacy system
     elif config.cleaning_time_per_sqft and property_size:
         return (property_size / 1000) * (config.cleaning_time_per_sqft / 60)
-    
+
     # Final fallback to realistic estimates
     else:
         if property_size <= 800:
@@ -85,16 +85,16 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
     """Calculate quote based on business config and form data"""
     import logging
     logger = logging.getLogger(__name__)
-    
+
     pricing_model = config.pricing_model
     property_size = int(form_data.get("squareFootage", 0) or 0)
     num_rooms = int(form_data.get("numberOfOffices", 0) or form_data.get("numberOfRooms", 0) or 0)
     frequency = form_data.get("cleaningFrequency", "Weekly")
     logger.info(f"📊 Config rates - sqft: {config.rate_per_sqft}, room: {config.rate_per_room}, hourly: {config.hourly_rate}, flat: {config.flat_rate}")
-    
+
     base_price = 0.0
     estimated_hours = 0.0
-    
+
     # Calculate base price based on pricing model
     if pricing_model == "sqft" and config.rate_per_sqft:
         base_price = property_size * config.rate_per_sqft
@@ -112,7 +112,7 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
         base_price = config.flat_rate
         # Use new three-category time estimation system
         estimated_hours = calculate_estimated_hours(config, property_size)
-    
+
     # If no pricing model matched or base_price is still 0, try fallbacks
     if base_price == 0:
         logger.warning(f"⚠️ Base price is 0 - trying fallback rates")
@@ -224,13 +224,13 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
                 if addon_id in selected_addons:
                     unit_price = float(custom_addon.get("price", 0))
                     pricing_metric = custom_addon.get("pricingMetric", "per service")
-                    
+
                     # For "per service" or "flat rate", quantity is always 1
                     if pricing_metric in ["per service", "flat rate"]:
                         quantity = 1
                     else:
                         quantity = addon_quantities.get(addon_id, 1)
-                    
+
                     addon_price = unit_price * quantity
                     addon_total += addon_price
                     addon_details.append({
@@ -241,7 +241,7 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
                         "pricing_metric": pricing_metric
                     })
     logger.info(f"📊 Total add-ons: ${addon_total}")
-    
+
     # Apply frequency discount to base price only (not add-ons)
     discount_percent = 0
     if frequency == "Weekly" and config.discount_weekly:
@@ -250,32 +250,32 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
         discount_percent = config.discount_monthly
     elif frequency == "Monthly" and config.discount_long_term:
         discount_percent = config.discount_long_term
-    
+
     discount_amount = base_price * (discount_percent / 100) if discount_percent else 0
     discounted_base_price = base_price - discount_amount
     final_price = discounted_base_price + addon_total
-    
+
     # Determine number of cleaners
     cleaners = config.cleaners_small_job or 1
     if property_size > 2000:
         cleaners = config.cleaners_large_job or 2
-    
+
     # Calculate term duration total if provided (for recurring services)
     term_duration = form_data.get("contractTermDuration")
     term_unit = form_data.get("contractTermUnit", "Months")
     total_term_rate = None
     service_occurrences = None
-    
+
     # Check if this is a one-time service (no contract duration needed)
     one_time_frequencies = ["One-time", "One-time deep clean", "Per turnover", "On-demand", "As needed"]
     is_one_time = frequency in one_time_frequencies
-    
+
     if term_duration and not is_one_time:
         try:
             duration_value = int(term_duration)
             # Convert term to months
             duration_months = duration_value if term_unit == "Months" else duration_value * 12
-            
+
             # Calculate number of service occurrences based on frequency
             if frequency == "Daily":
                 # Approximate 22 working days per month
@@ -296,15 +296,15 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
                 service_occurrences = duration_months * 4
             else:
                 service_occurrences = duration_months * 4  # Default to weekly
-            
+
             total_term_rate = final_price * service_occurrences
         except (ValueError, TypeError):
             pass
-    
+
     # Ensure minimum values for display
     if estimated_hours < 1:
         estimated_hours = 1.0
-    
+
     # If still no price, set a flag for "quote pending"
     quote_pending = base_price == 0 and final_price == 0
     return {
@@ -335,24 +335,26 @@ async def generate_contract_html(
     contract_created_at: Optional[datetime] = None
 ) -> str:
     """Generate HTML for the contract"""
-    
+
     # Debug logging for business config pricing
     logger.info(f"🖼️ Business config branding - name: {business_config.business_name}, logo: {business_config.logo_url}")
-    
+
     # Warn if all pricing fields are NULL
     if not any([business_config.rate_per_sqft, business_config.rate_per_room, business_config.hourly_rate, business_config.flat_rate]):
         logger.warning(f"⚠️ ALL PRICING FIELDS ARE NULL for user_id: {business_config.user_id} - user needs to update pricing in Settings")
-    
+
     # Debug logging for signatures - INPUT
     if client_signature:
+        pass  # Client signature provided
     if provider_signature:
+        pass  # Provider signature provided
     # Get branding
     business_name = business_config.business_name or "Cleaning Service"
     logo_url = None
     signature_url = None
-    
+
     logger.info(f"🏢 Business config - name: {business_name}, logo_url key: {business_config.logo_url}")
-    
+
     # Download and convert logo to base64 for Playwright
     if business_config.logo_url:
         try:
@@ -387,7 +389,7 @@ async def generate_contract_html(
             if signature_url:
         except Exception as e:
             logger.warning(f"⚠️ Failed to generate signature URL: {e}")
-    
+
     # Download and convert client signature to base64
     if client_signature:
         if client_signature.startswith("data:image"):
@@ -406,12 +408,12 @@ async def generate_contract_html(
     base_date = contract_created_at or datetime.now()
     contract_date = base_date.strftime("%B %d, %Y")
     contract_number = f"CLN-{base_date.strftime('%Y%m%d')}-{client.id:04d}"
-    
+
     # Smart start date logic based on service type
     frequency = quote["frequency"]
     one_time_frequencies = ["One-time", "One-time deep clean", "Per turnover", "On-demand", "As needed", "one-time"]
     is_recurring = frequency not in one_time_frequencies
-    
+
     if is_recurring:
         # Recurring contracts: billing starts on signing date
         start_date = base_date.strftime("%B %d, %Y")
@@ -420,36 +422,36 @@ async def generate_contract_html(
         # One-time/deep cleans: align with service date (typically 7 days out)
         start_date = (base_date + timedelta(days=7)).strftime("%B %d, %Y")
         start_date_note = "Agreement effective on scheduled service date."
-    
+
     payment_due_days = business_config.payment_due_days or 15
     late_fee = business_config.late_fee_percent or 1.5
     cancellation_window = business_config.cancellation_window or 24
-    
+
     # Client info
     client_name = client.contact_name or client.business_name
     client_email = client.email or ""
     client_phone = client.phone or ""
     client_address = form_data.get("billingAddress", "") or form_data.get("address", "")
-    
+
     # Property details
     property_size = form_data.get("squareFootage", "N/A")
     property_type = client.property_type or "Commercial"
-    
+
     # Special requests from client form
     special_requests = form_data.get("specialRequests", "").strip() if form_data.get("specialRequests") else None
     if special_requests == "":
         special_requests = None
-    
+
     # Service details (frequency already extracted above for start_date logic)
     # Combine standard and custom inclusions/exclusions
     standard_inclusions = business_config.standard_inclusions or []
     custom_inclusions = business_config.custom_inclusions or []
     inclusions = standard_inclusions + custom_inclusions
-    
+
     standard_exclusions = business_config.standard_exclusions or []
     custom_exclusions = business_config.custom_exclusions or []
     exclusions = standard_exclusions + custom_exclusions
-    
+
     # Build inclusions/exclusions HTML
     inclusions_html = "".join([f"<li>{item}</li>" for item in inclusions]) if inclusions else "<li>Standard cleaning services</li>"
     exclusions_html = "".join([f"<li>{item}</li>" for item in exclusions]) if exclusions else "<li>None specified</li>"
@@ -458,7 +460,7 @@ async def generate_contract_html(
         logger.info(f"🖊️ [BEFORE TEMPLATE] Provider sig is base64: {signature_url.startswith('data:image')}")
     if client_signature:
         logger.info(f"🖊️ [BEFORE TEMPLATE] Client sig is base64: {client_signature.startswith('data:image')}")
-    
+
     # Prepare signature HTML fragments
     provider_signature_html = ""
     if signature_url:
@@ -749,7 +751,7 @@ async def generate_contract_html(
             font-style: italic;
             margin-top: 8px;
         }}
-        
+
         /* Print-specific styles */
         @media print {{
             * {{
@@ -788,10 +790,10 @@ async def generate_contract_html(
 
     <!-- Contract Title -->
     <div class="contract-title">Service Agreement</div>
-    
+
     <!-- Contract Intro -->
     <p class="contract-intro">
-        This Service Agreement (the "Agreement") is made and entered into on <strong>{contract_date}</strong> 
+        This Service Agreement (the "Agreement") is made and entered into on <strong>{contract_date}</strong>
         by and between <strong>{business_name}</strong> ("Service Provider") and <strong>{client_name}</strong> ("Client").
         <br/><span style="color: #94A3B8; font-size: 9pt;">Contract #{contract_number}</span>
     </p>
@@ -800,7 +802,7 @@ async def generate_contract_html(
     <div class="section">
         <div class="section-title"><span class="section-number">1.</span>Purpose</div>
         <p class="section-content">
-            The purpose of this Agreement is to outline the terms and conditions for the cleaning and maintenance services 
+            The purpose of this Agreement is to outline the terms and conditions for the cleaning and maintenance services
             to be provided by <strong>{business_name}</strong> ("Service Provider") to <strong>{client_name}</strong> ("Client").
         </p>
     </div>
@@ -849,7 +851,7 @@ async def generate_contract_html(
     <div class="section">
         <div class="section-title"><span class="section-number">5.</span>Payment and Pricing</div>
         <p class="section-content" style="margin-bottom: 12px;">
-            The Client will pay the Service Provider the total agreed sum, outlined in the pricing below, for 
+            The Client will pay the Service Provider the total agreed sum, outlined in the pricing below, for
             the completion of the scope of work outlined in this Agreement.
         </p>
         <table class="pricing-table">
@@ -874,11 +876,11 @@ async def generate_contract_html(
                 {f"<tr><td style='padding-top: 20px;'><strong>Contract Term</strong></td><td style='padding-top: 20px;'>{quote['term_duration']} {quote['term_unit']} ({quote['service_occurrences']} visits)</td><td style='text-align: right; padding-top: 20px;'></td></tr><tr class='total-row'><td><strong>Total Contract Value</strong></td><td>For entire {quote['term_duration']} {quote['term_unit'].lower()} term</td><td style='text-align: right;'><strong>USD ${quote['total_term_rate']:,.2f}</strong></td></tr>" if quote.get('total_term_rate') and not quote.get('quote_pending') else ""}
             </tbody>
         </table>
-        
+
         {f'''<div style="background: #FEF3C7; border: 1px solid #F59E0B; border-radius: 6px; padding: 12px; margin-top: 16px; font-size: 9pt; color: #92400E;">
             <strong>⚠️ Time Estimate Disclaimer:</strong> The estimated {quote['estimated_hours']} hours is based on similar jobs for this service provider and property size. Actual cleaning time may be shorter or longer depending on specific conditions, level of cleaning required, and property layout. This estimate is provided for planning purposes only.
         </div>''' if not quote.get('quote_pending') else ""}
-        
+
         <p class="terms-note">Payment due within {payment_due_days} days of service completion. A {late_fee}% late fee applies after due date.</p>
     </div>
 
@@ -888,20 +890,20 @@ async def generate_contract_html(
         <p class="section-content">
             This Agreement will begin on the date of acceptance and will remain in effect until all services have been completed.
         </p>
-        
+
         <h4 style="margin-top: 16px; margin-bottom: 8px; color: #000000; font-size: 11pt;">Payment Terms</h4>
         <ul class="bullet-list">
             <li><strong>Payment Due:</strong> Payment is due within {payment_due_days} days of service completion</li>
             <li><strong>Late Fee:</strong> A {late_fee}% late fee will be applied to any balance not paid by the due date</li>
             <li><strong>Accepted Methods:</strong> Payment may be made via check, bank transfer, or other agreed-upon methods</li>
         </ul>
-        
+
         <h4 style="margin-top: 16px; margin-bottom: 8px; color: #000000; font-size: 11pt;">Cancellation Policy</h4>
         <ul class="bullet-list">
             <li><strong>Notice Required:</strong> {cancellation_window}-hour advance notice is required for cancellations</li>
             <li><strong>Late Cancellation:</strong> Cancellations made with less than {cancellation_window} hours notice may be subject to a cancellation fee</li>
         </ul>
-        
+
         <h4 style="margin-top: 16px; margin-bottom: 8px; color: #000000; font-size: 11pt;">General Terms</h4>
         <ul class="bullet-list">
             <li><strong>Access:</strong> Client agrees to provide necessary access to the property</li>
@@ -958,32 +960,32 @@ async def download_image_as_base64(url: str) -> str:
     """
     import httpx
     import base64
-    
+
     if not url:
         logger.warning("⚠️ download_image_as_base64 called with empty URL")
         return None
-    
+
     try:
         logger.info(f"📥 Downloading image from: {url[:100]}...")
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.get(url)
             logger.info(f"📥 Response status: {response.status_code}, content-type: {response.headers.get('content-type')}")
             response.raise_for_status()
-            
+
             # Determine content type
             content_type = response.headers.get('content-type', 'image/png')
-            
+
             # Handle content types that might have charset
             if ';' in content_type:
                 content_type = content_type.split(';')[0].strip()
-            
+
             # Convert to base64
             image_bytes = response.content
             if len(image_bytes) == 0:
                 logger.warning("⚠️ Downloaded image has 0 bytes")
                 return None
             b64_encoded = base64.b64encode(image_bytes).decode('utf-8')
-            
+
             # Return as data URL
             return f"data:{content_type};base64,{b64_encoded}"
     except httpx.HTTPStatusError as e:
@@ -1006,18 +1008,18 @@ async def html_to_pdf(html: str) -> bytes:
     import subprocess
     import sys
     import os
-    
+
     # Get the path to the pdf_worker script
     worker_path = os.path.join(os.path.dirname(__file__), '..', 'pdf_worker.py')
     worker_path = os.path.abspath(worker_path)
-    
+
     # Get the correct Python executable from the venv
     # sys.executable should point to the venv python when running from uvicorn
     python_exe = sys.executable
-    
+
     # Encode HTML as base64 to safely pass via stdin
     html_b64 = base64.b64encode(html.encode('utf-8')).decode('utf-8')
-    
+
     def run_worker():
         # Run the worker script as a separate process
         try:
@@ -1029,10 +1031,10 @@ async def html_to_pdf(html: str) -> bytes:
                 timeout=120,  # 120 second timeout for slow systems
                 creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
             )
-            
+
             if result.returncode != 0:
                 raise Exception(f"PDF worker failed (exit {result.returncode}): {result.stderr}")
-            
+
             # Decode the base64 PDF from stdout
             pdf_b64 = result.stdout.strip()
             if not pdf_b64:
@@ -1042,14 +1044,14 @@ async def html_to_pdf(html: str) -> bytes:
             raise Exception("PDF generation timed out after 120 seconds")
         except Exception as e:
             raise Exception(f"PDF generation error: {str(e)}")
-    
+
     # Run in thread pool to not block the event loop
     return await asyncio.to_thread(run_worker)
 
 def upload_pdf_to_r2(pdf_bytes: bytes, owner_uid: str, contract_id: int) -> str:
     """Upload PDF to R2 and return the key"""
     key = f"contracts/{owner_uid}/{contract_id}-{uuid.uuid4()}.pdf"
-    
+
     r2 = get_r2_client()
     r2.put_object(
         Bucket=R2_BUCKET_NAME,
@@ -1057,7 +1059,7 @@ def upload_pdf_to_r2(pdf_bytes: bytes, owner_uid: str, contract_id: int) -> str:
         Body=pdf_bytes,
         ContentType="application/pdf",
     )
-    
+
     return key
 
 @router.post("/generate-pdf")
@@ -1071,32 +1073,32 @@ async def generate_contract_pdf(
         user = db.query(User).filter(User.firebase_uid == data.ownerUid).first()
         if not user:
             raise HTTPException(status_code=404, detail="Business not found")
-        
+
         # Get business config
         config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
         if not config:
             raise HTTPException(status_code=404, detail="Business configuration not found")
-        
+
         # Get client
         client = db.query(Client).filter(Client.id == data.clientId).first()
         if not client:
             raise HTTPException(status_code=404, detail="Client not found")
-        
+
         # Calculate quote
         quote = calculate_quote(config, data.formData)
-        
+
         # Generate HTML
         html = await generate_contract_html(
-            config, 
-            client, 
-            data.formData, 
+            config,
+            client,
+            data.formData,
             quote,
             client_signature=data.clientSignature
         )
-        
+
         # Generate PDF
         pdf_bytes = await html_to_pdf(html)
-        
+
         # Create contract record first to get the ID
         contract = Contract(
             user_id=user.id,
@@ -1111,12 +1113,12 @@ async def generate_contract_pdf(
         db.add(contract)
         db.commit()
         db.refresh(contract)
-        
+
         # Upload PDF to R2 and store the key
         pdf_key = upload_pdf_to_r2(pdf_bytes, data.ownerUid, contract.id)
         contract.pdf_key = pdf_key
         db.commit()
-        
+
         # Generate backend URL instead of presigned R2 URL to avoid CORS issues
         from ..config import FRONTEND_URL
         # Determine the backend base URL based on the frontend URL
@@ -1124,7 +1126,7 @@ async def generate_contract_pdf(
             backend_base = FRONTEND_URL.replace("localhost:5173", "localhost:8000").replace("localhost:5174", "localhost:8000")
         else:
             backend_base = "https://api.cleanenroll.com"
-        
+
         backend_pdf_url = f"{backend_base}/contracts/pdf/public/{contract.public_id}"
         return {
             "contractId": contract.id,
@@ -1132,7 +1134,7 @@ async def generate_contract_pdf(
             "pdfUrl": backend_pdf_url,
             "message": "Contract generated successfully"
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -1150,13 +1152,13 @@ async def get_contract_pdf(
         Contract.id == contract_id,
         Contract.user_id == current_user.id
     ).first()
-    
+
     if not contract:
         raise HTTPException(status_code=404, detail="Contract not found")
-    
+
     if not contract.pdf_key:
         raise HTTPException(status_code=404, detail="No PDF available for this contract")
-    
+
     try:
         # Generate backend URL instead of presigned R2 URL to avoid CORS issues
         from ..config import FRONTEND_URL
@@ -1165,9 +1167,9 @@ async def get_contract_pdf(
             backend_base = FRONTEND_URL.replace("localhost:5173", "localhost:8000").replace("localhost:5174", "localhost:8000")
         else:
             backend_base = "https://api.cleanenroll.com"
-        
+
         backend_pdf_url = f"{backend_base}/contracts/pdf/public/{contract.public_id}"
-        
+
         return {
             "url": backend_pdf_url,
             "contractId": contract.id,
@@ -1195,18 +1197,18 @@ async def download_contract_pdf(
         Contract.id == contract_id,
         Contract.user_id == current_user.id
     ).first()
-    
+
     if not contract:
         raise HTTPException(status_code=404, detail="Contract not found")
-    
+
     if not contract.pdf_key:
         raise HTTPException(status_code=404, detail="No PDF available for this contract")
-    
+
     try:
         r2 = get_r2_client()
         response = r2.get_object(Bucket=R2_BUCKET_NAME, Key=contract.pdf_key)
         pdf_bytes = response['Body'].read()
-        
+
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",
@@ -1236,23 +1238,23 @@ async def view_contract_pdf_public(
     from .contracts import validate_uuid
     if not validate_uuid(contract_public_id):
         raise HTTPException(status_code=400, detail="Invalid contract ID format")
-    
+
     contract = db.query(Contract).filter(Contract.public_id == contract_public_id).first()
-    
+
     if not contract:
         raise HTTPException(status_code=404, detail="Contract not found")
-    
+
     if not contract.pdf_key:
         raise HTTPException(status_code=404, detail="No PDF available for this contract")
-    
+
     # Apply per-contract rate limit
     await rate_limit_per_contract(request, contract.id)
-    
+
     try:
         r2 = get_r2_client()
         response = r2.get_object(Bucket=R2_BUCKET_NAME, Key=contract.pdf_key)
         pdf_bytes = response['Body'].read()
-        
+
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",
@@ -1279,19 +1281,19 @@ async def preview_contract(
     user = db.query(User).filter(User.firebase_uid == owner_uid).first()
     if not user:
         raise HTTPException(status_code=404, detail="Business not found")
-    
+
     config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
     if not config:
         raise HTTPException(status_code=404, detail="Business configuration not found")
-    
+
     client = db.query(Client).filter(Client.id == client_id).first()
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
-    
+
     # Get form data from client
     form_data = client.form_data if client.form_data else {}
-    
+
     quote = calculate_quote(config, form_data)
     html = await generate_contract_html(config, client, form_data, quote)
-    
+
     return Response(content=html, media_type="text/html")
