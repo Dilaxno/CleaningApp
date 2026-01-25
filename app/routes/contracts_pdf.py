@@ -1090,7 +1090,7 @@ async def html_to_pdf(html: str) -> bytes:
                 input=html_b64,
                 capture_output=True,
                 text=True,
-                timeout=30,  # 30 second timeout (optimized Playwright)
+                timeout=60,  # 60 second timeout with buffer for complex contracts
                 creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
             )
             
@@ -1103,7 +1103,7 @@ async def html_to_pdf(html: str) -> bytes:
                 raise Exception("PDF worker returned empty output")
             return base64.b64decode(pdf_b64)
         except subprocess.TimeoutExpired:
-            raise Exception("PDF generation timed out after 120 seconds")
+            raise Exception("PDF generation timed out after 60 seconds")
         except Exception as e:
             raise Exception(f"PDF generation error: {str(e)}")
     
