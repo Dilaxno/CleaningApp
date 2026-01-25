@@ -22,6 +22,7 @@ class BusinessConfigCreate(BaseModel):
     logoUrl: Optional[str] = None
     signatureUrl: Optional[str] = None
     onboardingComplete: Optional[bool] = None
+    formEmbeddingEnabled: Optional[bool] = None
     # Pricing
     pricingModel: Optional[str] = None
     meetingsRequired: Optional[bool] = None
@@ -99,6 +100,30 @@ def is_provided(val) -> bool:
     return True
 
 
+@router.get("/public/{firebase_uid}")
+def get_public_business_info(firebase_uid: str, db: Session = Depends(get_db)):
+    """Get public business info for embedding (no authentication required)"""
+    logger.info(f"📥 Getting public business info for firebase_uid: {firebase_uid}")
+
+    # Find user by firebase_uid
+    user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
+    if not user:
+        logger.warning(f"⚠️ User not found for firebase_uid: {firebase_uid}")
+        raise HTTPException(status_code=404, detail="Business not found")
+
+    # Get business config
+    config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
+    if not config:
+        logger.warning(f"⚠️ Business config not found for user_id: {user.id}")
+        raise HTTPException(status_code=404, detail="Business not found")
+
+    # Return only public information
+    return {
+        "businessName": config.business_name,
+        "formEmbeddingEnabled": config.form_embedding_enabled,
+    }
+
+
 @router.get("")
 def get_current_user_business_config(
     current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
@@ -137,6 +162,7 @@ def get_current_user_business_config(
         "signatureKey": config.signature_url,
         "signatureUrl": signature_presigned_url,
         "onboardingComplete": config.onboarding_complete,
+        "formEmbeddingEnabled": config.form_embedding_enabled,
         "pricingModel": config.pricing_model,
         "meetingsRequired": config.meetings_required,
         "paymentHandling": config.payment_handling,
@@ -214,6 +240,8 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 existing.signature_url = data.signatureUrl
             if data.onboardingComplete is not None:
                 existing.onboarding_complete = data.onboardingComplete
+            if data.formEmbeddingEnabled is not None:
+                existing.form_embedding_enabled = data.formEmbeddingEnabled
             if is_provided(data.pricingModel):
                 existing.pricing_model = data.pricingModel
             if data.meetingsRequired is not None:
@@ -311,6 +339,7 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 logo_url=data.logoUrl,
                 signature_url=data.signatureUrl,
                 onboarding_complete=data.onboardingComplete,
+                form_embedding_enabled=data.formEmbeddingEnabled,
                 pricing_model=data.pricingModel,
                 meetings_required=data.meetingsRequired,
                 payment_handling=data.paymentHandling,

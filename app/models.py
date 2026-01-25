@@ -159,6 +159,9 @@ class BusinessConfig(Base):
     )  # Hex color code for brand (e.g., #00C4B4)
     signature_url = Column(String(500), nullable=True)
     onboarding_complete = Column(Boolean, default=False)
+    form_embedding_enabled = Column(
+        Boolean, default=False
+    )  # Whether owner wants iframe embedding for full automation
     pricing_model = Column(String(50), nullable=True)  # sqft, room, hourly, flat
     meetings_required = Column(
         Boolean, default=False
