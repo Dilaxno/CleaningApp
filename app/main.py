@@ -54,57 +54,49 @@ SECURITY_HEADERS_ENABLED = os.getenv("SECURITY_HEADERS_ENABLED", "true").lower()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Create tables
-    logger.info("🚀 Starting up...")
+    logger.info("Application starting up...")
     try:
         Base.metadata.create_all(bind=engine, checkfirst=True)
-        logger.info("✅ Database tables created")
+        logger.info("Database tables created successfully")
     except Exception as e:
-        logger.error(f"❌ Failed to create tables: {e}")
+        logger.error(f"Failed to create database tables: {e}")
     
-    # Test Redis connection for rate limiting
     try:
         from .rate_limiter import get_redis_client
         redis_client = get_redis_client()
-        logger.info("✅ Redis rate limiting is ready")
+        logger.info("Redis connection established")
     except Exception as e:
-        logger.warning(f"⚠️ Redis connection failed - Rate limiting will operate in fail-open mode: {e}")
+        logger.warning(f"Redis connection failed - Rate limiting will operate in fail-open mode: {e}")
     
     yield
-    # Shutdown
-    logger.info("👋 Shutting down...")
+    logger.info("Application shutting down...")
 
 
 app = FastAPI(title="CleanEnroll API", version="1.0.0", lifespan=lifespan)
 
 
-# Request logging middleware
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
-    logger.info(f"➡️  {request.method} {request.url.path}")
     try:
         response = await call_next(request)
-        logger.info(f"✅ {request.method} {request.url.path} - {response.status_code}")
         return response
     except Exception as e:
-        logger.error(f"❌ {request.method} {request.url.path} - Error: {str(e)}")
+        logger.error(f"{request.method} {request.url.path} - Error: {str(e)}")
         raise
 
 
-# Security Headers Middleware (adds X-Frame-Options, CSP, etc.)
 if SECURITY_HEADERS_ENABLED:
     app.add_middleware(SecurityHeadersMiddleware, exclude_paths=["/health", "/docs", "/openapi.json"])
-    logger.info("🔒 Security headers enabled")
+    logger.info("Security headers enabled")
 else:
-    logger.warning("⚠️ Security headers DISABLED - only use in development!")
+    logger.warning("Security headers DISABLED - only use in development!")
 
 
-# CSRF Protection Middleware (disabled by default until frontend integration)
 if CSRF_ENABLED:
     app.add_middleware(CSRFMiddleware)
-    logger.info("🔒 CSRF protection enabled")
+    logger.info("CSRF protection enabled")
 else:
-    logger.info("ℹ️ CSRF protection disabled - set CSRF_ENABLED=true to enable")
+    logger.info("CSRF protection disabled")
 
 
 # CORS - must expose csrf_token cookie and allow X-CSRF-Token header

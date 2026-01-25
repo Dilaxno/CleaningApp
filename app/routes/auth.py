@@ -53,27 +53,22 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 # In-memory OTP storage (in production, use Redis or database)
 otp_storage: dict = {}
 
-
 class RequestOTPRequest(BaseModel):
     email: str
     turnstileToken: Optional[str] = None
 
-
 class VerifyOTPRequest(BaseModel):
     email: str
     otp: str
-
 
 class ResetPasswordRequest(BaseModel):
     email: str
     otp: str
     new_password: str
 
-
 class RecoveryMethodsRequest(BaseModel):
     email: str
     turnstileToken: Optional[str] = None
-
 
 class RecoveryMethodsResponse(BaseModel):
     has_totp: bool
@@ -83,17 +78,14 @@ class RecoveryMethodsResponse(BaseModel):
     recovery_email_hint: Optional[str] = None
     phone_hint: Optional[str] = None
 
-
 class VerifyRecoveryRequest(BaseModel):
     email: str
     method: str  # "totp", "phone", "recovery_email", "backup_code"
     code: str
 
-
 def generate_otp() -> str:
     """Generate a 6-digit OTP"""
     return ''.join(random.choices(string.digits, k=6))
-
 
 def mask_email(email: str) -> str:
     """Mask email for privacy: jo***@gm***.com"""
@@ -105,23 +97,19 @@ def mask_email(email: str) -> str:
     masked_domain = domain_parts[0][:2] + "***" if len(domain_parts[0]) > 2 else domain_parts[0][0] + "***"
     return f"{masked_local}@{masked_domain}.{domain_parts[-1]}"
 
-
 def mask_phone(phone: str) -> str:
     """Mask phone for privacy: ***-***-1234"""
     if not phone or len(phone) < 4:
         return "***-***-****"
     return f"***-***-{phone[-4:]}"
 
-
 def decrypt_backup_codes(encrypted_codes: List[str]) -> List[str]:
     """Decrypt backup codes"""
     return [cipher.decrypt(code.encode()).decode() for code in encrypted_codes]
 
-
 def encrypt_backup_codes(codes: List[str]) -> List[str]:
     """Encrypt backup codes before storing"""
     return [cipher.encrypt(code.encode()).decode() for code in codes]
-
 
 # Rate limiters
 rate_limit_password_reset = create_rate_limiter(
@@ -130,7 +118,6 @@ rate_limit_password_reset = create_rate_limiter(
     key_prefix="password_reset",
     use_ip=True
 )
-
 
 @router.post("/request-otp")
 async def request_password_reset_otp(
@@ -146,7 +133,6 @@ async def request_password_reset_otp(
         is_valid = await verify_turnstile(data.turnstileToken, client_ip)
         if not is_valid:
             raise HTTPException(status_code=400, detail="CAPTCHA verification failed")
-        logger.info(f"✅ Turnstile verified for password reset request from IP: {client_ip}")
     else:
         logger.warning("⚠️ No Turnstile token provided for password reset request")
     
@@ -188,7 +174,6 @@ async def request_password_reset_otp(
     
     return {"message": "If an account exists with this email, you will receive an OTP code."}
 
-
 @router.post("/verify-otp")
 async def verify_otp(data: VerifyOTPRequest):
     """Verify OTP code"""
@@ -216,7 +201,6 @@ async def verify_otp(data: VerifyOTPRequest):
     stored["verified"] = True
     
     return {"message": "OTP verified successfully", "verified": True}
-
 
 @router.post("/reset-password")
 async def reset_password(
@@ -265,7 +249,6 @@ async def reset_password(
         "success": True
     }
 
-
 # ==================== Account Recovery with 2FA ====================
 
 @router.post("/recovery/methods", response_model=RecoveryMethodsResponse)
@@ -302,7 +285,6 @@ async def get_recovery_methods(
         recovery_email_hint=mask_email(user.recovery_email) if user.recovery_email_verified else None,
         phone_hint=mask_phone(user.phone_number) if user.phone_2fa_enabled else None
     )
-
 
 @router.post("/recovery/send-code")
 async def send_recovery_code(
@@ -349,7 +331,6 @@ async def send_recovery_code(
         logger.info(f"Recovery code sent to recovery email for: {user.email}")
     
     return {"message": "If recovery methods are available, a code has been sent."}
-
 
 @router.post("/recovery/verify")
 async def verify_recovery_method(
@@ -457,12 +438,10 @@ async def verify_recovery_method(
     
     raise HTTPException(status_code=400, detail="Verification failed")
 
-
 @router.get("/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
     """Get current authenticated user"""
     return current_user
-
 
 @router.patch("/me", response_model=UserResponse)
 async def update_me(

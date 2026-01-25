@@ -17,13 +17,11 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/scheduling-calendly", tags=["scheduling-calendly"])
 calendly_service = CalendlyService()
 
-
 class CalendlyBookingInfo(BaseModel):
     """Info needed for Calendly booking widget"""
     booking_url: str
     provider_name: str
     business_name: str
-
 
 @router.get("/booking-info/{client_id}", response_model=CalendlyBookingInfo)
 async def get_booking_info(
@@ -42,9 +40,6 @@ async def get_booking_info(
         if not client:
             logger.error(f"❌ Client not found: client_id={client_id}")
             raise HTTPException(status_code=404, detail="Client not found")
-        
-        logger.info(f"✅ Found client {client_id}, user_id={client.user_id}")
-        
         # Get service provider's Calendly integration
         logger.info(f"🔍 Looking up Calendly integration for user_id: {client.user_id}")
         integration = db.query(CalendlyIntegration).filter(
@@ -57,9 +52,6 @@ async def get_booking_info(
                 status_code=404,
                 detail="Service provider has not connected Calendly"
             )
-        
-        logger.info(f"✅ Found Calendly integration for user {client.user_id}")
-        
         if not integration.default_event_type_url:
             logger.error(f"❌ Calendly integration exists but default_event_type_url is not set for user_id={client.user_id}")
             raise HTTPException(
@@ -77,9 +69,6 @@ async def get_booking_info(
             integration.default_event_type_url,
             prefill_data
         )
-        
-        logger.info(f"📅 Generated Calendly booking URL for client {client_id}")
-        
         return CalendlyBookingInfo(
             booking_url=booking_url,
             provider_name=integration.calendly_user_email or "Your Service Provider",
@@ -91,7 +80,6 @@ async def get_booking_info(
     except Exception as e:
         logger.error(f"❌ Error getting booking info: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @router.get("/client-preferences/{client_id}")
 async def get_client_preferences(
@@ -130,7 +118,6 @@ async def get_client_preferences(
     except Exception as e:
         logger.error(f"❌ Error getting client preferences: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @router.post("/webhook")
 async def calendly_webhook(
@@ -178,9 +165,6 @@ async def calendly_webhook(
                 client.scheduling_status = "client_selected"
                 
                 db.commit()
-                
-                logger.info(f"✅ Updated client {client.id} with scheduled time: {start_time} - {end_time}")
-                
                 # TODO: Send notification to provider about client's selected time
                 
                 return {
@@ -205,8 +189,6 @@ async def calendly_webhook(
                 client.calendly_event_id = None
                 client.scheduling_status = "pending"
                 db.commit()
-                
-                logger.info(f"✅ Cleared scheduling for client {client.id}")
                 return {"status": "success", "action": "cleared"}
         
         return {"status": "success", "event": event_type}

@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/schedules", tags=["Schedules"])
 
-
 class ScheduleCreate(BaseModel):
     clientId: int
     title: str
@@ -29,7 +28,6 @@ class ScheduleCreate(BaseModel):
     isRecurring: Optional[bool] = False
     recurrencePattern: Optional[str] = None
 
-
 class ScheduleUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
@@ -45,7 +43,6 @@ class ScheduleUpdate(BaseModel):
     price: Optional[float] = None
     isRecurring: Optional[bool] = None
     recurrencePattern: Optional[str] = None
-
 
 class ScheduleResponse(BaseModel):
     id: int
@@ -79,7 +76,6 @@ class ScheduleResponse(BaseModel):
 
     class Config:
         from_attributes = True
-
 
 @router.get("", response_model=List[ScheduleResponse])
 async def get_schedules(
@@ -130,7 +126,6 @@ async def get_schedules(
         ))
     return result
 
-
 @router.post("", response_model=ScheduleResponse)
 async def create_schedule(
     data: ScheduleCreate,
@@ -165,8 +160,6 @@ async def create_schedule(
     db.add(schedule)
     db.commit()
     db.refresh(schedule)
-    
-    logger.info(f"✅ Schedule created: id={schedule.id}")
     return ScheduleResponse(
         id=schedule.id,
         clientId=schedule.client_id,
@@ -187,7 +180,6 @@ async def create_schedule(
         recurrencePattern=schedule.recurrence_pattern,
         createdAt=schedule.created_at
     )
-
 
 @router.patch("/{schedule_id}", response_model=ScheduleResponse)
 async def update_schedule(
@@ -255,7 +247,6 @@ async def update_schedule(
         createdAt=schedule.created_at
     )
 
-
 @router.delete("/{schedule_id}")
 async def delete_schedule(
     schedule_id: int,
@@ -271,13 +262,11 @@ async def delete_schedule(
     db.commit()
     return {"message": "Schedule deleted"}
 
-
 class ScheduleApprovalRequest(BaseModel):
     action: str  # 'accept' or 'request_change'
     proposedDate: Optional[datetime] = None
     proposedStartTime: Optional[str] = None
     proposedEndTime: Optional[str] = None
-
 
 @router.post("/{schedule_id}/approve")
 async def approve_schedule(
@@ -315,13 +304,9 @@ async def approve_schedule(
         client = db.query(Client).filter(Client.id == schedule.client_id).first()
         if client:
             client.status = "scheduled"
-            logger.info(f"✅ Updated client {client.id} status to 'scheduled'")
-        
         # Note: Contract status stays as 'signed' - 'scheduled' is a client status, not contract status
          
         db.commit()
-        logger.info(f"✅ Schedule {schedule_id} confirmed - provider will handle payments manually")
-        
         # Send confirmation email to client
         if client and client.email:
             try:
@@ -333,7 +318,6 @@ async def approve_schedule(
                     confirmed_start_time=schedule.start_time,
                     confirmed_end_time=schedule.end_time
                 )
-                logger.info(f"✅ Sent confirmation email to client {client.email}")
             except Exception as e:
                 logger.error(f"⚠️ Failed to send confirmation email: {str(e)}")
 
@@ -369,7 +353,6 @@ async def approve_schedule(
                     schedule_id=schedule_id,
                     client_id=client.id
                 )
-                logger.info(f"✅ Sent change request email to client {client.email}")
             except Exception as e:
                 logger.error(f"⚠️ Failed to send change request email: {str(e)}")
         
@@ -384,7 +367,6 @@ async def approve_schedule(
     else:
         raise HTTPException(status_code=400, detail="Invalid action")
 
-
 # ============================================
 # PUBLIC ENDPOINTS - Client Schedule Response
 # ============================================
@@ -398,12 +380,10 @@ def generate_schedule_token(schedule_id: int, client_id: int) -> str:
     data = f"{schedule_id}:{client_id}:cleanenroll_schedule_secret"
     return hashlib.sha256(data.encode()).hexdigest()[:32]
 
-
 def verify_schedule_token(schedule_id: int, client_id: int, token: str) -> bool:
     """Verify the schedule response token"""
     expected_token = generate_schedule_token(schedule_id, client_id)
     return secrets.compare_digest(expected_token, token)
-
 
 class PublicScheduleProposalResponse(BaseModel):
     id: int
@@ -417,10 +397,8 @@ class PublicScheduleProposalResponse(BaseModel):
     proposedEndTime: str
     status: str
 
-
 class ClientAcceptRequest(BaseModel):
     token: str
-
 
 class ClientCounterRequest(BaseModel):
     token: str
@@ -428,7 +406,6 @@ class ClientCounterRequest(BaseModel):
     preferred_start_time: str
     preferred_end_time: str
     reason: str
-
 
 @router.get("/public/proposal/{schedule_id}")
 async def get_public_schedule_proposal(
@@ -466,7 +443,6 @@ async def get_public_schedule_proposal(
         proposedEndTime=schedule.proposed_end_time or "",
         status=schedule.approval_status or "pending"
     )
-
 
 @router.post("/public/proposal/{schedule_id}/accept")
 async def client_accept_proposal(
@@ -508,13 +484,9 @@ async def client_accept_proposal(
     # Update client status to 'scheduled'
     if client:
         client.status = "scheduled"
-        logger.info(f"✅ Updated client {client.id} status to 'scheduled'")
-    
     # Note: Contract status stays as 'signed' - 'scheduled' is a client status, not contract status
     
     db.commit()
-    logger.info(f"✅ Schedule {schedule_id} confirmed (public flow) - provider will handle payments manually")
-    
     # Send confirmation email to provider
     if user and user.email:
         try:
@@ -527,7 +499,6 @@ async def client_accept_proposal(
                 accepted_end_time=schedule.end_time,
                 schedule_id=schedule_id
             )
-            logger.info(f"✅ Sent acceptance notification to provider {user.email}")
         except Exception as e:
             logger.error(f"⚠️ Failed to send acceptance email: {str(e)}")
     
@@ -535,7 +506,6 @@ async def client_accept_proposal(
         "message": "Proposal accepted", 
         "schedule_id": schedule_id
     }
-
 
 @router.post("/public/proposal/{schedule_id}/counter")
 async def client_counter_proposal(
@@ -593,7 +563,6 @@ async def client_counter_proposal(
                 client_reason=request.reason,
                 schedule_id=schedule_id
             )
-            logger.info(f"✅ Sent counter-proposal notification to provider {user.email}")
         except Exception as e:
             logger.error(f"⚠️ Failed to send counter-proposal email: {str(e)}")
     

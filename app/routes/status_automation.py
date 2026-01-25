@@ -14,7 +14,6 @@ from typing import Dict
 
 router = APIRouter(prefix="/status", tags=["status"])
 
-
 class StatusSummary(BaseModel):
     new: int
     signed: int
@@ -23,12 +22,10 @@ class StatusSummary(BaseModel):
     cancelled: int
     completed: int
 
-
 class AutomationResult(BaseModel):
     scheduled_to_active: int
     active_to_completed: int
     total_updated: int
-
 
 @router.get("/analytics", response_model=StatusSummary)
 async def get_status_analytics(
@@ -61,7 +58,6 @@ async def get_status_analytics(
             summary[status] = count
     
     return StatusSummary(**summary)
-
 
 @router.post("/automation/run", response_model=AutomationResult)
 async def run_status_automation(

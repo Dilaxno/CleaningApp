@@ -20,7 +20,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/invoices", tags=["Invoices"])
 
-
 def validate_uuid(value: str) -> bool:
     """Validate UUID format"""
     try:
@@ -28,7 +27,6 @@ def validate_uuid(value: str) -> bool:
         return True
     except (ValueError, AttributeError):
         return False
-
 
 class InvoiceCreate(BaseModel):
     client_id: int
@@ -43,7 +41,6 @@ class InvoiceCreate(BaseModel):
     is_recurring: bool = False
     recurrence_pattern: Optional[str] = None
     due_days: int = 15
-
 
 class InvoiceResponse(BaseModel):
     id: int
@@ -73,7 +70,6 @@ class InvoiceResponse(BaseModel):
     paid_at: Optional[datetime]
     created_at: datetime
 
-
 def generate_invoice_number(user_id: int, db: Session) -> str:
     """Generate unique invoice number"""
     year = datetime.now().year
@@ -82,7 +78,6 @@ def generate_invoice_number(user_id: int, db: Session) -> str:
         Invoice.created_at >= datetime(year, 1, 1)
     ).count() + 1
     return f"INV-{year}-{user_id:04d}-{count:04d}"
-
 
 def calculate_frequency_discount(base_amount: float, frequency: str, business_config: BusinessConfig) -> float:
     """Calculate discount based on cleaning frequency"""
@@ -98,7 +93,6 @@ def calculate_frequency_discount(base_amount: float, frequency: str, business_co
     
     return 0
 
-
 def get_billing_interval(frequency: str) -> tuple:
     """Get Dodo billing interval from frequency"""
     intervals = {
@@ -107,7 +101,6 @@ def get_billing_interval(frequency: str) -> tuple:
         "monthly": ("month", 1),
     }
     return intervals.get(frequency, ("month", 1))
-
 
 @router.get("", response_model=List[InvoiceResponse])
 async def get_invoices(
@@ -157,7 +150,6 @@ async def get_invoices(
     
     return result
 
-
 @router.post("", response_model=InvoiceResponse)
 async def create_invoice(
     data: InvoiceCreate,
@@ -165,8 +157,6 @@ async def create_invoice(
     db: Session = Depends(get_db)
 ):
     """Create a new invoice"""
-    logger.info(f"📄 Creating invoice for client {data.client_id}")
-    
     # Verify client belongs to user
     client = db.query(Client).filter(
         Client.id == data.client_id,
@@ -231,9 +221,6 @@ async def create_invoice(
     db.add(invoice)
     db.commit()
     db.refresh(invoice)
-    
-    logger.info(f"✅ Invoice created: {invoice_number}")
-    
     return InvoiceResponse(
         id=invoice.id,
         public_id=invoice.public_id,
@@ -262,7 +249,6 @@ async def create_invoice(
         paid_at=invoice.paid_at,
         created_at=invoice.created_at
     )
-
 
 @router.post("/{invoice_id}/generate-payment-link")
 async def generate_payment_link(
@@ -314,8 +300,6 @@ async def generate_payment_link(
     try:
         # Use the adhoc product instead of creating a new one
         product_id = DODO_ADHOC_PRODUCT_ID
-        logger.info(f"Using adhoc product: {product_id}")
-        
         # Create checkout session with custom amount using pay-what-you-want
         return_url = f"{FRONTEND_URL}/payment/success/{invoice.id}"
         
@@ -358,9 +342,6 @@ async def generate_payment_link(
         invoice.status = "sent"
         
         db.commit()
-        
-        logger.info(f"✅ Payment link generated using adhoc product: {checkout_url}")
-        
         return {
             "payment_link": checkout_url,
             "session_id": session_id,
@@ -374,7 +355,6 @@ async def generate_payment_link(
         logger.error(f"❌ Failed to create payment link: {e}")
         raise HTTPException(status_code=400, detail=f"Failed to create payment link: {str(e)}")
 
-
 @router.post("/{invoice_id}/send")
 async def send_invoice_to_client(
     invoice_id: int,
@@ -383,9 +363,6 @@ async def send_invoice_to_client(
 ):
     """Send invoice with payment link to client via email"""
     from ..email_service import send_invoice_payment_link_email
-    
-    logger.info(f"📧 Sending invoice {invoice_id} to client")
-    
     invoice = db.query(Invoice).filter(
         Invoice.id == invoice_id,
         Invoice.user_id == current_user.id
@@ -426,14 +403,11 @@ async def send_invoice_to_client(
         
         invoice.status = "sent"
         db.commit()
-        
-        logger.info(f"✅ Invoice sent to {client.email}")
         return {"message": "Invoice sent successfully", "email": client.email}
         
     except Exception as e:
         logger.error(f"❌ Failed to send invoice email: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
-
 
 @router.get("/public/{public_id}")
 async def get_public_invoice(
@@ -481,7 +455,6 @@ async def get_public_invoice(
         "due_date": invoice.due_date.isoformat() if invoice.due_date else None,
         "paid_at": invoice.paid_at.isoformat() if invoice.paid_at else None,
     }
-
 
 def calculate_addon_amount_from_contract(contract: Contract, business_config: BusinessConfig) -> float:
     """Calculate addon amount from contract's client form data"""
@@ -538,7 +511,6 @@ def calculate_addon_amount_from_contract(contract: Contract, business_config: Bu
     
     return addon_total
 
-
 @router.post("/auto-create-from-schedule/{schedule_id}")
 async def auto_create_invoice_from_schedule(
     schedule_id: int,
@@ -546,8 +518,6 @@ async def auto_create_invoice_from_schedule(
     db: Session = Depends(get_db)
 ):
     """Automatically create invoice when schedule is confirmed"""
-    logger.info(f"📄 Auto-creating invoice from schedule {schedule_id}")
-    
     schedule = db.query(Schedule).filter(
         Schedule.id == schedule_id,
         Schedule.user_id == current_user.id
@@ -566,7 +536,6 @@ async def auto_create_invoice_from_schedule(
         Invoice.schedule_id == schedule.id
     ).order_by(Invoice.created_at.desc()).first()
     if existing_invoice:
-        logger.info(f"ℹ️ Invoice already exists for schedule {schedule_id}: {existing_invoice.invoice_number}")
         return {
             "invoice_id": existing_invoice.id,
             "invoice_number": existing_invoice.invoice_number,
@@ -599,8 +568,6 @@ async def auto_create_invoice_from_schedule(
     addon_amount = 0.0
     if contract and business_config:
         addon_amount = calculate_addon_amount_from_contract(contract, business_config)
-        logger.info(f"📊 Calculated addon amount: ${addon_amount}")
-    
     # Calculate frequency discount
     frequency_discount = calculate_frequency_discount(base_amount, service_type, business_config)
     total_amount = base_amount - frequency_discount + addon_amount
@@ -640,17 +607,12 @@ async def auto_create_invoice_from_schedule(
     db.add(invoice)
     db.commit()
     db.refresh(invoice)
-    
-    logger.info(f"✅ Invoice auto-created: {invoice_number}")
-    
     return {
         "invoice_id": invoice.id,
         "invoice_number": invoice.invoice_number,
         "total_amount": invoice.total_amount,
         "status": invoice.status
     }
-
-
 
 @router.post("/{invoice_id}/mark-paid")
 async def mark_invoice_as_paid(
@@ -662,8 +624,6 @@ async def mark_invoice_as_paid(
     Manually mark an invoice as paid (for offline payments, cash, check, etc.)
     This endpoint allows providers to mark invoices as paid when payment is received outside the platform
     """
-    logger.info(f"💰 Manually marking invoice {invoice_id} as paid by user {current_user.id}")
-    
     invoice = db.query(Invoice).filter(
         Invoice.id == invoice_id,
         Invoice.user_id == current_user.id
@@ -688,9 +648,6 @@ async def mark_invoice_as_paid(
     
     db.commit()
     db.refresh(invoice)
-    
-    logger.info(f"✅ Invoice {invoice_id} manually marked as paid")
-    
     # Optionally send notification to provider
     from ..email_service import send_payment_received_notification
     client = db.query(Client).filter(Client.id == invoice.client_id).first()

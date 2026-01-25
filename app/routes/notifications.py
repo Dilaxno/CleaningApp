@@ -10,7 +10,6 @@ from ..auth import get_current_user
 
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
 
-
 class NotificationPreferences(BaseModel):
     notify_new_clients: bool
     notify_contract_signed: bool
@@ -19,11 +18,9 @@ class NotificationPreferences(BaseModel):
     notify_reminders: bool
     notify_marketing: bool
 
-
 class PaymentNotificationResponse(BaseModel):
     unread_count: int
     recent_payments: list
-
 
 @router.get("/payment-notifications", response_model=PaymentNotificationResponse)
 async def get_payment_notifications(
@@ -57,7 +54,6 @@ async def get_payment_notifications(
         recent_payments=recent_payments
     )
 
-
 @router.post("/mark-payments-read")
 async def mark_payments_read(
     current_user: User = Depends(get_current_user),
@@ -70,7 +66,6 @@ async def mark_payments_read(
     db.commit()
     
     return {"message": "Payment notifications marked as read"}
-
 
 @router.get("/preferences")
 async def get_notification_preferences(
@@ -87,7 +82,6 @@ async def get_notification_preferences(
         "notify_reminders": user.notify_reminders if hasattr(user, 'notify_reminders') else True,
         "notify_marketing": user.notify_marketing if hasattr(user, 'notify_marketing') else False,
     }
-
 
 @router.put("/preferences")
 async def update_notification_preferences(

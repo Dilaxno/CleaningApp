@@ -35,7 +35,6 @@ ALLOWED_IMAGE_TYPES = [
     "image/avif",
 ]
 
-
 def get_r2_client():
     """Create and return an R2 client."""
     return boto3.client(
@@ -45,7 +44,6 @@ def get_r2_client():
         aws_secret_access_key=R2_SECRET_ACCESS_KEY,
         config=Config(signature_version="s3v4"),
     )
-
 
 def generate_presigned_url(key: str, expiration: int = PRESIGNED_URL_EXPIRATION) -> str:
     """Generate a presigned URL for accessing a private object."""
@@ -65,7 +63,6 @@ def generate_presigned_url(key: str, expiration: int = PRESIGNED_URL_EXPIRATION)
         ExpiresIn=expiration,
     )
 
-
 @router.post("/logo/{firebase_uid}")
 async def upload_logo(
     firebase_uid: str,
@@ -74,8 +71,6 @@ async def upload_logo(
 ):
     """Upload business logo to R2 (private)."""
     logger.info(f"📤 Uploading logo for firebase_uid: {firebase_uid}")
-    logger.info(f"📄 File details: name='{file.filename}', type='{file.content_type}', size={file.size if hasattr(file, 'size') else 'unknown'}")
-
     # Validate firebase_uid format to prevent path traversal
     if not firebase_uid or len(firebase_uid) > 128 or not firebase_uid.replace('-', '').replace('_', '').isalnum():
         raise HTTPException(status_code=400, detail="Invalid user identifier")
@@ -122,9 +117,6 @@ async def upload_logo(
         if len(file.filename) > 255:
             logger.warning(f"❌ Filename too long: '{file.filename}' ({len(file.filename)} chars)")
             raise HTTPException(status_code=400, detail="Filename too long - maximum 255 characters")
-        
-        logger.info(f"✅ Filename validation passed: '{file.filename}'")
-
     # Read file contents
     contents = await file.read()
     
@@ -166,14 +158,11 @@ async def upload_logo(
 
         # Return presigned URL for immediate display
         presigned_url = generate_presigned_url(key)
-
-        logger.info(f"✅ Logo uploaded: {key}")
         return {"url": presigned_url, "key": key}
 
     except Exception as e:
         logger.error(f"❌ Upload failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
-
 
 @router.post("/signature/{firebase_uid}")
 async def upload_signature(
@@ -226,14 +215,11 @@ async def upload_signature(
 
         # Return presigned URL for immediate display
         presigned_url = generate_presigned_url(key)
-
-        logger.info(f"✅ Signature uploaded: {key}")
         return {"url": presigned_url, "key": key}
 
     except Exception as e:
         logger.error(f"❌ Upload failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
-
 
 @router.get("/presigned/{firebase_uid}/{file_type}")
 async def get_presigned_url_endpoint(
@@ -278,7 +264,6 @@ async def get_presigned_url_endpoint(
     except Exception as e:
         logger.error(f"❌ Failed to generate presigned URL: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to generate URL: {str(e)}")
-
 
 @router.post("/profile-picture/{firebase_uid}")
 async def upload_profile_picture(
@@ -351,14 +336,11 @@ async def upload_profile_picture(
 
         # Return presigned URL for immediate display
         presigned_url = generate_presigned_url(key)
-
-        logger.info(f"✅ Profile picture uploaded: {key}")
         return {"url": presigned_url, "key": key}
 
     except Exception as e:
         logger.error(f"❌ Upload failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
-
 
 @router.post("/integration-logo")
 async def upload_integration_logo(
@@ -418,8 +400,6 @@ async def upload_integration_logo(
 
         # Return presigned URL for display and key for storage
         presigned_url = generate_presigned_url(key, expiration=86400 * 7)  # 7 days
-
-        logger.info(f"✅ Integration logo uploaded: {key}")
         return {"url": presigned_url, "key": key}
 
     except Exception as e:

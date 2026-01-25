@@ -18,23 +18,19 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/verification", tags=["verification"])
 
-
 class SendOTPRequest(BaseModel):
     """Request to send OTP - no data needed, uses current user"""
     pass
 
-
 class VerifyOTPRequest(BaseModel):
     """Request to verify OTP"""
     otp: str
-
 
 class VerifyOTPResponse(BaseModel):
     """Response after OTP verification"""
     success: bool
     message: str
     email_verified: bool
-
 
 class VerificationStatusResponse(BaseModel):
     """Current verification status"""
@@ -43,17 +39,14 @@ class VerificationStatusResponse(BaseModel):
     has_pending_otp: bool
     otp_expires_at: str | None
 
-
 class RequestEmailChangeRequest(BaseModel):
     """Request to change email"""
     new_email: str
-
 
 class VerifyEmailChangeRequest(BaseModel):
     """Verify OTP and complete email change"""
     otp: str
     new_email: str
-
 
 class EmailChangeResponse(BaseModel):
     """Response after email change"""
@@ -61,13 +54,11 @@ class EmailChangeResponse(BaseModel):
     message: str
     new_email: str
 
-
 def generate_otp(length: int = 6) -> str:
     """Generate a random numeric OTP code"""
     otp = ''.join(random.choices(string.digits, k=length))
     logger.debug(f"🔢 Generated OTP: {otp}")
     return otp
-
 
 @router.post("/send-otp")
 async def send_verification_otp(
@@ -83,7 +74,6 @@ async def send_verification_otp(
         
         # Check if already verified
         if current_user.email_verified:
-            logger.info(f"✅ User {current_user.email} already verified, skipping OTP send")
             return {
                 "success": True,
                 "message": "Email already verified",
@@ -93,9 +83,6 @@ async def send_verification_otp(
         # Generate new OTP
         otp = generate_otp(6)
         otp_expires_at = datetime.utcnow() + timedelta(minutes=10)
-        
-        logger.info(f"🔐 Generated OTP for {current_user.email}: {otp} (expires at {otp_expires_at})")
-        
         # Save OTP to database
         current_user.verification_otp = otp
         current_user.otp_expires_at = otp_expires_at
@@ -107,15 +94,11 @@ async def send_verification_otp(
         
         # Send OTP email
         try:
-            logger.info(f"📧 Attempting to send OTP email to {current_user.email}")
-            
             email_response = await send_email_verification_otp(
                 to=current_user.email,
                 user_name=current_user.full_name or "there",
                 otp=otp
             )
-            
-            logger.info(f"✅ OTP email sent successfully to {current_user.email}")
             logger.debug(f"📬 Email service response: {email_response}")
             
             return {
@@ -149,7 +132,6 @@ async def send_verification_otp(
             detail=f"Internal server error: {str(e)}"
         )
 
-
 @router.post("/verify-otp", response_model=VerifyOTPResponse)
 async def verify_otp(
     request: VerifyOTPRequest,
@@ -171,7 +153,6 @@ async def verify_otp(
         
         # Check if already verified
         if current_user.email_verified:
-            logger.info(f"✅ User {current_user.email} already verified")
             return VerifyOTPResponse(
                 success=True,
                 message="Email already verified",
@@ -209,9 +190,6 @@ async def verify_otp(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid verification code. Please try again."
             )
-        
-        logger.info(f"✅ OTP match! Marking {current_user.email} as verified")
-        
         # Mark email as verified and clear OTP
         current_user.email_verified = True
         current_user.verification_otp = None
@@ -238,7 +216,6 @@ async def verify_otp(
             detail=f"Internal server error: {str(e)}"
         )
 
-
 @router.post("/request-email-change")
 async def request_email_change(
     request: RequestEmailChangeRequest,
@@ -250,9 +227,6 @@ async def request_email_change(
     """
     try:
         new_email = request.new_email.strip().lower()
-        
-        logger.info(f"📧 Email change request from {current_user.email} to {new_email}")
-        
         # Validate new email is different
         if new_email == current_user.email:
             raise HTTPException(
@@ -271,9 +245,6 @@ async def request_email_change(
         # Generate OTP for email change
         otp = generate_otp(6)
         otp_expires_at = datetime.utcnow() + timedelta(minutes=10)
-        
-        logger.info(f"🔐 Generated email change OTP: {otp} (expires at {otp_expires_at})")
-        
         # Store pending email change info
         current_user.pending_email = new_email
         current_user.verification_otp = otp
@@ -308,9 +279,6 @@ async def request_email_change(
                 title="Email Change Verification",
                 content_html=content
             )
-            
-            logger.info(f"✅ Email change OTP sent to {new_email}")
-            
             return {
                 "success": True,
                 "message": f"Verification code sent to {new_email}",
@@ -340,7 +308,6 @@ async def request_email_change(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Internal server error: {str(e)}"
         )
-
 
 @router.post("/verify-email-change", response_model=EmailChangeResponse)
 async def verify_email_change(
@@ -398,9 +365,6 @@ async def verify_email_change(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid verification code. Please try again."
             )
-        
-        logger.info(f"✅ OTP verified! Changing email from {current_user.email} to {new_email}")
-        
         # Update email and clear pending change
         old_email = current_user.email
         current_user.email = new_email
@@ -429,7 +393,6 @@ async def verify_email_change(
             detail=f"Internal server error: {str(e)}"
         )
 
-
 @router.get("/status", response_model=VerificationStatusResponse)
 async def get_verification_status(
     current_user: User = Depends(get_current_user),
@@ -441,8 +404,6 @@ async def get_verification_status(
     try:
         # Refresh user from database to get latest data
         db.refresh(current_user)
-        
-        logger.info(f"📊 Status check for user: {current_user.email}")
         logger.debug(f"📊 Verified: {current_user.email_verified}, "
                     f"Has OTP: {current_user.verification_otp is not None}")
         

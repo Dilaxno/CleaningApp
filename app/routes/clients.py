@@ -18,7 +18,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/clients", tags=["Clients"])
 
-
 def validate_uuid(value: str) -> bool:
     """Validate UUID format"""
     try:
@@ -26,7 +25,6 @@ def validate_uuid(value: str) -> bool:
         return True
     except (ValueError, AttributeError):
         return False
-
 
 # Rate limiters for public form submissions
 rate_limit_form_per_ip = create_rate_limiter(
@@ -42,7 +40,6 @@ rate_limit_form_global = create_rate_limiter(
     key_prefix="form_submit_global",
     use_ip=False
 )
-
 
 def validate_us_phone(phone: str) -> str:
     """Validate and normalize US phone number"""
@@ -63,7 +60,6 @@ def validate_us_phone(phone: str) -> str:
     # Format as E.164 for storage
     return f"+1{digits}"
 
-
 class ClientCreate(BaseModel):
     businessName: str
     contactName: Optional[str] = None
@@ -80,7 +76,6 @@ class ClientCreate(BaseModel):
         if v:
             return validate_us_phone(v)
         return v
-
 
 class ClientUpdate(BaseModel):
     businessName: Optional[str] = None
@@ -100,7 +95,6 @@ class ClientUpdate(BaseModel):
             return validate_us_phone(v)
         return v
 
-
 class ClientResponse(BaseModel):
     id: int
     public_id: Optional[str] = None  # UUID for secure public access
@@ -117,7 +111,6 @@ class ClientResponse(BaseModel):
 
     class Config:
         from_attributes = True
-
 
 @router.get("", response_model=List[ClientResponse])
 async def get_clients(
@@ -145,7 +138,6 @@ async def get_clients(
         )
         for c in clients
     ]
-
 
 @router.get("/{client_id}", response_model=ClientResponse)
 async def get_client(
@@ -176,7 +168,6 @@ async def get_client(
         notes=client.notes,
         form_data=client.form_data
     )
-
 
 @router.post("", response_model=ClientResponse)
 async def create_client(
@@ -212,7 +203,6 @@ async def create_client(
     db.refresh(client)
     
     # Note: Client count is incremented when contract is fully signed (both parties)
-    logger.info(f"✅ Client created: id={client.id}")
     return ClientResponse(
         id=client.id,
         businessName=client.business_name,
@@ -225,7 +215,6 @@ async def create_client(
         status=client.status,
         notes=client.notes
     )
-
 
 @router.patch("/{client_id}", response_model=ClientResponse)
 async def update_client(
@@ -274,7 +263,6 @@ async def update_client(
         notes=client.notes
     )
 
-
 @router.delete("/{client_id}")
 async def delete_client(
     client_id: int,
@@ -301,14 +289,10 @@ async def delete_client(
     # Decrement client count if they had a signed contract
     if has_signed_contract:
         decrement_client_count(current_user, db)
-        logger.info(f"📊 Client count decremented for user {current_user.id}: {current_user.clients_this_month}")
-    
     return {"message": "Client deleted"}
-
 
 class BatchDeleteRequest(BaseModel):
     clientIds: List[int]
-
 
 @router.post("/batch-delete")
 async def batch_delete_clients(
@@ -358,13 +342,10 @@ async def batch_delete_clients(
         decrement_client_count(current_user, db)
     
     if signed_contracts_count > 0:
-        logger.info(f"📊 Client count decremented by {signed_contracts_count} for user {current_user.id}: {current_user.clients_this_month}")
-    
     return {
         "message": f"Successfully deleted {deleted_count} client(s)",
         "deletedCount": deleted_count
     }
-
 
 @router.get("/export")
 async def export_clients_csv(
@@ -458,8 +439,6 @@ async def export_clients_csv(
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
-
-
 class PublicClientCreate(BaseModel):
     """Schema for public form submission - uses owner's Firebase UID"""
     ownerUid: str
@@ -483,12 +462,10 @@ class PublicClientCreate(BaseModel):
             return validate_us_phone(v)
         return v
 
-
 class QuotePreviewRequest(BaseModel):
     """Schema for quote preview - calculates quote without creating client"""
     ownerUid: str
     formData: dict
-
 
 class QuotePreviewResponse(BaseModel):
     """Response for quote preview"""
@@ -505,13 +482,11 @@ class QuotePreviewResponse(BaseModel):
     pricingExplanation: str
     quotePending: bool = False
 
-
 class PublicSubmitResponse(BaseModel):
     client: Optional[ClientResponse] = None
     contractPdfUrl: Optional[str] = None
     jobId: Optional[str] = None
     message: str
-
 
 @router.post("/public/quote-preview", response_model=QuotePreviewResponse)
 async def get_quote_preview(
@@ -528,9 +503,6 @@ async def get_quote_preview(
     client_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "unknown")
     if client_ip and "," in client_ip:
         client_ip = client_ip.split(",")[0].strip()
-    
-    logger.info(f"📊 Quote preview request for owner UID: {data.ownerUid} from IP: {client_ip}")
-    
     # Find the user by Firebase UID
     user = db.query(User).filter(User.firebase_uid == data.ownerUid).first()
     if not user:
@@ -589,9 +561,6 @@ async def get_quote_preview(
             explanation_parts.append(f"{quote['discount_percent']:.0f}% {frequency.lower()} discount applied")
         
         explanation = " • ".join(explanation_parts)
-    
-    logger.info(f"✅ Quote preview calculated: ${quote['final_price']:,.2f} for {frequency}")
-    
     return QuotePreviewResponse(
         basePrice=quote['base_price'],
         discountPercent=quote['discount_percent'],
@@ -606,7 +575,6 @@ async def get_quote_preview(
         pricingExplanation=explanation,
         quotePending=quote.get('quote_pending', False)
     )
-
 
 @router.post("/public/submit")
 async def submit_public_form(
@@ -729,9 +697,6 @@ async def submit_public_form(
     db.add(client)
     db.commit()
     db.refresh(client)
-    
-    logger.info(f"✅ Public form client created: id={client.id} for user_id={user.id} with status=pending_signature")
-    
     # Queue contract PDF generation as background job (async to prevent timeout)
     job_id = None
     if data.formData:
@@ -773,8 +738,6 @@ async def submit_public_form(
             user.id,
             data.ownerUid
         )
-        logger.info(f"📧 Email notification job queued for client {client.id}")
-            
     except Exception as email_err:
         logger.warning(f"⚠️ Failed to queue email notifications: {email_err}")
         # Continue - email failure shouldn't fail the submission
@@ -798,12 +761,10 @@ async def submit_public_form(
         message="Form submitted successfully - Contract generation in progress" if job_id else "Form submitted successfully"
     )
 
-
 class SignContractRequest(BaseModel):
     clientPublicId: str  # UUID for secure public access
     contractPublicId: Optional[str] = None  # UUID for specific contract (optional for backwards compatibility)
     signature: str
-
 
 # Rate limiter for contract signing - 10 per hour per IP
 rate_limit_sign_contract = create_rate_limiter(
@@ -812,7 +773,6 @@ rate_limit_sign_contract = create_rate_limiter(
     key_prefix="sign_contract",
     use_ip=True
 )
-
 
 @router.post("/public/sign-contract")
 async def sign_contract(
@@ -849,9 +809,6 @@ async def sign_contract(
     if client_ip and "," in client_ip:
         client_ip = client_ip.split(",")[0].strip()
     user_agent = request.headers.get("User-Agent", "unknown")
-
-    logger.info(f"📝 Contract signing request for client public_id: {data.clientPublicId}")
-
     # Find the client by public_id
     client = db.query(Client).filter(Client.public_id == data.clientPublicId).first()
     if not client:
@@ -892,8 +849,6 @@ async def sign_contract(
     # Now the client will appear in the provider's client list
     if client.status == "pending_signature":
         client.status = "new_lead"
-        logger.info(f"✅ Client status updated from pending_signature to new_lead: client_id={client.id}")
-    
     # Upload client signature to R2 for PDF rendering
     client_signature_url = None
     if data.signature and data.signature.startswith("data:image"):
@@ -916,7 +871,6 @@ async def sign_contract(
             
             # Generate presigned URL (7 days max for R2)
             client_signature_url = generate_presigned_url(signature_key, expiration=604800)  # 7 days
-            logger.info(f"✅ Client signature uploaded to R2: {signature_key}")
         except Exception as sig_err:
             logger.warning(f"⚠️ Failed to upload client signature to R2: {sig_err}")
     
@@ -926,11 +880,7 @@ async def sign_contract(
         
         if config and client.form_data:
             form_data = client.form_data
-            
-            # Log old PDF key
             old_pdf_key = contract.pdf_key
-            logger.info(f"📄 Old PDF key: {old_pdf_key}")
-            
             # Calculate quote for regeneration
             from .contracts_pdf import calculate_quote
             quote = calculate_quote(config, form_data)
@@ -954,9 +904,7 @@ async def sign_contract(
             
             # Verify signature URL is in HTML
             if client_signature_url and client_signature_url in html:
-                logger.info("✅ Client signature URL IS in generated HTML")
             elif data.signature in html:
-                logger.info("✅ Client signature (base64) IS in generated HTML")
             else:
                 logger.warning("⚠️ Client signature NOT found in generated HTML!")
             
@@ -980,8 +928,6 @@ async def sign_contract(
                 
                 contract.pdf_key = pdf_key
                 contract.pdf_hash = pdf_hash
-                
-                logger.info(f"✅ Signed contract PDF uploaded: {pdf_key}")
                 logger.info(f"📝 Updated contract.pdf_key from {old_pdf_key} to {pdf_key}")
             except Exception as upload_err:
                 logger.warning(f"⚠️ Failed to upload signed PDF: {upload_err}")
@@ -991,9 +937,6 @@ async def sign_contract(
     
     db.commit()
     db.refresh(contract)
-    
-    logger.info(f"✅ Contract signed by client: contract_id={contract.id}")
-    
     # Generate backend URL for the new signed PDF (avoids CORS issues)
     signed_pdf_url = None
     if contract.pdf_key:
@@ -1006,7 +949,6 @@ async def sign_contract(
                 backend_base = "https://api.cleanenroll.com"
             
             signed_pdf_url = f"{backend_base}/contracts/pdf/public/{contract.public_id}"
-            logger.info(f"✅ Generated backend URL for signed contract PDF")
         except Exception as url_err:
             logger.warning(f"⚠️ Failed to generate backend URL: {url_err}")
     
@@ -1022,7 +964,6 @@ async def sign_contract(
                 client_name=client.contact_name or client.business_name,
                 contract_title=contract.title,
             )
-            logger.info(f"📧 Contract signed notification sent to: {user.email}")
     except Exception as email_err:
         logger.warning(f"⚠️ Failed to send contract signed notification: {email_err}")
     
@@ -1032,12 +973,10 @@ async def sign_contract(
         "signedPdfUrl": signed_pdf_url
     }
 
-
 class ScheduleDecisionRequest(BaseModel):
     action: str  # 'confirm' or 'request_change'
     proposed_start_time: Optional[str] = None
     proposed_end_time: Optional[str] = None
-
 
 @router.post("/{client_id}/schedule-decision")
 async def handle_schedule_decision(
@@ -1089,9 +1028,6 @@ async def handle_schedule_decision(
                     title="Your Cleaning is Scheduled! 🎉",
                     content_html=content
                 )
-                
-            logger.info(f"✅ Provider confirmed schedule for client {client_id}")
-            
         elif data.action == 'request_change':
             # Provider requested a different time
             if not data.proposed_start_time or not data.proposed_end_time:
@@ -1145,9 +1081,6 @@ async def handle_schedule_decision(
                     title="Schedule Change Request",
                     content_html=content
                 )
-                
-            logger.info(f"✅ Provider requested schedule change for client {client_id}")
-            
         else:
             raise HTTPException(status_code=400, detail="Invalid action")
         

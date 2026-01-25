@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/email", tags=["Email"])
 
-
 class SendEmailRequest(BaseModel):
     to: str
     subject: str
@@ -23,10 +22,8 @@ class SendEmailRequest(BaseModel):
     cta_url: Optional[str] = None
     cta_label: Optional[str] = None
 
-
 class TestEmailRequest(BaseModel):
     email_type: str  # "welcome", "test"
-
 
 @router.post("/send")
 async def send_custom_email(
@@ -44,7 +41,6 @@ async def send_custom_email(
         cta_label=data.cta_label,
     )
     return {"success": True, "result": result}
-
 
 @router.post("/test")
 async def send_test_email(

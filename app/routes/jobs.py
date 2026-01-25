@@ -14,13 +14,11 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/jobs", tags=["Jobs"])
 
-
 class JobStatusResponse(BaseModel):
     jobId: str
     status: str  # queued, in_progress, complete, failed
     result: Optional[dict] = None
     error: Optional[str] = None
-
 
 async def get_job_status_with_retry(job_id: str, max_retries: int = 3, retry_delay: float = 1.0):
     """
@@ -75,7 +73,6 @@ async def get_job_status_with_retry(job_id: str, max_retries: int = 3, retry_del
                             result = job_result
                         else:
                             result = {"data": job_result}
-                        logger.info(f"✅ Job {job_id} completed successfully")
                     except asyncio.TimeoutError:
                         logger.warning(f"⏰ Timeout getting result for job {job_id}")
                         error = "Timeout retrieving job result"
@@ -117,7 +114,6 @@ async def get_job_status_with_retry(job_id: str, max_retries: int = 3, retry_del
         # Exponential backoff
         if attempt < max_retries - 1:
             await asyncio.sleep(retry_delay * (2 ** attempt))
-
 
 @router.get("/status/{job_id}")
 async def get_job_status(job_id: str):

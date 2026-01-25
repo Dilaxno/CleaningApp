@@ -18,7 +18,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/integration-requests", tags=["Integration Requests"])
 
-
 class IntegrationRequestCreate(BaseModel):
     name: str
     logo_url: str
@@ -30,7 +29,6 @@ class IntegrationRequestCreate(BaseModel):
         if len(v) > 2000:
             raise ValueError("Logo URL is too long (max 2000 characters). Please use a direct image URL.")
         return v
-
 
 class IntegrationRequestResponse(BaseModel):
     id: int
@@ -47,13 +45,11 @@ class IntegrationRequestResponse(BaseModel):
     class Config:
         from_attributes = True
 
-
 class SubmitStatusResponse(BaseModel):
     can_submit: bool
     days_until_next: Optional[int] = None
     seconds_until_next: Optional[int] = None
     last_submission_date: Optional[datetime] = None
-
 
 @router.get("/submit-status", response_model=SubmitStatusResponse)
 async def get_submit_status(
@@ -82,7 +78,6 @@ async def get_submit_status(
         )
     
     return SubmitStatusResponse(can_submit=True)
-
 
 @router.get("", response_model=List[IntegrationRequestResponse])
 async def get_integration_requests(
@@ -118,7 +113,6 @@ async def get_integration_requests(
         ))
     
     return result
-
 
 @router.post("", response_model=IntegrationRequestResponse)
 async def create_integration_request(
@@ -207,9 +201,6 @@ async def create_integration_request(
     
     db.commit()
     db.refresh(request)
-    
-    logger.info(f"✅ Integration request created: {request.id} - {request.name}")
-    
     return IntegrationRequestResponse(
         id=request.id,
         name=request.name,
@@ -222,7 +213,6 @@ async def create_integration_request(
         submitted_by=current_user.full_name or current_user.email.split('@')[0],
         created_at=request.created_at
     )
-
 
 @router.post("/{request_id}/upvote")
 async def upvote_integration_request(
@@ -262,7 +252,6 @@ async def upvote_integration_request(
     logger.info(f"👍 User {current_user.id} upvoted integration request {request_id}")
     
     return {"message": "Vote recorded", "upvotes": request.upvotes}
-
 
 @router.delete("/{request_id}/upvote")
 async def remove_upvote(

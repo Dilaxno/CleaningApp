@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/business-config", tags=["Business Configuration"])
 
-
 class BusinessConfigCreate(BaseModel):
     firebaseUid: str
     # Branding
@@ -65,7 +64,6 @@ class BusinessConfigCreate(BaseModel):
     customExclusions: Optional[List[str]] = None
     preferredUnits: Optional[str] = None
 
-
 def to_float(val: Optional[str]) -> Optional[float]:
     """Convert string to float, returning None for empty/invalid values."""
     if val is None or val == "":
@@ -74,7 +72,6 @@ def to_float(val: Optional[str]) -> Optional[float]:
         return float(val)
     except ValueError:
         return None
-
 
 def to_int(val: Optional[str]) -> Optional[int]:
     """Convert string to int, returning None for empty/invalid values."""
@@ -85,7 +82,6 @@ def to_int(val: Optional[str]) -> Optional[int]:
     except ValueError:
         return None
 
-
 def is_provided(val) -> bool:
     """Check if a value was actually provided (not None and not empty string)."""
     if val is None:
@@ -93,7 +89,6 @@ def is_provided(val) -> bool:
     if isinstance(val, str) and val == "":
         return False
     return True
-
 
 @router.get("")
 def get_current_user_business_config(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -120,8 +115,6 @@ def get_current_user_business_config(current_user: User = Depends(get_current_us
             signature_presigned_url = generate_presigned_url(config.signature_url)
         except Exception as e:
             logger.warning(f"⚠️ Failed to generate presigned URL for signature: {e}")
-
-    logger.info(f"✅ Found business config for user_id: {current_user.id}")
     return {
         "businessName": config.business_name,
         "logoKey": config.logo_url,
@@ -172,7 +165,6 @@ def get_current_user_business_config(current_user: User = Depends(get_current_us
         "addonCarpetLarge": config.addon_carpet_large,
     }
 
-
 @router.post("")
 def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get_db)):
     logger.info(f"📥 Creating business config for firebase_uid: {data.firebaseUid}")
@@ -186,29 +178,21 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
         if not user:
             logger.error(f"❌ User not found for firebase_uid: {data.firebaseUid}")
             raise HTTPException(status_code=404, detail="User not found")
-        
-        logger.info(f"✅ Found user: id={user.id}, email={user.email}")
-
         existing = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
         if existing:
-            logger.info(f"📝 Updating existing config for user_id: {user.id}")
             logger.info(f"📝 Current DB values: logo_url={existing.logo_url}, rate_per_sqft={existing.rate_per_sqft}, pricing_model={existing.pricing_model}")
             # Only update fields that are explicitly provided (not None and not empty string)
             if is_provided(data.businessName):
-                logger.info(f"📝 Updating business_name: {data.businessName}")
                 existing.business_name = data.businessName
             if is_provided(data.logoUrl):
-                logger.info(f"📝 Updating logo_url: {data.logoUrl}")
                 existing.logo_url = data.logoUrl
             if is_provided(data.signatureUrl):
                 existing.signature_url = data.signatureUrl
             if data.onboardingComplete is not None:
-                logger.info(f"📝 Setting onboarding_complete to: {data.onboardingComplete}")
                 existing.onboarding_complete = data.onboardingComplete
             if is_provided(data.pricingModel):
                 existing.pricing_model = data.pricingModel
             if data.meetingsRequired is not None:
-                logger.info(f"📝 Setting meetings_required to: {data.meetingsRequired}")
                 existing.meetings_required = data.meetingsRequired
             if is_provided(data.paymentHandling):
                 existing.payment_handling = data.paymentHandling
@@ -232,19 +216,15 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 existing.available_supplies = data.availableSupplies
             if is_provided(data.ratePerSqft):
                 converted_rate = to_float(data.ratePerSqft)
-                logger.info(f"📝 Updating rate_per_sqft: raw={data.ratePerSqft}, converted={converted_rate}")
                 existing.rate_per_sqft = converted_rate
             if is_provided(data.ratePerRoom):
                 converted_rate = to_float(data.ratePerRoom)
-                logger.info(f"📝 Updating rate_per_room: raw={data.ratePerRoom}, converted={converted_rate}")
                 existing.rate_per_room = converted_rate
             if is_provided(data.hourlyRate):
                 converted_rate = to_float(data.hourlyRate)
-                logger.info(f"📝 Updating hourly_rate: raw={data.hourlyRate}, converted={converted_rate}")
                 existing.hourly_rate = converted_rate
             if is_provided(data.flatRate):
                 converted_rate = to_float(data.flatRate)
-                logger.info(f"📝 Updating flat_rate: raw={data.flatRate}, converted={converted_rate}")
                 existing.flat_rate = converted_rate
             if is_provided(data.minimumCharge):
                 existing.minimum_charge = to_float(data.minimumCharge)
@@ -355,8 +335,6 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
 
         user.onboarding_completed = data.onboardingComplete if data.onboardingComplete is not None else user.onboarding_completed
         db.commit()
-        
-        logger.info(f"✅ Business config saved successfully, id={config.id}")
         return {"message": "Business configuration saved", "id": config.id}
     
     except HTTPException:
@@ -365,7 +343,6 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
         logger.error(f"❌ Error creating business config: {str(e)}")
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @router.get("/{firebase_uid}")
 def get_business_config(firebase_uid: str, db: Session = Depends(get_db)):
@@ -400,8 +377,6 @@ def get_business_config(firebase_uid: str, db: Session = Depends(get_db)):
             signature_presigned_url = generate_presigned_url(config.signature_url)
         except Exception as e:
             logger.warning(f"⚠️ Failed to generate presigned URL for signature: {e}")
-
-    logger.info(f"✅ Found business config for user_id: {user.id}")
     return {
         "businessName": config.business_name,
         "logoKey": config.logo_url,  # The R2 key
@@ -446,7 +421,6 @@ def get_business_config(firebase_uid: str, db: Session = Depends(get_db)):
         "addonCarpetLarge": config.addon_carpet_large,
     }
 
-
 @router.get("/public/branding/{firebase_uid}")
 def get_public_branding(firebase_uid: str, db: Session = Depends(get_db)):
     """
@@ -468,7 +442,6 @@ def get_public_branding(firebase_uid: str, db: Session = Depends(get_db)):
     
     # Return default branding if no config exists
     if not config:
-        logger.info(f"⚠️ No business config found, returning default branding")
         return {
             "businessName": None,
             "logoUrl": None,
@@ -481,14 +454,11 @@ def get_public_branding(firebase_uid: str, db: Session = Depends(get_db)):
             logo_presigned_url = generate_presigned_url(config.logo_url)
         except Exception as e:
             logger.warning(f"⚠️ Failed to generate presigned URL for logo: {e}")
-
-    logger.info(f"✅ Returning public branding for user_id: {user.id}")
     return {
         "businessName": config.business_name,
         "logoUrl": logo_presigned_url,
         "plan": user.plan,  # Include plan for conditional badge display
     }
-
 
 @router.get("/public/addons/{firebase_uid}")
 def get_public_addons(firebase_uid: str, db: Session = Depends(get_db)):
@@ -511,7 +481,6 @@ def get_public_addons(firebase_uid: str, db: Session = Depends(get_db)):
     
     # Return empty addons if no config exists
     if not config:
-        logger.info(f"⚠️ No business config found, returning empty addons")
         return {
             "customAddons": [],
             "addonWindows": None,
@@ -520,8 +489,6 @@ def get_public_addons(firebase_uid: str, db: Session = Depends(get_db)):
             "addonCarpetMedium": None,
             "addonCarpetLarge": None,
         }
-
-    logger.info(f"✅ Returning public addons for user_id: {user.id}")
     return {
         "customAddons": config.custom_addons or [],
         "addonWindows": config.addon_windows,
@@ -601,9 +568,6 @@ def get_public_business_info(firebase_uid: str, db: Session = Depends(get_db)):
                 off_work_periods = json.loads(config.off_work_periods)
         except Exception as e:
             logger.warning(f"⚠️ Failed to parse off_work_periods for {firebase_uid}: {e}")
-    
-    logger.info(f"✅ Public business info retrieved for firebase_uid: {firebase_uid}")
-    
     return {
         "business_name": config.business_name or "Business",
         "working_hours": working_hours,

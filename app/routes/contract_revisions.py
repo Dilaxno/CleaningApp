@@ -12,13 +12,11 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/contracts", tags=["Contract Revisions"])
 
-
 class RevisionRequest(BaseModel):
     revision_type: str  # 'pricing', 'scope', 'both'
     revision_notes: str
     custom_quote: Optional[Dict[str, Any]] = None
     custom_scope: Optional[Dict[str, Any]] = None
-
 
 class RevisionResponse(BaseModel):
     id: int
@@ -32,7 +30,6 @@ class RevisionResponse(BaseModel):
 
     class Config:
         from_attributes = True
-
 
 @router.post("/{contract_id}/request-revision", response_model=RevisionResponse)
 async def request_contract_revision(
@@ -110,8 +107,6 @@ async def request_contract_revision(
     db.refresh(contract)
     
     # TODO: Send email notification to client about revision request
-    logger.info(f"📝 Contract {contract_id} revision requested by provider. Type: {revision.revision_type}")
-    
     return RevisionResponse(
         id=contract.id,
         revision_requested=contract.revision_requested,
@@ -122,7 +117,6 @@ async def request_contract_revision(
         custom_scope=contract.custom_scope,
         revision_requested_at=contract.revision_requested_at
     )
-
 
 @router.post("/{contract_id}/approve-revision")
 async def approve_contract_revision(
@@ -153,15 +147,11 @@ async def approve_contract_revision(
     
     db.commit()
     db.refresh(contract)
-    
-    logger.info(f"✅ Contract {contract_id} revision approved by client")
-    
     return {
         "message": "Revision approved successfully",
         "contract_id": contract.id,
         "status": contract.status
     }
-
 
 @router.post("/{contract_id}/reject-revision")
 async def reject_contract_revision(
@@ -201,15 +191,11 @@ async def reject_contract_revision(
     
     db.commit()
     db.refresh(contract)
-    
-    logger.info(f"❌ Contract {contract_id} revision rejected by client")
-    
     return {
         "message": "Revision rejected. Contract returned to original terms.",
         "contract_id": contract.id,
         "status": contract.status
     }
-
 
 @router.get("/{contract_id}/revision-history")
 async def get_revision_history(

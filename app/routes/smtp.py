@@ -26,14 +26,12 @@ router = APIRouter(prefix="/smtp", tags=["SMTP"])
 # Initialize encryption
 fernet = Fernet(SMTP_ENCRYPTION_KEY) if SMTP_ENCRYPTION_KEY else None
 
-
 def encrypt_password(password: str) -> str:
     """Encrypt SMTP password for storage"""
     if not fernet:
         logger.warning("SMTP_ENCRYPTION_KEY not set, storing password in plain text")
         return password
     return fernet.encrypt(password.encode()).decode()
-
 
 def decrypt_password(encrypted: str) -> str:
     """Decrypt SMTP password for use"""
@@ -44,7 +42,6 @@ def decrypt_password(encrypted: str) -> str:
     except Exception:
         return encrypted  # Fallback if not encrypted
 
-
 class SetupSMTPRequest(BaseModel):
     email: EmailStr  # e.g., bookings@preclean.com
     host: str  # e.g., smtp.gmail.com
@@ -52,7 +49,6 @@ class SetupSMTPRequest(BaseModel):
     username: str
     password: str
     use_tls: bool = True
-
 
 class SMTPStatusResponse(BaseModel):
     enabled: bool
@@ -65,7 +61,6 @@ class SMTPStatusResponse(BaseModel):
     last_test_at: Optional[str]
     error_message: Optional[str]
 
-
 class TestSMTPRequest(BaseModel):
     email: EmailStr
     host: str
@@ -73,7 +68,6 @@ class TestSMTPRequest(BaseModel):
     username: str
     password: str
     use_tls: bool = True
-
 
 def test_smtp_connection(
     host: str,
@@ -88,8 +82,6 @@ def test_smtp_connection(
     Returns (success, message)
     """
     try:
-        logger.info(f"Testing SMTP connection to {host}:{port}")
-        
         if port == 465:
             # SSL connection
             context = ssl.create_default_context()
@@ -148,7 +140,6 @@ def test_smtp_connection(
         logger.error(f"SMTP error: {e}")
         return False, f"Connection failed: {str(e)}"
 
-
 @router.post("/test")
 async def test_smtp_settings(
     request: TestSMTPRequest,
@@ -168,7 +159,6 @@ async def test_smtp_settings(
         "success": success,
         "message": message
     }
-
 
 @router.post("/setup")
 async def setup_smtp(
@@ -223,7 +213,6 @@ async def setup_smtp(
         "status": "live"
     }
 
-
 @router.get("/status")
 async def get_smtp_status(
     current_user: User = Depends(get_current_user),
@@ -256,7 +245,6 @@ async def get_smtp_status(
         last_test_at=config.smtp_last_test_at.isoformat() if config.smtp_last_test_at else None,
         error_message=config.smtp_error_message,
     )
-
 
 @router.post("/verify")
 async def verify_smtp_connection(
@@ -291,7 +279,6 @@ async def verify_smtp_connection(
         "status": config.smtp_status,
         "message": message
     }
-
 
 @router.delete("/remove")
 async def remove_smtp(

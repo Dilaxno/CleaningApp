@@ -15,7 +15,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/contracts", tags=["Contracts"])
 
-
 def validate_uuid(value: str) -> bool:
     """Validate UUID format"""
     try:
@@ -23,7 +22,6 @@ def validate_uuid(value: str) -> bool:
         return True
     except (ValueError, AttributeError):
         return False
-
 
 class ContractCreate(BaseModel):
     clientId: int
@@ -36,7 +34,6 @@ class ContractCreate(BaseModel):
     paymentTerms: Optional[str] = None
     termsConditions: Optional[str] = None
 
-
 class ContractUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
@@ -47,7 +44,6 @@ class ContractUpdate(BaseModel):
     totalValue: Optional[float] = None
     paymentTerms: Optional[str] = None
     termsConditions: Optional[str] = None
-
 
 class ContractResponse(BaseModel):
     id: int
@@ -76,11 +72,9 @@ class ContractResponse(BaseModel):
     class Config:
         from_attributes = True
 
-
 class ProviderSignatureRequest(BaseModel):
     signature_data: str  # Base64 signature image
     use_default_signature: bool = False  # If true, use provider's default signature from onboarding
-
 
 def get_pdf_url(pdf_key: Optional[str], contract_public_id: Optional[str] = None) -> Optional[str]:
     """Generate backend URL for PDF if key exists (avoids CORS issues)"""
@@ -97,7 +91,6 @@ def get_pdf_url(pdf_key: Optional[str], contract_public_id: Optional[str] = None
         return f"{backend_base}/contracts/pdf/public/{contract_public_id}"
     except Exception:
         return None
-
 
 @router.get("", response_model=List[ContractResponse])
 async def get_contracts(
@@ -152,7 +145,6 @@ async def get_contracts(
         ))
     return result
 
-
 @router.post("", response_model=ContractResponse)
 async def create_contract(
     data: ContractCreate,
@@ -183,8 +175,6 @@ async def create_contract(
     db.add(contract)
     db.commit()
     db.refresh(contract)
-    
-    logger.info(f"✅ Contract created: id={contract.id}")
     return ContractResponse(
         id=contract.id,
         public_id=contract.public_id,
@@ -208,7 +198,6 @@ async def create_contract(
         clientSignatureTimestamp=contract.client_signature_timestamp,
         createdAt=contract.created_at
     )
-
 
 @router.patch("/{contract_id}", response_model=ContractResponse)
 async def update_contract(
@@ -274,7 +263,6 @@ async def update_contract(
                         business_name=business_name,
                         business_config=business_config
                     )
-                    logger.info(f"📧 Contract cancellation email sent to {client.email}")
                     logger.info(f"👤 Client {client.id} status updated to cancelled")
                 else:
                     logger.warning(f"⚠️ No email found for client {contract.client_id}, skipping cancellation notification")
@@ -321,7 +309,6 @@ async def update_contract(
         createdAt=contract.created_at
     )
 
-
 @router.post("/{contract_id}/sign-provider")
 async def sign_contract_as_provider(
     contract_id: int,
@@ -331,8 +318,6 @@ async def sign_contract_as_provider(
     db: Session = Depends(get_db)
 ):
     """Provider signs the contract and sends notification to client"""
-    logger.info(f"🖊️ Provider signing contract {contract_id}")
-    
     # Get contract and verify ownership
     contract = db.query(Contract).filter(
         Contract.id == contract_id,
@@ -341,8 +326,6 @@ async def sign_contract_as_provider(
     
     if not contract:
         raise HTTPException(status_code=404, detail="Contract not found")
-    
-    # Log contract signature status for debugging
     logger.info(f"📋 Contract {contract_id} signature status: client_signature={bool(contract.client_signature)}, client_signature_timestamp={contract.client_signature_timestamp}")
     if contract.client_signature:
         logger.info(f"📋 Client signature format: {contract.client_signature[:100]}...")
@@ -378,7 +361,6 @@ async def sign_contract_as_provider(
                 if response.status_code == 200:
                     import base64
                     signature_to_use = f"data:image/png;base64,{base64.b64encode(response.content).decode()}"
-                    logger.info("✅ Using default signature from onboarding")
                 else:
                     logger.warning(f"⚠️ Failed to fetch default signature, using provided signature")
         except Exception as e:
@@ -399,10 +381,7 @@ async def sign_contract_as_provider(
     # Increment client count now that contract is fully signed
     from ..plan_limits import increment_client_count
     increment_client_count(current_user, db)
-    logger.info(f"📊 Client count incremented for user {current_user.id}: {current_user.clients_this_month}")
-    
     # Regenerate PDF with provider signature
-    logger.info(f"📄 Regenerating contract PDF with provider signature")
     try:
         import hashlib
         from .contracts_pdf import generate_contract_html, html_to_pdf, calculate_quote
@@ -413,10 +392,7 @@ async def sign_contract_as_provider(
         quote = calculate_quote(business_config, form_data)
         
         # Debug the signatures being passed to HTML generation
-        logger.info(f"🖊️ [PROVIDER SIGN] About to generate HTML with:")
         logger.info(f"🖊️ [PROVIDER SIGN] Client signature: {'SET (' + str(len(contract.client_signature)) + ' chars)' if contract.client_signature else 'NOT SET'}")
-        logger.info(f"🖊️ [PROVIDER SIGN] Provider signature: {'SET (' + str(len(signature_to_use)) + ' chars)' if signature_to_use else 'NOT SET'}")
-        
         # Generate HTML with both signatures - use contract's created_at for consistent dates
         html = await generate_contract_html(
             business_config,
@@ -441,8 +417,6 @@ async def sign_contract_as_provider(
         contract.pdf_key = pdf_key
         contract.pdf_hash = pdf_hash
         db.commit()
-        
-        logger.info(f"✅ Contract PDF regenerated with provider signature: {pdf_key}")
     except Exception as e:
         logger.error(f"Failed to regenerate PDF with provider signature: {e}")
         # Continue even if PDF regeneration fails
@@ -471,7 +445,6 @@ async def sign_contract_as_provider(
                 contract_pdf_url=pdf_url,
                 contract_public_id=contract.public_id
             )
-            logger.info(f"✅ Sent fully executed contract email to {client.email}")
         except Exception as e:
             logger.error(f"Failed to send client email: {e}")
             # Don't fail the signing if email fails
@@ -487,13 +460,9 @@ async def sign_contract_as_provider(
                 property_address=property_address,
                 contract_pdf_url=pdf_url
             )
-            logger.info(f"✅ Sent provider confirmation email to {current_user.email}")
         except Exception as e:
             logger.error(f"Failed to send provider email: {e}")
             # Don't fail the signing if email fails
-    
-    logger.info(f"✅ Contract {contract_id} fully signed")
-    
     pdf_url = get_pdf_url(contract.pdf_key, contract.public_id)
     return ContractResponse(
         id=contract.id,
@@ -518,7 +487,6 @@ async def sign_contract_as_provider(
         clientSignatureTimestamp=contract.client_signature_timestamp,
         createdAt=contract.created_at
     )
-
 
 @router.delete("/{contract_id}")
 async def delete_contract(

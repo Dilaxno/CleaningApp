@@ -47,7 +47,6 @@ rate_limit_billing_webhook = create_rate_limiter(
     use_ip=False  # Global limit for all webhooks
 )
 
-
 class CheckoutRequest(BaseModel):
     product_id: str
     # Optional plan metadata for your app state
@@ -81,10 +80,8 @@ class CheckoutRequest(BaseModel):
             raise ValueError("quantity must be at least 1")
         return v
 
-
 class UpdatePlanRequest(BaseModel):
     plan: str  # "solo", "team", "enterprise"
-
 
 class CancelRequest(BaseModel):
     # When true, subscription remains active until the end of the current billing period
@@ -92,14 +89,12 @@ class CancelRequest(BaseModel):
     # When true, immediately revoke access (set plan to null). Dodo will still process scheduled cancel if cancel_at_period_end=True
     revoke_access_now: bool = False
 
-
 class ChangePlanRequest(BaseModel):
     product_id: str
     quantity: int = 1
     proration_billing_mode: str = "prorated_immediately"  # per docs
     # optional local plan update for app gating ("solo" | "team" | "enterprise")
     plan: Optional[str] = None
-
 
 # Plan limits configuration
 PLAN_LIMITS = {
@@ -110,7 +105,6 @@ PLAN_LIMITS = {
 
 # Default limits for users without a plan (should not happen after onboarding)
 NO_PLAN_LIMITS = {"clients": 0, "contracts": 0, "schedules": 0}
-
 
 @router.get("/usage-stats")
 async def get_usage_stats(
@@ -175,8 +169,6 @@ async def get_usage_stats(
         "reset_date": reset_date.isoformat(),
     }
 
-
-
 @router.post("/update-plan")
 async def update_user_plan(
     body: UpdatePlanRequest,
@@ -195,7 +187,6 @@ async def update_user_plan(
     db.commit()
     logger.info(f"User {user.id} plan manually updated to {body.plan}")
     return {"message": f"Plan updated to {body.plan}", "plan": body.plan}
-
 
 @router.get("/current-plan")
 async def get_current_plan(
@@ -216,7 +207,6 @@ async def get_current_plan(
         "subscription_start_date": subscription_start.isoformat() if subscription_start else None,
         "next_billing_date": next_billing_date.isoformat(),
     }
-
 
 @router.post("/checkout")
 async def create_checkout_session(
@@ -281,7 +271,6 @@ async def create_checkout_session(
         logger.error(f"Failed to create checkout session: {e}")
         raise HTTPException(status_code=400, detail="Failed to create checkout session")
 
-
 @router.post("/cancel")
 async def cancel_subscription(
     body: CancelRequest,
@@ -322,7 +311,6 @@ async def cancel_subscription(
         logger.error(f"Failed to cancel subscription: {e}")
         raise HTTPException(status_code=400, detail="Failed to cancel subscription")
 
-
 @router.post("/change-plan")
 async def change_subscription_plan(
     body: ChangePlanRequest,
@@ -362,9 +350,7 @@ async def change_subscription_plan(
         logger.error(f"Failed to change plan: {e}")
         raise HTTPException(status_code=400, detail="Failed to change subscription plan")
 
-
 # No product-to-plan mapping on backend; plan is derived from metadata set at checkout creation.
-
 
 @webhooks_router.post("/webhooks/dodopayments")
 @webhooks_router.post("/api/payments/dodo/webhook")  # Alias for Dodo's configured webhook URL
@@ -472,8 +458,6 @@ async def handle_dodopayments_webhook(
                         user.next_billing_date = datetime.utcnow() + timedelta(days=30)
                     
                     db.commit()
-                    logger.info(f"💰 New subscription activated for user {user.id}: {user.billing_cycle}, next billing: {user.next_billing_date}")
-                
                 # Handle subscription renewals (recurring charges)
                 elif event_type == "subscription.renewed":
                     user.last_payment_date = datetime.utcnow()
@@ -486,8 +470,6 @@ async def handle_dodopayments_webhook(
                         user.next_billing_date = datetime.utcnow() + timedelta(days=30)
                     
                     db.commit()
-                    logger.info(f"💰 Subscription renewed for user {user.id}: {user.billing_cycle}, next billing: {user.next_billing_date}")
-
                 # Update plan if provided
                 if selected_plan and selected_plan != "unknown":
                     user.plan = selected_plan
@@ -519,8 +501,6 @@ async def handle_dodopayments_webhook(
                 except Exception:
                     pass
                 db.commit()
-                logger.info(f"❌ User {user.id} subscription cancelled, plan revoked")
-
         elif event_type == "invoice.paid":
             # Track successful subscription invoice payment
             meta = (data.get("metadata") or {})
@@ -533,8 +513,6 @@ async def handle_dodopayments_webhook(
                     user.last_payment_date = datetime.utcnow()
                     user.subscription_status = "active"
                     db.commit()
-                    logger.info(f"💰 Invoice paid for user {user.id}, subscription status: active")
-            
             logger.info("Invoice paid event processed")
 
         elif event_type == "payment.succeeded":
@@ -568,8 +546,6 @@ async def handle_dodopayments_webhook(
         logger.error(f"Error processing webhook: {e}")
         raise HTTPException(status_code=500, detail="Webhook processing failed")
 
-
-
 async def _handle_client_invoice_payment(data: Dict, db: Session):
     """Handle payment webhook for client invoices"""
     from ..models_invoice import Invoice
@@ -583,9 +559,6 @@ async def _handle_client_invoice_payment(data: Dict, db: Session):
     if not invoice_id:
         logger.info("Payment webhook without invoice_id in metadata - likely a subscription payment")
         return
-    
-    logger.info(f"💰 Processing client invoice payment for invoice {invoice_id}")
-    
     try:
         invoice = db.query(Invoice).filter(Invoice.id == int(invoice_id)).first()
         if not invoice:
@@ -610,7 +583,6 @@ async def _handle_client_invoice_payment(data: Dict, db: Session):
             user.unread_payments_count = (user.unread_payments_count or 0) + 1
         
         db.commit()
-        logger.info(f"✅ Invoice {invoice_id} marked as paid, unread counter updated")
         business_config = db.query(BusinessConfig).filter(
             BusinessConfig.user_id == invoice.user_id
         ).first()
@@ -629,7 +601,6 @@ async def _handle_client_invoice_payment(data: Dict, db: Session):
                     currency=invoice.currency,
                     payment_date=datetime.utcnow().strftime("%B %d, %Y")
                 )
-                logger.info(f"📧 Payment notification sent to provider {user.email}")
             except Exception as e:
                 logger.error(f"Failed to send provider notification: {e}")
         
@@ -644,7 +615,6 @@ async def _handle_client_invoice_payment(data: Dict, db: Session):
                     amount=invoice.total_amount,
                     currency=invoice.currency
                 )
-                logger.info(f"📧 Thank you email sent to client {client.email}")
             except Exception as e:
                 logger.error(f"Failed to send client thank you email: {e}")
                 

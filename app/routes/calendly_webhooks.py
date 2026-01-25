@@ -27,7 +27,6 @@ rate_limit_webhook = create_rate_limiter(
 
 CALENDLY_WEBHOOK_SECRET = os.getenv("CALENDLY_WEBHOOK_SECRET")
 
-
 @router.post("/events")
 async def handle_calendly_webhook(
     request: Request,
@@ -68,8 +67,6 @@ async def handle_calendly_webhook(
         elif event_type == "invitee.canceled":
             await handle_invitee_canceled(event_data, db)
         else:
-            logger.info(f"ℹ️ Unhandled event type: {event_type}")
-        
         return {"status": "ok"}
     
     except HTTPException:
@@ -78,7 +75,6 @@ async def handle_calendly_webhook(
         logger.error(f"❌ Webhook processing error: {str(e)}")
         logger.exception("Full webhook error traceback:")
         raise HTTPException(status_code=500, detail=str(e))
-
 
 async def handle_invitee_created(event_data: dict, db: Session):
     """Handle new Calendly booking"""
@@ -134,7 +130,6 @@ async def handle_invitee_created(event_data: dict, db: Session):
         ).first()
         
         if existing:
-            logger.info(f"ℹ️ Schedule already exists for event: {event_uri}")
             return
         
         # Create new schedule entry
@@ -159,14 +154,10 @@ async def handle_invitee_created(event_data: dict, db: Session):
         db.add(schedule)
         db.commit()
         db.refresh(schedule)
-        
-        logger.info(f"✅ Created schedule from Calendly booking: ID={schedule.id}, Event={event_uri}")
-    
     except Exception as e:
         logger.error(f"❌ Error handling invitee.created: {str(e)}")
         logger.exception("Full error traceback:")
         db.rollback()
-
 
 async def handle_invitee_canceled(event_data: dict, db: Session):
     """Handle Calendly booking cancellation"""
@@ -190,9 +181,6 @@ async def handle_invitee_canceled(event_data: dict, db: Session):
         schedule.status = "cancelled"
         schedule.notes = (schedule.notes or "") + f"\n[Auto-cancelled via Calendly at {datetime.utcnow().isoformat()}]"
         db.commit()
-        
-        logger.info(f"✅ Cancelled schedule from Calendly: ID={schedule.id}, Event={event_uri}")
-    
     except Exception as e:
         logger.error(f"❌ Error handling invitee.canceled: {str(e)}")
         logger.exception("Full error traceback:")

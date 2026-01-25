@@ -28,7 +28,6 @@ rate_limit_trial = create_rate_limiter(
     use_ip=True
 )
 
-
 class TrialFormData(BaseModel):
     clientName: str
     clientEmail: Optional[EmailStr] = None
@@ -39,10 +38,8 @@ class TrialFormData(BaseModel):
     numberOfRooms: Optional[int] = None
     address: Optional[str] = None
 
-
 class TrialCheckRequest(BaseModel):
     sessionId: str
-
 
 def get_client_ip(request: Request) -> str:
     """Extract client IP from request, handling proxies"""
@@ -61,12 +58,10 @@ def get_client_ip(request: Request) -> str:
     
     return "unknown"
 
-
 def hash_identifier(session_id: str, ip_address: str) -> str:
     """Create a hash of session + IP for privacy"""
     combined = f"{session_id}:{ip_address}"
     return hashlib.sha256(combined.encode()).hexdigest()
-
 
 @router.post("/check-eligibility")
 async def check_trial_eligibility(
@@ -101,7 +96,6 @@ async def check_trial_eligibility(
     except Exception as e:
         logger.error(f"Error checking trial eligibility: {e}")
         raise HTTPException(status_code=500, detail="Failed to check eligibility")
-
 
 @router.post("/generate-contract")
 async def generate_trial_contract(
@@ -271,9 +265,6 @@ async def generate_trial_contract(
         
         db.commit()
         trial_record_id = result.fetchone()[0]
-        
-        logger.info(f"✅ Trial contract generated: ID={trial_record_id}, Session={session_id}, IP={ip_address}")
-        
         # Generate backend URL instead of presigned R2 URL to avoid CORS issues
         from ..config import FRONTEND_URL
         # Determine the backend base URL based on the frontend URL
@@ -302,7 +293,6 @@ async def generate_trial_contract(
         logger.error(f"Error generating trial contract: {e}")
         db.rollback()
         raise HTTPException(status_code=500, detail="Failed to generate trial contract")
-
 
 @router.get("/contract/{trial_id}/pdf")
 async def get_trial_contract_pdf(
@@ -339,7 +329,6 @@ async def get_trial_contract_pdf(
     except Exception as e:
         logger.error(f"Error retrieving trial contract: {e}")
         raise HTTPException(status_code=500, detail="Failed to retrieve contract")
-
 
 @router.get("/pdf/public/{trial_id}")
 async def view_trial_contract_pdf_public(

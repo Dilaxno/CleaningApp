@@ -15,13 +15,11 @@ router = APIRouter(prefix="/users", tags=["Users"])
 # Default profile picture for users without one
 DEFAULT_PROFILE_PICTURE = "https://res.cloudinary.com/dxqum9ywx/image/upload/v1768518062/pfp_dvk6gi.jpg"
 
-
 def validate_firebase_uid(firebase_uid: str) -> bool:
     """Validate firebase_uid format to prevent injection"""
     if not firebase_uid or len(firebase_uid) > 128:
         return False
     return firebase_uid.replace("-", "").replace("_", "").isalnum()
-
 
 def verify_user_access(firebase_uid: str, current_user: User) -> None:
     """Verify the authenticated user has access to the requested resource"""
@@ -33,7 +31,6 @@ def verify_user_access(firebase_uid: str, current_user: User) -> None:
             status_code=403, detail="You can only access your own user data"
         )
 
-
 class UserCreate(BaseModel):
     firebaseUid: str
     email: str
@@ -42,7 +39,6 @@ class UserCreate(BaseModel):
     hearAbout: Optional[str] = None
     profilePictureUrl: Optional[str] = None
 
-
 class UserUpdate(BaseModel):
     fullName: Optional[str] = None
     email: Optional[str] = None
@@ -50,7 +46,6 @@ class UserUpdate(BaseModel):
     accountType: Optional[str] = None
     hearAbout: Optional[str] = None
     plan: Optional[str] = None
-
 
 class UserResponse(BaseModel):
     id: int
@@ -67,7 +62,6 @@ class UserResponse(BaseModel):
     class Config:
         from_attributes = True
 
-
 @router.post("", response_model=UserResponse)
 def create_or_update_user(data: UserCreate, db: Session = Depends(get_db)):
     """Create or update a user from Firebase"""
@@ -78,7 +72,6 @@ def create_or_update_user(data: UserCreate, db: Session = Depends(get_db)):
         user = db.query(User).filter(User.firebase_uid == data.firebaseUid).first()
 
         if user:
-            logger.info(f"📝 Updating existing user: {user.id}")
             user.email = data.email
             if data.fullName:
                 user.full_name = data.fullName
@@ -110,8 +103,6 @@ def create_or_update_user(data: UserCreate, db: Session = Depends(get_db)):
 
         db.commit()
         db.refresh(user)
-        logger.info(f"✅ User saved: id={user.id}, account_type={user.account_type}, hear_about={user.hear_about}")
-        
         # Generate presigned URL for profile picture if exists
         response = UserResponse.model_validate(user)
         if user.profile_picture_url:
@@ -125,7 +116,6 @@ def create_or_update_user(data: UserCreate, db: Session = Depends(get_db)):
         logger.error(f"❌ Error saving user: {str(e)}")
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @router.get("/{firebase_uid}/plan-usage")
 def get_plan_usage(
@@ -144,7 +134,6 @@ def get_plan_usage(
     verify_user_access(firebase_uid, current_user)
 
     return get_usage_stats(current_user, db)
-
 
 @router.get("/{firebase_uid}")
 def get_user(
@@ -185,7 +174,6 @@ def get_user(
         "hear_about": current_user.hear_about,
         "onboarding_completed": current_user.onboarding_completed,
     }
-
 
 @router.put("/{firebase_uid}")
 def update_user(
@@ -231,8 +219,6 @@ def update_user(
                 )
             except Exception:
                 pass
-
-        logger.info(f"✅ User updated: id={current_user.id}")
         return {
             "id": current_user.id,
             "firebase_uid": current_user.firebase_uid,
@@ -251,7 +237,6 @@ def update_user(
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @router.patch("/{firebase_uid}")
 def patch_user(
     firebase_uid: str,
@@ -261,7 +246,6 @@ def patch_user(
 ):
     """Partially update user settings (authenticated - same as PUT)"""
     return update_user(firebase_uid, data, current_user, db)
-
 
 # Payout Information Models
 class PayoutInfoUpdate(BaseModel):
@@ -275,7 +259,6 @@ class PayoutInfoUpdate(BaseModel):
     swiftBic: Optional[str] = None  # SWIFT/BIC code
     bankAddress: Optional[str] = None
 
-
 class PayoutInfoResponse(BaseModel):
     country: Optional[str] = None
     currency: Optional[str] = None
@@ -288,13 +271,11 @@ class PayoutInfoResponse(BaseModel):
     bankAddress: Optional[str] = None
     isConfigured: bool = False
 
-
 def mask_sensitive(value: Optional[str], visible_chars: int = 4) -> Optional[str]:
     """Mask sensitive data, showing only last few characters"""
     if not value or len(value) <= visible_chars:
         return value
     return "*" * (len(value) - visible_chars) + value[-visible_chars:]
-
 
 @router.get("/{firebase_uid}/payout-info", response_model=PayoutInfoResponse)
 def get_payout_info(
@@ -327,7 +308,6 @@ def get_payout_info(
         isConfigured=is_configured
     )
 
-
 @router.put("/{firebase_uid}/payout-info")
 def update_payout_info(
     firebase_uid: str,
@@ -356,9 +336,6 @@ def update_payout_info(
         
         db.commit()
         db.refresh(current_user)
-        
-        logger.info(f"✅ Payout info updated for user: {current_user.id}")
-        
         return {
             "success": True,
             "message": "Payout information saved successfully"

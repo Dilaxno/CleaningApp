@@ -15,16 +15,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/calendly", tags=["calendly"])
 calendly_service = CalendlyService()
 
-
 class CalendlyOAuthResponse(BaseModel):
     authorization_url: str
     state: str
 
-
 class CalendlyTokenRequest(BaseModel):
     code: str
     state: str
-
 
 class CalendlyConnectionStatus(BaseModel):
     connected: bool
@@ -32,12 +29,10 @@ class CalendlyConnectionStatus(BaseModel):
     event_types: Optional[List[Dict[str, Any]]] = None
     default_event_type: Optional[Dict[str, str]] = None
 
-
 class EventTypeUpdate(BaseModel):
     event_type_uri: str
     event_type_name: str
     event_type_url: str
-
 
 @router.get("/connect", response_model=CalendlyOAuthResponse)
 async def initiate_calendly_connection(
@@ -51,14 +46,10 @@ async def initiate_calendly_connection(
     # For now, we'll trust the frontend to send it back
     
     auth_url = calendly_service.get_authorization_url(state)
-    
-    logger.info(f"🔗 Generated Calendly auth URL for user {current_user.id}")
-    
     return CalendlyOAuthResponse(
         authorization_url=auth_url,
         state=state
     )
-
 
 @router.post("/callback")
 async def calendly_oauth_callback(
@@ -68,8 +59,6 @@ async def calendly_oauth_callback(
 ):
     """Handle OAuth callback and store tokens"""
     try:
-        logger.info(f"📥 Processing Calendly callback for user {current_user.id}")
-        
         # Exchange code for tokens
         token_data = await calendly_service.exchange_code_for_token(data.code)
         
@@ -92,7 +81,6 @@ async def calendly_oauth_callback(
             integration.calendly_user_uri = user_info["resource"]["uri"]
             integration.calendly_user_email = user_info["resource"]["email"]
             integration.calendly_organization_uri = user_info["resource"].get("current_organization")
-            logger.info(f"✅ Updated Calendly integration for user {current_user.id}")
         else:
             # Create new
             integration = CalendlyIntegration(
@@ -105,8 +93,6 @@ async def calendly_oauth_callback(
                 calendly_organization_uri=user_info["resource"].get("current_organization")
             )
             db.add(integration)
-            logger.info(f"✅ Created new Calendly integration for user {current_user.id}")
-        
         db.commit()
         db.refresh(integration)
         
@@ -125,7 +111,6 @@ async def calendly_oauth_callback(
                 integration.default_event_type_name = first_event.get("name")
                 integration.default_event_type_url = first_event.get("scheduling_url")
                 db.commit()
-                logger.info(f"✅ Auto-selected default event type: {first_event.get('name')}")
         except Exception as event_err:
             logger.warning(f"⚠️ Failed to auto-select event type: {event_err}")
             # Don't fail the connection if event type selection fails
@@ -140,7 +125,6 @@ async def calendly_oauth_callback(
         logger.error(f"❌ Failed to connect Calendly for user {current_user.id}: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Failed to connect Calendly: {str(e)}")
 
-
 async def _ensure_fresh_token(integration: CalendlyIntegration, db: Session) -> str:
     """Ensure access token is fresh, refresh if needed"""
     if datetime.utcnow() >= integration.token_expires_at - timedelta(minutes=5):
@@ -151,13 +135,11 @@ async def _ensure_fresh_token(integration: CalendlyIntegration, db: Session) -> 
             integration.refresh_token = token_data.get("refresh_token", integration.refresh_token)
             integration.token_expires_at = datetime.utcnow() + timedelta(seconds=token_data.get("expires_in", 7200))
             db.commit()
-            logger.info(f"✅ Token refreshed for user {integration.user_id}")
         except Exception as e:
             logger.error(f"❌ Failed to refresh token for user {integration.user_id}: {str(e)}")
             raise HTTPException(status_code=401, detail="Calendly token expired. Please reconnect.")
     
     return integration.access_token
-
 
 @router.get("/status", response_model=CalendlyConnectionStatus)
 async def get_calendly_status(
@@ -213,7 +195,6 @@ async def get_calendly_status(
         logger.error(f"❌ Failed to get Calendly status: {str(e)}")
         return CalendlyConnectionStatus(connected=False)
 
-
 @router.post("/disconnect")
 async def disconnect_calendly(
     current_user: User = Depends(get_current_user),
@@ -235,7 +216,6 @@ async def disconnect_calendly(
     logger.info(f"🔌 Disconnected Calendly for user {current_user.id}")
     
     return {"message": "Calendly disconnected successfully"}
-
 
 @router.put("/event-type")
 async def set_default_event_type(
@@ -259,7 +239,6 @@ async def set_default_event_type(
     logger.info(f"📅 Set default event type for user {current_user.id}: {data.event_type_name}")
     
     return {"message": "Default event type updated"}
-
 
 @router.get("/events")
 async def get_upcoming_events(
@@ -309,7 +288,6 @@ async def get_upcoming_events(
     
     return {"collection": enriched_events}
 
-
 @router.get("/scheduling-link/{client_id}")
 async def get_client_scheduling_link(
     client_id: int,
@@ -356,7 +334,6 @@ async def get_client_scheduling_link(
         "client_name": client.business_name
     }
 
-
 @router.delete("/events/{event_uuid}")
 async def cancel_calendly_event(
     event_uuid: str,
@@ -381,9 +358,6 @@ async def cancel_calendly_event(
             event_uuid,
             reason="Cancelled by provider"
         )
-        
-        logger.info(f"✅ Cancelled Calendly event {event_uuid} for user {current_user.id}")
-        
         return {"message": "Consultation cancelled successfully"}
     except Exception as e:
         logger.error(f"❌ Failed to cancel Calendly event {event_uuid}: {str(e)}")

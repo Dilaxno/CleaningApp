@@ -18,13 +18,11 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/payouts", tags=["Payouts"])
 
-
 class PayoutRequest(BaseModel):
     invoice_ids: List[int]
     payout_method: str = "bank_transfer"  # "bank_transfer" | "paypal"
     payout_details: Optional[dict] = None  # e.g., {"bank_name": "...", "account_holder": "...", "account_number": "...", "routing_number": "..."} or {"paypal_email": "..."}
     notes: Optional[str] = None
-
 
 class PayoutResponse(BaseModel):
     id: int
@@ -39,14 +37,12 @@ class PayoutResponse(BaseModel):
     reference_id: Optional[str]
     notes: Optional[str]
 
-
 class PaymentSummary(BaseModel):
     total_received: float
     total_pending: float
     total_available: float
     total_paid_out: float
     currency: str
-
 
 class ClientPaymentInfo(BaseModel):
     client_id: int
@@ -55,7 +51,6 @@ class ClientPaymentInfo(BaseModel):
     total_pending: float
     last_payment_date: Optional[datetime]
     invoice_count: int
-
 
 @router.get("/summary", response_model=PaymentSummary)
 async def get_payment_summary(
@@ -91,7 +86,6 @@ async def get_payment_summary(
         total_paid_out=total_paid_out,
         currency="USD"
     )
-
 
 @router.get("/client-payments", response_model=List[ClientPaymentInfo])
 async def get_client_payments(
@@ -139,7 +133,6 @@ async def get_client_payments(
     
     return result
 
-
 @router.get("/history", response_model=List[PayoutResponse])
 async def get_payout_history(
     status: Optional[str] = None,
@@ -168,7 +161,6 @@ async def get_payout_history(
         notes=p.notes
     ) for p in payouts]
 
-
 @router.post("/request", response_model=PayoutResponse)
 async def request_payout(
     data: PayoutRequest,
@@ -176,8 +168,6 @@ async def request_payout(
     db: Session = Depends(get_db)
 ):
     """Request a payout for paid invoices"""
-    logger.info(f"💰 Payout request from user {current_user.id}")
-    
     if not data.invoice_ids:
         raise HTTPException(status_code=400, detail="No invoices selected for payout")
     
@@ -227,9 +217,6 @@ async def request_payout(
     db.add(payout)
     db.commit()
     db.refresh(payout)
-    
-    logger.info(f"✅ Payout request created: {payout.id} for ${total_amount}")
-    
     return PayoutResponse(
         id=payout.id,
         amount=payout.amount,
@@ -243,7 +230,6 @@ async def request_payout(
         reference_id=payout.reference_id,
         notes=payout.notes
     )
-
 
 @router.get("/available-invoices")
 async def get_available_invoices_for_payout(
@@ -284,7 +270,6 @@ async def get_available_invoices_for_payout(
         })
     
     return result
-
 
 @router.get("/last-method")
 async def get_last_payout_method(
