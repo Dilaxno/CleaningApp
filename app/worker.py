@@ -208,21 +208,38 @@ async def generate_contract_pdf_task(ctx, client_id: int, owner_uid: str, form_d
         else:
             backend_base = "https://api.cleanenroll.com"
         
-        # Create contract record first to get public_id
-        contract = Contract(
-            user_id=user.id,
-            client_id=client.id,
-            title=f"Cleaning Contract - {client.business_name or client.contact_name}",
-            pdf_key=pdf_key,
-            total_value=quote.get("final_price", quote.get("total", 0)),
-            status="new" if not signature else "signed",
-        )
+        # Check if contract already exists for this client to avoid duplicates
+        contract = db.query(Contract).filter(
+            Contract.client_id == client.id,
+            Contract.user_id == user.id
+        ).order_by(Contract.created_at.desc()).first()
         
-        if signature:
-            contract.client_signature = signature
-            contract.signed_at = datetime.now()
+        if contract:
+            # Update existing contract
+            logger.info(f"📝 Updating existing contract {contract.id} for client {client.id}")
+            contract.pdf_key = pdf_key
+            contract.total_value = quote.get("final_price", quote.get("total", 0))
+            if signature and not contract.client_signature:
+                contract.client_signature = signature
+                contract.signed_at = datetime.now()
+        else:
+            # Create new contract record
+            logger.info(f"📝 Creating new contract for client {client.id}")
+            contract = Contract(
+                user_id=user.id,
+                client_id=client.id,
+                title=f"Cleaning Contract - {client.business_name or client.contact_name}",
+                pdf_key=pdf_key,
+                total_value=quote.get("final_price", quote.get("total", 0)),
+                status="new" if not signature else "signed",
+            )
+            
+            if signature:
+                contract.client_signature = signature
+                contract.signed_at = datetime.now()
+            
+            db.add(contract)
         
-        db.add(contract)
         db.commit()
         db.refresh(contract)
         

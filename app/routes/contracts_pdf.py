@@ -1324,6 +1324,7 @@ async def view_contract_pdf_public(
     """
     View a contract PDF publicly using the contract's public ID
     Rate limited: 5 downloads per minute per IP, 3 downloads per minute per contract
+    Regenerates PDF if signatures have been added since last generation
     """
     # Validate UUID format
     from .contracts import validate_uuid
@@ -1341,10 +1342,78 @@ async def view_contract_pdf_public(
     # Apply per-contract rate limit
     await rate_limit_per_contract(request, contract.id)
     
+    # Check if PDF needs regeneration (signatures added after PDF generation)
+    needs_regeneration = False
+    if contract.client_signature and contract.client_signature_timestamp:
+        # Check if client signed after PDF was last generated
+        # If pdf_hash was updated after client signed, PDF is current
+        # Otherwise, need to regenerate
+        if not contract.signed_at or (contract.client_signature_timestamp and not contract.pdf_hash):
+            needs_regeneration = True
+            logger.info(f"🔄 PDF needs regeneration: client signature exists but PDF may not include it")
+    
     try:
-        r2 = get_r2_client()
-        response = r2.get_object(Bucket=R2_BUCKET_NAME, Key=contract.pdf_key)
-        pdf_bytes = response['Body'].read()
+        # If PDF needs regeneration, generate new one with signatures
+        if needs_regeneration:
+            logger.info(f"📄 Regenerating PDF for contract {contract.id} with client signature")
+            
+            # Get required data
+            client = db.query(Client).filter(Client.id == contract.client_id).first()
+            if not client:
+                raise HTTPException(status_code=404, detail="Client not found")
+            
+            user = db.query(User).filter(User.id == contract.user_id).first()
+            if not user:
+                raise HTTPException(status_code=404, detail="User not found")
+            
+            config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
+            if not config:
+                raise HTTPException(status_code=500, detail="Business config not found")
+            
+            form_data = client.form_data if client.form_data else {}
+            
+            # Calculate quote
+            quote = calculate_quote(config, form_data)
+            
+            # Generate HTML with signatures
+            html = await generate_contract_html(
+                config,
+                client,
+                form_data,
+                quote,
+                client_signature=contract.client_signature,
+                provider_signature=contract.provider_signature,
+                contract_created_at=contract.created_at
+            )
+            
+            # Generate PDF
+            pdf_bytes = await html_to_pdf(html)
+            logger.info(f"✅ PDF regenerated with signatures: {len(pdf_bytes)} bytes")
+            
+            # Upload new PDF to R2
+            import hashlib
+            pdf_hash = hashlib.sha256(pdf_bytes).hexdigest()
+            pdf_key = f"contracts/{user.firebase_uid}/{contract.id}-{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
+            
+            r2 = get_r2_client()
+            r2.put_object(
+                Bucket=R2_BUCKET_NAME,
+                Key=pdf_key,
+                Body=pdf_bytes,
+                ContentType="application/pdf"
+            )
+            
+            # Update contract with new PDF
+            contract.pdf_key = pdf_key
+            contract.pdf_hash = pdf_hash
+            db.commit()
+            
+            logger.info(f"✅ Contract PDF updated with client signature")
+        else:
+            # Serve existing PDF from R2
+            r2 = get_r2_client()
+            response = r2.get_object(Bucket=R2_BUCKET_NAME, Key=contract.pdf_key)
+            pdf_bytes = response['Body'].read()
         
         return Response(
             content=pdf_bytes,
@@ -1359,6 +1428,8 @@ async def view_contract_pdf_public(
         )
     except Exception as e:
         logger.error(f"❌ Failed to serve PDF: {str(e)}")
+        import traceback
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail="Failed to load PDF")
 
 
