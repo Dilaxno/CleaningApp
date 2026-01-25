@@ -1,16 +1,17 @@
 import logging
+from typing import Dict, List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from typing import Optional, List, Dict
-from ..database import get_db
-from ..models import User, BusinessConfig
+from sqlalchemy.orm import Session
+
 from ..auth import get_current_user
+from ..database import get_db
+from ..models import BusinessConfig, User
 from .upload import generate_presigned_url
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/business-config", tags=["Business Configuration"])
 
 class BusinessConfigCreate(BaseModel):
     firebaseUid: str
@@ -28,7 +29,9 @@ class BusinessConfigCreate(BaseModel):
     workingHours: Optional[Dict[str, str]] = None
     breakTimes: Optional[List[str]] = None
     daySchedules: Optional[Dict] = None  # Per-day working hours
-    offWorkPeriods: Optional[List[Dict]] = None  # Off-work periods (vacations, holidays)
+    offWorkPeriods: Optional[List[Dict]] = (
+        None  # Off-work periods (vacations, holidays)
+    )
     customAddons: Optional[List[Dict]] = None  # Custom add-on services
     suppliesProvided: Optional[str] = None  # "provider" or "client"
     availableSupplies: Optional[List[str]] = None  # List of supply IDs
@@ -64,6 +67,7 @@ class BusinessConfigCreate(BaseModel):
     customExclusions: Optional[List[str]] = None
     preferredUnits: Optional[str] = None
 
+
 def to_float(val: Optional[str]) -> Optional[float]:
     """Convert string to float, returning None for empty/invalid values."""
     if val is None or val == "":
@@ -72,6 +76,7 @@ def to_float(val: Optional[str]) -> Optional[float]:
         return float(val)
     except ValueError:
         return None
+
 
 def to_int(val: Optional[str]) -> Optional[int]:
     """Convert string to int, returning None for empty/invalid values."""
@@ -82,6 +87,7 @@ def to_int(val: Optional[str]) -> Optional[int]:
     except ValueError:
         return None
 
+
 def is_provided(val) -> bool:
     """Check if a value was actually provided (not None and not empty string)."""
     if val is None:
@@ -90,12 +96,19 @@ def is_provided(val) -> bool:
         return False
     return True
 
+
 @router.get("")
-def get_current_user_business_config(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def get_current_user_business_config(
+    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
     """Get business config for the currently authenticated user"""
     logger.info(f"📥 Getting business config for current user: {current_user.id}")
-    
-    config = db.query(BusinessConfig).filter(BusinessConfig.user_id == current_user.id).first()
+
+    config = (
+        db.query(BusinessConfig)
+        .filter(BusinessConfig.user_id == current_user.id)
+        .first()
+    )
     if not config:
         logger.warning(f"⚠️ Business config not found for user_id: {current_user.id}")
         raise HTTPException(status_code=404, detail="Business config not found")
@@ -103,13 +116,13 @@ def get_current_user_business_config(current_user: User = Depends(get_current_us
     # Generate presigned URLs for logo and signature if they exist
     logo_presigned_url = None
     signature_presigned_url = None
-    
+
     if config.logo_url:
         try:
             logo_presigned_url = generate_presigned_url(config.logo_url)
         except Exception as e:
             logger.warning(f"⚠️ Failed to generate presigned URL for logo: {e}")
-    
+
     if config.signature_url:
         try:
             signature_presigned_url = generate_presigned_url(config.signature_url)
@@ -165,22 +178,31 @@ def get_current_user_business_config(current_user: User = Depends(get_current_us
         "addonCarpetLarge": config.addon_carpet_large,
     }
 
+
 @router.post("")
 def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get_db)):
     logger.info(f"📥 Creating business config for firebase_uid: {data.firebaseUid}")
-    logger.info(f"📋 Data received: pricingModel={data.pricingModel}, logoUrl={data.logoUrl}")
-    logger.info(f"📋 Pricing data: ratePerSqft={data.ratePerSqft}, ratePerRoom={data.ratePerRoom}, hourlyRate={data.hourlyRate}, flatRate={data.flatRate}")
+    logger.info(
+        f"📋 Data received: pricingModel={data.pricingModel}, logoUrl={data.logoUrl}"
+    )
+    logger.info(
+        f"📋 Pricing data: ratePerSqft={data.ratePerSqft}, ratePerRoom={data.ratePerRoom}, hourlyRate={data.hourlyRate}, flatRate={data.flatRate}"
+    )
     logger.info(f"📋 Business name: {data.businessName}")
     logger.info(f"📋 All data fields: {data.model_dump()}")
-    
+
     try:
         user = db.query(User).filter(User.firebase_uid == data.firebaseUid).first()
         if not user:
             logger.error(f"❌ User not found for firebase_uid: {data.firebaseUid}")
             raise HTTPException(status_code=404, detail="User not found")
-        existing = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
+        existing = (
+            db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
+        )
         if existing:
-            logger.info(f"📝 Current DB values: logo_url={existing.logo_url}, rate_per_sqft={existing.rate_per_sqft}, pricing_model={existing.pricing_model}")
+            logger.info(
+                f"📝 Current DB values: logo_url={existing.logo_url}, rate_per_sqft={existing.rate_per_sqft}, pricing_model={existing.pricing_model}"
+            )
             # Only update fields that are explicitly provided (not None and not empty string)
             if is_provided(data.businessName):
                 existing.business_name = data.businessName
@@ -333,10 +355,14 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
             db.add(config)
             db.commit()
 
-        user.onboarding_completed = data.onboardingComplete if data.onboardingComplete is not None else user.onboarding_completed
+        user.onboarding_completed = (
+            data.onboardingComplete
+            if data.onboardingComplete is not None
+            else user.onboarding_completed
+        )
         db.commit()
         return {"message": "Business configuration saved", "id": config.id}
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -344,14 +370,19 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.get("/{firebase_uid}")
 def get_business_config(firebase_uid: str, db: Session = Depends(get_db)):
     logger.info(f"📥 Getting business config for firebase_uid: {firebase_uid}")
-    
+
     # Validate firebase_uid format to prevent injection
-    if not firebase_uid or len(firebase_uid) > 128 or not firebase_uid.replace('-', '').replace('_', '').isalnum():
+    if (
+        not firebase_uid
+        or len(firebase_uid) > 128
+        or not firebase_uid.replace("-", "").replace("_", "").isalnum()
+    ):
         raise HTTPException(status_code=400, detail="Invalid user identifier")
-    
+
     user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
     if not user:
         logger.error(f"❌ User not found for firebase_uid: {firebase_uid}")
@@ -365,13 +396,13 @@ def get_business_config(firebase_uid: str, db: Session = Depends(get_db)):
     # Generate presigned URLs for logo and signature if they exist
     logo_presigned_url = None
     signature_presigned_url = None
-    
+
     if config.logo_url:
         try:
             logo_presigned_url = generate_presigned_url(config.logo_url)
         except Exception as e:
             logger.warning(f"⚠️ Failed to generate presigned URL for logo: {e}")
-    
+
     if config.signature_url:
         try:
             signature_presigned_url = generate_presigned_url(config.signature_url)
@@ -421,6 +452,7 @@ def get_business_config(firebase_uid: str, db: Session = Depends(get_db)):
         "addonCarpetLarge": config.addon_carpet_large,
     }
 
+
 @router.get("/public/branding/{firebase_uid}")
 def get_public_branding(firebase_uid: str, db: Session = Depends(get_db)):
     """
@@ -428,18 +460,22 @@ def get_public_branding(firebase_uid: str, db: Session = Depends(get_db)):
     No authentication required - accessed via shareable form links.
     """
     logger.info(f"📥 Getting public branding for firebase_uid: {firebase_uid}")
-    
+
     # Validate firebase_uid format to prevent injection
-    if not firebase_uid or len(firebase_uid) > 128 or not firebase_uid.replace('-', '').replace('_', '').isalnum():
+    if (
+        not firebase_uid
+        or len(firebase_uid) > 128
+        or not firebase_uid.replace("-", "").replace("_", "").isalnum()
+    ):
         raise HTTPException(status_code=400, detail="Invalid business identifier")
-    
+
     user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
     if not user:
         logger.error(f"❌ User not found for firebase_uid: {firebase_uid}")
         raise HTTPException(status_code=404, detail="Business not found")
 
     config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
-    
+
     # Return default branding if no config exists
     if not config:
         return {
@@ -457,8 +493,10 @@ def get_public_branding(firebase_uid: str, db: Session = Depends(get_db)):
     return {
         "businessName": config.business_name,
         "logoUrl": logo_presigned_url,
+        "brandColor": config.brand_color,  # Brand color for intake forms
         "plan": user.plan,  # Include plan for conditional badge display
     }
+
 
 @router.get("/public/addons/{firebase_uid}")
 def get_public_addons(firebase_uid: str, db: Session = Depends(get_db)):
@@ -467,18 +505,22 @@ def get_public_addons(firebase_uid: str, db: Session = Depends(get_db)):
     No authentication required - accessed via shareable form links.
     """
     logger.info(f"📥 Getting public addons for firebase_uid: {firebase_uid}")
-    
+
     # Validate firebase_uid format to prevent injection
-    if not firebase_uid or len(firebase_uid) > 128 or not firebase_uid.replace('-', '').replace('_', '').isalnum():
+    if (
+        not firebase_uid
+        or len(firebase_uid) > 128
+        or not firebase_uid.replace("-", "").replace("_", "").isalnum()
+    ):
         raise HTTPException(status_code=400, detail="Invalid business identifier")
-    
+
     user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
     if not user:
         logger.error(f"❌ User not found for firebase_uid: {firebase_uid}")
         raise HTTPException(status_code=404, detail="Business not found")
 
     config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
-    
+
     # Return empty addons if no config exists
     if not config:
         return {
@@ -498,6 +540,7 @@ def get_public_addons(firebase_uid: str, db: Session = Depends(get_db)):
         "addonCarpetLarge": config.addon_carpet_large,
     }
 
+
 @router.get("/{firebase_uid}/public-info")
 def get_public_business_info(firebase_uid: str, db: Session = Depends(get_db)):
     """
@@ -505,29 +548,39 @@ def get_public_business_info(firebase_uid: str, db: Session = Depends(get_db)):
     No authentication required - accessed via client forms and scheduling components.
     """
     logger.info(f"📥 Getting public business info for firebase_uid: {firebase_uid}")
-    
+
     # Validate firebase_uid format to prevent injection
-    if not firebase_uid or len(firebase_uid) > 128 or not firebase_uid.replace('-', '').replace('_', '').isalnum():
+    if (
+        not firebase_uid
+        or len(firebase_uid) > 128
+        or not firebase_uid.replace("-", "").replace("_", "").isalnum()
+    ):
         raise HTTPException(status_code=400, detail="Invalid business identifier")
-    
+
     # Find user by firebase_uid
     user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
     if not user:
         logger.warning(f"❌ User not found for firebase_uid: {firebase_uid}")
         raise HTTPException(status_code=404, detail="Business not found")
-    
+
     # Get business config
     config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
     if not config:
         logger.warning(f"❌ Business config not found for user_id: {user.id}")
         raise HTTPException(status_code=404, detail="Business configuration not found")
-    
+
     # Parse working hours and days with defaults
     working_hours = {"start": "9:00", "end": "17:00"}  # Default 9 AM - 5 PM
-    working_days = ["monday", "tuesday", "wednesday", "thursday", "friday"]  # Default weekdays
+    working_days = [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+    ]  # Default weekdays
     day_schedules = {}
     off_work_periods = []
-    
+
     # Use the stored working_hours, working_days, day_schedules, and off_work_periods
     if config.working_hours:
         try:
@@ -535,37 +588,45 @@ def get_public_business_info(firebase_uid: str, db: Session = Depends(get_db)):
                 working_hours = config.working_hours
             elif isinstance(config.working_hours, str):
                 import json
+
                 working_hours = json.loads(config.working_hours)
         except Exception as e:
             logger.warning(f"⚠️ Failed to parse working_hours for {firebase_uid}: {e}")
-    
+
     if config.working_days:
         try:
             if isinstance(config.working_days, list):
                 working_days = config.working_days
             elif isinstance(config.working_days, str):
                 import json
+
                 working_days = json.loads(config.working_days)
         except Exception as e:
             logger.warning(f"⚠️ Failed to parse working_days for {firebase_uid}: {e}")
-    
+
     if config.day_schedules:
         try:
             if isinstance(config.day_schedules, dict):
                 day_schedules = config.day_schedules
             elif isinstance(config.day_schedules, str):
                 import json
+
                 day_schedules = json.loads(config.day_schedules)
         except Exception as e:
             logger.warning(f"⚠️ Failed to parse day_schedules for {firebase_uid}: {e}")
-    
+
     if config.off_work_periods:
         try:
             if isinstance(config.off_work_periods, list):
                 off_work_periods = config.off_work_periods
             elif isinstance(config.off_work_periods, str):
                 import json
+
                 off_work_periods = json.loads(config.off_work_periods)
+        except Exception as e:
+            logger.warning(
+                f"⚠️ Failed to parse off_work_periods for {firebase_uid}: {e}"
+            )
         except Exception as e:
             logger.warning(f"⚠️ Failed to parse off_work_periods for {firebase_uid}: {e}")
     return {
