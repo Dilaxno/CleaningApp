@@ -67,6 +67,9 @@ async def handle_calendly_webhook(
         elif event_type == "invitee.canceled":
             await handle_invitee_canceled(event_data, db)
         else:
+            # Handle other event types or ignore them
+            logger.info(f"Unhandled event type: {event_type}")
+        
         return {"status": "ok"}
     
     except HTTPException:
