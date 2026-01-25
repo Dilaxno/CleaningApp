@@ -97,7 +97,7 @@ def send_via_custom_smtp(
         server.sendmail(from_address.split("<")[-1].rstrip(">"), recipients, msg.as_string())
         server.quit()
         
-        logger.info(f"✅ Email sent via custom SMTP to {recipients}")
+        pass
         return {"id": f"smtp-{datetime.utcnow().timestamp()}", "success": True}
         
     except Exception as e:
@@ -387,7 +387,7 @@ async def send_email(
     # Try custom SMTP first if configured and live
     if business_config and business_config.smtp_status == "live" and business_config.smtp_host:
         try:
-            logger.info(f"📧 Sending email via custom SMTP to {recipients} - Subject: {subject}")
+            pass
             response = send_via_custom_smtp(
                 business_config=business_config,
                 to=recipients,
@@ -406,14 +406,14 @@ async def send_email(
         raise Exception("Email service not configured")
     
     try:
-        logger.info(f"📧 Sending email via Resend to {recipients} - Subject: {subject}")
+        pass
         response = resend.Emails.send({
             "from": sender,
             "to": recipients,
             "subject": subject,
             "html": html_content,
         })
-        logger.info(f"✅ Email sent successfully to {recipients} - Response: {response}")
+        pass
         return response
     except Exception as e:
         logger.error(f"❌ Email send error to {recipients}: {e}")

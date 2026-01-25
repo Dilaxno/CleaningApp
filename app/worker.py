@@ -66,7 +66,7 @@ async def generate_contract_pdf_task(ctx, client_id: int, owner_uid: str, form_d
     from .config import R2_BUCKET_NAME
     from datetime import datetime
     
-    logger.info(f"📄 Starting contract PDF generation for client {client_id}")
+    logger.info(f"Starting contract PDF generation for client {client_id}")
     
     db = SessionLocal()
     try:
@@ -86,15 +86,15 @@ async def generate_contract_pdf_task(ctx, client_id: int, owner_uid: str, form_d
         
         # Calculate quote
         quote = calculate_quote(config, form_data)
-        logger.info(f"💰 Quote calculated: {quote}")
+        pass
         
         # Generate HTML
         html = await generate_contract_html(config, client, form_data, quote, signature)
-        logger.info(f"📝 HTML generated: {len(html)} chars")
+        pass
         
         # Generate PDF
         pdf_bytes = await html_to_pdf(html)
-        logger.info(f"✅ PDF generated: {len(pdf_bytes)} bytes")
+        pass
         
         # Upload to R2
         pdf_key = f"contracts/{user.firebase_uid}/{client.id}-{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
@@ -137,7 +137,7 @@ async def generate_contract_pdf_task(ctx, client_id: int, owner_uid: str, form_d
         # Generate backend PDF URL using public_id
         backend_pdf_url = f"{backend_base}/contracts/pdf/public/{contract.public_id}"
         
-        logger.info(f"✅ Contract created: ID={contract.id}, PDF uploaded to R2")
+        logger.info(f"Contract created: ID={contract.id}")
         
         return {
             "contract_id": contract.id,
@@ -165,7 +165,7 @@ async def send_form_notification_emails_task(ctx, client_id: int, user_id: int, 
     """
     from .email_service import send_new_client_notification, send_form_submission_confirmation
     
-    logger.info(f"📧 Starting email notifications for client {client_id}")
+    logger.info(f"Starting email notifications for client {client_id}")
     
     db = SessionLocal()
     try:
@@ -191,7 +191,7 @@ async def send_form_notification_emails_task(ctx, client_id: int, user_id: int, 
                 client_email=client.email or "Not provided",
                 property_type=client.property_type or "Not specified",
             )
-            logger.info(f"✅ Notification email sent to business owner: {user.email}")
+            pass
         
         # Send confirmation to client
         if client.email:
@@ -201,7 +201,7 @@ async def send_form_notification_emails_task(ctx, client_id: int, user_id: int, 
                 business_name=business_name,
                 property_type=client.property_type or "Property",
             )
-            logger.info(f"✅ Confirmation email sent to client: {client.email}")
+            pass
         
         return {"status": "completed", "emails_sent": 2 if user.email and client.email else 1 if user.email or client.email else 0}
         
@@ -220,7 +220,7 @@ async def smtp_health_check_task(ctx):
     from .routes.smtp import test_smtp_connection, decrypt_password
     from datetime import datetime
     
-    logger.info("🔍 Starting daily SMTP health check")
+    logger.info("Starting daily SMTP health check")
     
     db = SessionLocal()
     try:
@@ -230,7 +230,7 @@ async def smtp_health_check_task(ctx):
             BusinessConfig.smtp_email.isnot(None)
         ).all()
         
-        logger.info(f"📧 Checking {len(configs)} SMTP configurations")
+        logger.info(f"Checking {len(configs)} SMTP configurations")
         
         checked = 0
         failed = 0
@@ -269,7 +269,7 @@ async def smtp_health_check_task(ctx):
                 logger.error(f"❌ SMTP check error for user {config.user_id}: {e}")
         
         db.commit()
-        logger.info(f"✅ SMTP health check complete: {checked} checked, {failed} failed")
+        logger.info(f"SMTP health check complete: {checked} checked, {failed} failed")
         
         return {"checked": checked, "failed": failed}
         
@@ -290,12 +290,12 @@ async def status_automation_task(ctx):
     """
     from .services.status_automation import update_contract_statuses
     
-    logger.info("🔄 Starting daily status automation")
+    logger.info("Starting daily status automation")
     
     db = SessionLocal()
     try:
         summary = update_contract_statuses(db)
-        logger.info(f"✅ Status automation complete: {summary}")
+        logger.info(f"Status automation complete: {summary}")
         return summary
     except Exception as e:
         logger.error(f"❌ Status automation failed: {str(e)}")
@@ -333,7 +333,7 @@ async def reset_monthly_client_limits_task(ctx):
                 # If counter was reset, increment our counter
                 if user.clients_this_month < before_count or (before_count > 0 and user.clients_this_month == 0):
                     reset_count += 1
-                    logger.info(f"✅ Reset client limit for user {user.id} (plan: {user.plan}, was: {before_count}, now: {user.clients_this_month})")
+                    pass
                 
                 checked_count += 1
                 
@@ -341,7 +341,7 @@ async def reset_monthly_client_limits_task(ctx):
                 logger.error(f"❌ Failed to check/reset limits for user {user.id}: {str(e)}")
                 continue
         
-        logger.info(f"✅ Monthly limit reset complete: checked {checked_count} users, reset {reset_count} users")
+        logger.info(f"Monthly limit reset complete: checked {checked_count} users, reset {reset_count} users")
         
         return {
             "checked": checked_count,

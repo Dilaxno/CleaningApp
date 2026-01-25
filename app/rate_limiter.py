@@ -58,8 +58,7 @@ def get_redis_client() -> redis.Redis:
                 )
                 # Test connection
                 info = redis_client.ping()
-                logger.info(f"✅ Redis connected successfully via URL - Rate limiting is ACTIVE")
-                logger.info(f"📊 Redis connection test: PONG received")
+                logger.info("Redis connected successfully via URL")
             except Exception as e:
                 logger.error(f"❌ Failed to connect to Redis via URL: {str(e)}")
                 logger.error(f"⚠️ Rate limiting will NOT work - all requests will be allowed (fail-open mode)")
@@ -96,8 +95,7 @@ def get_redis_client() -> redis.Redis:
                 # Test connection
                 redis_client.ping()
                 ssl_status = "with SSL" if redis_ssl else "without SSL"
-                logger.info(f"✅ Redis connected successfully at {redis_host}:{redis_port} ({ssl_status})")
-                logger.info(f"📊 Redis connection test: PONG received - Rate limiting is ACTIVE")
+                logger.info(f"Redis connected successfully at {redis_host}:{redis_port} ({ssl_status})")
             except Exception as e:
                 logger.error(f"❌ Failed to connect to Redis: {str(e)}")
                 logger.error(f"⚠️ Rate limiting will NOT work - all requests will be allowed (fail-open mode)")
@@ -273,10 +271,8 @@ async def rate_limit_dependency(
                 headers={"Retry-After": str(retry_after)}
             )
         
-        if current_count % 100 == 0:  # Log every 100 requests instead of every request
-            logger.info(f"📊 Rate limit status for {key} - {current_count}/{limit} requests used")
-        else:
-            logger.debug(f"✅ Rate limit check passed for {key} - {current_count}/{limit} requests used")
+        if current_count % 100 == 0:
+            logger.debug(f"Rate limit status for {key} - {current_count}/{limit} requests used")
         
         # Add rate limit headers to response (will be added by middleware if needed)
         request.state.rate_limit_remaining = limit - current_count
