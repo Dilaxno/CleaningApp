@@ -8,31 +8,15 @@ from playwright.sync_api import sync_playwright
 
 
 def generate_pdf(html: str) -> bytes:
-    """Generate PDF from HTML using Playwright (optimized for speed)"""
+    """Generate PDF from HTML using Playwright"""
     with sync_playwright() as p:
-        # Launch browser with performance optimizations
-        browser = p.chromium.launch(
-            headless=True,
-            args=[
-                '--disable-gpu',
-                '--no-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-web-security',  # Allows embedded images
-                '--disable-features=VizDisplayCompositor',
-            ]
-        )
+        browser = p.chromium.launch()
         page = browser.new_page()
-        
-        # Use 'load' instead of 'networkidle' for 3-5x faster generation
-        # 'load' waits for DOM to load, 'networkidle' waits for all network requests (slow!)
-        page.set_content(html, wait_until="load")
-        
-        # Generate PDF
+        page.set_content(html, wait_until="networkidle")
         pdf = page.pdf(
             format="A4",
             margin={"top": "20px", "bottom": "20px", "left": "20px", "right": "20px"},
-            print_background=True,
-            prefer_css_page_size=False
+            print_background=True
         )
         browser.close()
         return pdf

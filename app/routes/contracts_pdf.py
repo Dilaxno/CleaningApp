@@ -389,86 +389,67 @@ async def generate_contract_html(
     
     logger.info(f"🏢 Business config - name: {business_name}, logo_url key: {business_config.logo_url}")
     
-    # Prepare all image download tasks for parallel execution
-    import asyncio
-    download_tasks = []
-    task_names = []
-    
-    # Task 1: Download logo
-    async def download_logo():
-        if not business_config.logo_url:
-            return None
+    # Download and convert logo to base64 for Playwright
+    if business_config.logo_url:
         try:
+            # Check if logo_url is already a full URL (shouldn't be, but handle it)
             if business_config.logo_url.startswith('http'):
                 presigned_logo_url = business_config.logo_url
+                logger.info(f"ℹ️ Logo URL is already a full URL")
             else:
                 presigned_logo_url = generate_presigned_url(business_config.logo_url)
-            logger.info(f"📥 Downloading logo...")
-            return await download_image_as_base64(presigned_logo_url)
-        except Exception as e:
-            logger.error(f"❌ Failed to download logo: {e}")
-            return None
-    
-    # Task 2: Download provider signature
-    async def download_provider_sig():
-        if provider_signature:
-            if provider_signature.startswith("data:image"):
-                return provider_signature
-            elif provider_signature.startswith("http"):
-                logger.info(f"📥 Downloading provider signature...")
-                return await download_image_as_base64(provider_signature)
+            logger.info(f"✅ Generated presigned URL for logo: {presigned_logo_url[:100]}...")
+            logo_url = await download_image_as_base64(presigned_logo_url)
+            if logo_url:
+                logger.info(f"✅ Logo downloaded and converted to base64 ({len(logo_url)} chars)")
             else:
-                return provider_signature
-        elif business_config.signature_url:
-            try:
-                presigned_sig_url = generate_presigned_url(business_config.signature_url)
-                logger.info(f"📥 Downloading provider signature from config...")
-                return await download_image_as_base64(presigned_sig_url)
-            except Exception as e:
-                logger.warning(f"⚠️ Failed to download signature: {e}")
-                return None
-        return None
+                logger.warning(f"⚠️ Logo download returned None for URL: {presigned_logo_url[:100]}...")
+        except Exception as e:
+            logger.error(f"❌ Failed to generate/download logo: {type(e).__name__}: {e}")
+            import traceback
+            logger.error(f"❌ Traceback: {traceback.format_exc()}")
+    else:
+        logger.info("ℹ️ No logo_url configured in business config")
     
-    # Task 3: Download client signature
-    async def download_client_sig():
-        if not client_signature:
-            return None
-        if client_signature.startswith("data:image"):
-            return client_signature
-        elif client_signature.startswith("http"):
-            logger.info(f"📥 Downloading client signature...")
-            return await download_image_as_base64(client_signature)
+    # Download and convert provider signature to base64
+    if provider_signature:
+        # Check if it's already base64 or a URL
+        if provider_signature.startswith("data:image"):
+            signature_url = provider_signature
+        elif provider_signature.startswith("http"):
+            signature_url = await download_image_as_base64(provider_signature)
+            if signature_url:
+                logger.info("✅ Provider signature downloaded and converted to base64")
         else:
-            return client_signature
+            signature_url = provider_signature
+    elif business_config.signature_url:
+        try:
+            presigned_sig_url = generate_presigned_url(business_config.signature_url)
+            logger.info(f"✅ Generated presigned URL for signature: {business_config.signature_url}")
+            signature_url = await download_image_as_base64(presigned_sig_url)
+            if signature_url:
+                logger.info("✅ Provider signature downloaded and converted to base64")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to generate signature URL: {e}")
     
-    # Execute all downloads in parallel
-    logger.info("🚀 Starting parallel image downloads...")
-    logo_url, signature_url, client_signature_result = await asyncio.gather(
-        download_logo(),
-        download_provider_sig(),
-        download_client_sig(),
-        return_exceptions=True
-    )
-    
-    # Handle exceptions from parallel downloads
-    if isinstance(logo_url, Exception):
-        logger.error(f"❌ Logo download failed: {logo_url}")
-        logo_url = None
-    elif logo_url:
-        logger.info(f"✅ Logo ready ({len(logo_url)} chars)")
-    
-    if isinstance(signature_url, Exception):
-        logger.error(f"❌ Provider signature download failed: {signature_url}")
-        signature_url = None
-    elif signature_url:
-        logger.info("✅ Provider signature ready")
-    
-    if isinstance(client_signature_result, Exception):
-        logger.error(f"❌ Client signature download failed: {client_signature_result}")
-        client_signature = None
-    elif client_signature_result:
-        client_signature = client_signature_result
-        logger.info("✅ Client signature ready")
+    # Download and convert client signature to base64
+    if client_signature:
+        if client_signature.startswith("data:image"):
+            # Already base64, use as-is
+            logger.info("✅ Client signature is already base64 format")
+        elif client_signature.startswith("http"):
+            # Download from URL
+            logger.info(f"📥 Downloading client signature from URL: {client_signature[:100]}...")
+            client_signature_b64 = await download_image_as_base64(client_signature)
+            if client_signature_b64:
+                client_signature = client_signature_b64
+                logger.info("✅ Client signature downloaded and converted to base64")
+            else:
+                logger.warning("⚠️ Failed to download client signature from URL")
+        # else: assume it's already in correct format
+        logger.info(f"📝 Final client signature format: {client_signature[:50]}...")
+    else:
+        logger.info("ℹ️ No client signature provided")
     
     # Contract details - use passed date or current date for new contracts
     base_date = contract_created_at or datetime.now()
@@ -1045,7 +1026,7 @@ async def download_image_as_base64(url: str) -> str:
     
     try:
         logger.info(f"📥 Downloading image from: {url[:100]}...")
-        async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.get(url)
             logger.info(f"📥 Response status: {response.status_code}, content-type: {response.headers.get('content-type')}")
             response.raise_for_status()
@@ -1109,7 +1090,7 @@ async def html_to_pdf(html: str) -> bytes:
                 input=html_b64,
                 capture_output=True,
                 text=True,
-                timeout=60,  # 60 second timeout with buffer for complex contracts
+                timeout=120,  # 120 second timeout for slow systems
                 creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
             )
             
@@ -1122,7 +1103,7 @@ async def html_to_pdf(html: str) -> bytes:
                 raise Exception("PDF worker returned empty output")
             return base64.b64decode(pdf_b64)
         except subprocess.TimeoutExpired:
-            raise Exception("PDF generation timed out after 60 seconds")
+            raise Exception("PDF generation timed out after 120 seconds")
         except Exception as e:
             raise Exception(f"PDF generation error: {str(e)}")
     
@@ -1324,7 +1305,6 @@ async def view_contract_pdf_public(
     """
     View a contract PDF publicly using the contract's public ID
     Rate limited: 5 downloads per minute per IP, 3 downloads per minute per contract
-    Regenerates PDF if signatures have been added since last generation
     """
     # Validate UUID format
     from .contracts import validate_uuid
@@ -1342,78 +1322,10 @@ async def view_contract_pdf_public(
     # Apply per-contract rate limit
     await rate_limit_per_contract(request, contract.id)
     
-    # Check if PDF needs regeneration (signatures added after PDF generation)
-    needs_regeneration = False
-    if contract.client_signature and contract.client_signature_timestamp:
-        # Check if client signed after PDF was last generated
-        # If pdf_hash was updated after client signed, PDF is current
-        # Otherwise, need to regenerate
-        if not contract.signed_at or (contract.client_signature_timestamp and not contract.pdf_hash):
-            needs_regeneration = True
-            logger.info(f"🔄 PDF needs regeneration: client signature exists but PDF may not include it")
-    
     try:
-        # If PDF needs regeneration, generate new one with signatures
-        if needs_regeneration:
-            logger.info(f"📄 Regenerating PDF for contract {contract.id} with client signature")
-            
-            # Get required data
-            client = db.query(Client).filter(Client.id == contract.client_id).first()
-            if not client:
-                raise HTTPException(status_code=404, detail="Client not found")
-            
-            user = db.query(User).filter(User.id == contract.user_id).first()
-            if not user:
-                raise HTTPException(status_code=404, detail="User not found")
-            
-            config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
-            if not config:
-                raise HTTPException(status_code=500, detail="Business config not found")
-            
-            form_data = client.form_data if client.form_data else {}
-            
-            # Calculate quote
-            quote = calculate_quote(config, form_data)
-            
-            # Generate HTML with signatures
-            html = await generate_contract_html(
-                config,
-                client,
-                form_data,
-                quote,
-                client_signature=contract.client_signature,
-                provider_signature=contract.provider_signature,
-                contract_created_at=contract.created_at
-            )
-            
-            # Generate PDF
-            pdf_bytes = await html_to_pdf(html)
-            logger.info(f"✅ PDF regenerated with signatures: {len(pdf_bytes)} bytes")
-            
-            # Upload new PDF to R2
-            import hashlib
-            pdf_hash = hashlib.sha256(pdf_bytes).hexdigest()
-            pdf_key = f"contracts/{user.firebase_uid}/{contract.id}-{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
-            
-            r2 = get_r2_client()
-            r2.put_object(
-                Bucket=R2_BUCKET_NAME,
-                Key=pdf_key,
-                Body=pdf_bytes,
-                ContentType="application/pdf"
-            )
-            
-            # Update contract with new PDF
-            contract.pdf_key = pdf_key
-            contract.pdf_hash = pdf_hash
-            db.commit()
-            
-            logger.info(f"✅ Contract PDF updated with client signature")
-        else:
-            # Serve existing PDF from R2
-            r2 = get_r2_client()
-            response = r2.get_object(Bucket=R2_BUCKET_NAME, Key=contract.pdf_key)
-            pdf_bytes = response['Body'].read()
+        r2 = get_r2_client()
+        response = r2.get_object(Bucket=R2_BUCKET_NAME, Key=contract.pdf_key)
+        pdf_bytes = response['Body'].read()
         
         return Response(
             content=pdf_bytes,
@@ -1428,8 +1340,6 @@ async def view_contract_pdf_public(
         )
     except Exception as e:
         logger.error(f"❌ Failed to serve PDF: {str(e)}")
-        import traceback
-        logger.error(f"❌ Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail="Failed to load PDF")
 
 

@@ -47,98 +47,6 @@ def get_redis_settings() -> RedisSettings:
         )
 
 
-async def regenerate_contract_pdf_task(ctx, contract_id: int):
-    """
-    Background task to regenerate contract PDF after signature updates.
-    This allows signature endpoints to return instantly.
-    
-    Args:
-        ctx: ARQ context
-        contract_id: Contract ID to regenerate
-    
-    Returns:
-        dict with status and pdf_url
-    """
-    from .routes.contracts_pdf import calculate_quote, generate_contract_html, html_to_pdf
-    from .routes.upload import get_r2_client, generate_presigned_url
-    from .config import R2_BUCKET_NAME
-    from datetime import datetime
-    import hashlib
-    
-    logger.info(f"📄 Starting PDF regeneration for contract {contract_id}")
-    
-    db = SessionLocal()
-    try:
-        # Get contract
-        contract = db.query(Contract).filter(Contract.id == contract_id).first()
-        if not contract:
-            raise Exception(f"Contract not found: {contract_id}")
-        
-        # Get related data
-        client = db.query(Client).filter(Client.id == contract.client_id).first()
-        if not client:
-            raise Exception(f"Client not found: {contract.client_id}")
-        
-        user = db.query(User).filter(User.id == contract.user_id).first()
-        if not user:
-            raise Exception(f"User not found: {contract.user_id}")
-        
-        config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
-        if not config:
-            raise Exception("Business config not found")
-        
-        # Get form data
-        form_data = client.form_data if client.form_data else {}
-        
-        # Calculate quote
-        quote = calculate_quote(config, form_data)
-        
-        # Generate HTML with signatures
-        html = await generate_contract_html(
-            config, 
-            client, 
-            form_data, 
-            quote,
-            client_signature=contract.client_signature,
-            provider_signature=contract.provider_signature,
-            contract_created_at=contract.created_at
-        )
-        
-        # Generate PDF
-        pdf_bytes = await html_to_pdf(html)
-        logger.info(f"✅ PDF regenerated: {len(pdf_bytes)} bytes")
-        
-        # Upload to R2
-        pdf_key = f"contracts/{user.firebase_uid}/{contract.id}-{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
-        pdf_hash = hashlib.sha256(pdf_bytes).hexdigest()
-        
-        r2_client = get_r2_client()
-        r2_client.put_object(
-            Bucket=R2_BUCKET_NAME,
-            Key=pdf_key,
-            Body=pdf_bytes,
-            ContentType="application/pdf"
-        )
-        
-        # Update contract with new PDF
-        contract.pdf_key = pdf_key
-        contract.pdf_hash = pdf_hash
-        db.commit()
-        
-        logger.info(f"✅ Contract PDF updated: ID={contract.id}")
-        
-        return {
-            "contract_id": contract.id,
-            "status": "completed"
-        }
-        
-    except Exception as e:
-        logger.error(f"❌ PDF regeneration failed: {str(e)}")
-        raise
-    finally:
-        db.close()
-
-
 async def generate_contract_pdf_task(ctx, client_id: int, owner_uid: str, form_data: dict, signature: str = None):
     """
     Background task to generate contract PDF
@@ -208,38 +116,21 @@ async def generate_contract_pdf_task(ctx, client_id: int, owner_uid: str, form_d
         else:
             backend_base = "https://api.cleanenroll.com"
         
-        # Check if contract already exists for this client to avoid duplicates
-        contract = db.query(Contract).filter(
-            Contract.client_id == client.id,
-            Contract.user_id == user.id
-        ).order_by(Contract.created_at.desc()).first()
+        # Create contract record first to get public_id
+        contract = Contract(
+            user_id=user.id,
+            client_id=client.id,
+            title=f"Cleaning Contract - {client.business_name or client.contact_name}",
+            pdf_key=pdf_key,
+            total_value=quote.get("final_price", quote.get("total", 0)),
+            status="new" if not signature else "signed",
+        )
         
-        if contract:
-            # Update existing contract
-            logger.info(f"📝 Updating existing contract {contract.id} for client {client.id}")
-            contract.pdf_key = pdf_key
-            contract.total_value = quote.get("final_price", quote.get("total", 0))
-            if signature and not contract.client_signature:
-                contract.client_signature = signature
-                contract.signed_at = datetime.now()
-        else:
-            # Create new contract record
-            logger.info(f"📝 Creating new contract for client {client.id}")
-            contract = Contract(
-                user_id=user.id,
-                client_id=client.id,
-                title=f"Cleaning Contract - {client.business_name or client.contact_name}",
-                pdf_key=pdf_key,
-                total_value=quote.get("final_price", quote.get("total", 0)),
-                status="new" if not signature else "signed",
-            )
-            
-            if signature:
-                contract.client_signature = signature
-                contract.signed_at = datetime.now()
-            
-            db.add(contract)
+        if signature:
+            contract.client_signature = signature
+            contract.signed_at = datetime.now()
         
+        db.add(contract)
         db.commit()
         db.refresh(contract)
         
@@ -466,7 +357,7 @@ async def reset_monthly_client_limits_task(ctx):
 
 class WorkerSettings:
     """ARQ Worker Settings - Optimized for Scale"""
-    functions = [generate_contract_pdf_task, regenerate_contract_pdf_task, send_form_notification_emails_task, smtp_health_check_task, status_automation_task, reset_monthly_client_limits_task]
+    functions = [generate_contract_pdf_task, send_form_notification_emails_task, smtp_health_check_task, status_automation_task, reset_monthly_client_limits_task]
     redis_settings = get_redis_settings()
     
     # Scalability settings - adjust based on server resources

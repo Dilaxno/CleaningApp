@@ -401,48 +401,123 @@ async def sign_contract_as_provider(
     increment_client_count(current_user, db)
     logger.info(f"📊 Client count incremented for user {current_user.id}: {current_user.clients_this_month}")
     
-    # Queue PDF regeneration as background job (don't block the response!)
-    logger.info(f"📄 Queueing PDF regeneration for contract {contract.id}")
+    # Regenerate PDF with provider signature
+    logger.info(f"📄 Regenerating contract PDF with provider signature")
     try:
-        from arq import create_pool
-        from ..worker import get_redis_settings
+        import hashlib
+        from .contracts_pdf import generate_contract_html, html_to_pdf, calculate_quote
+        from .upload import get_r2_client, R2_BUCKET_NAME
         
-        redis_settings = get_redis_settings()
-        pool = await create_pool(redis_settings)
+        # Get form data for regeneration
+        form_data = client.form_data if client.form_data else {}
+        quote = calculate_quote(business_config, form_data)
         
-        job = await pool.enqueue_job(
-            'regenerate_contract_pdf_task',
-            contract.id
+        # Debug the signatures being passed to HTML generation
+        logger.info(f"🖊️ [PROVIDER SIGN] About to generate HTML with:")
+        logger.info(f"🖊️ [PROVIDER SIGN] Client signature: {'SET (' + str(len(contract.client_signature)) + ' chars)' if contract.client_signature else 'NOT SET'}")
+        logger.info(f"🖊️ [PROVIDER SIGN] Provider signature: {'SET (' + str(len(signature_to_use)) + ' chars)' if signature_to_use else 'NOT SET'}")
+        
+        # Generate HTML with both signatures - use contract's created_at for consistent dates
+        html = await generate_contract_html(
+            business_config,
+            client,
+            form_data,
+            quote,
+            client_signature=contract.client_signature,
+            provider_signature=signature_to_use,
+            contract_created_at=contract.created_at
         )
         
-        logger.info(f"✅ PDF regeneration queued: job_id={job.job_id}")
-    except Exception as queue_err:
-        logger.error(f"⚠️ Failed to queue PDF regeneration: {queue_err}")
-        # Don't fail the signature if queueing fails - PDF will be regenerated eventually
+        # Convert to PDF
+        pdf_bytes = await html_to_pdf(html)
+        pdf_hash = hashlib.sha256(pdf_bytes).hexdigest()
+        
+        # Upload to R2
+        r2 = get_r2_client()
+        pdf_key = f"contracts/{current_user.id}/{contract.id}_signed.pdf"
+        r2.put_object(Bucket=R2_BUCKET_NAME, Key=pdf_key, Body=pdf_bytes, ContentType="application/pdf")
+        
+        # Update contract with new PDF
+        contract.pdf_key = pdf_key
+        contract.pdf_hash = pdf_hash
+        db.commit()
+        
+        logger.info(f"✅ Contract PDF regenerated with provider signature: {pdf_key}")
+    except Exception as e:
+        logger.error(f"Failed to regenerate PDF with provider signature: {e}")
+        # Continue even if PDF regeneration fails
     
-    # Send email notification about signing (async, don't block)
-    try:
-        from ..email_service import send_contract_fully_signed_notification
-        # Fire and forget - don't await
-        import asyncio
-        asyncio.create_task(
-            send_contract_fully_signed_notification(
-                client_email=client.email,
-                client_name=client.contact_name,
+    # Prepare email data
+    pdf_url = get_pdf_url(contract.pdf_key, contract.public_id) if contract.pdf_key else None
+    service_type = contract.contract_type or "Cleaning Service"
+    start_date = contract.start_date.strftime("%B %d, %Y") if contract.start_date else None
+    property_address = client.address if hasattr(client, 'address') else None
+    business_phone = business_config.business_phone if business_config and hasattr(business_config, 'business_phone') else None
+    
+    # Send notification email to client
+    if client.email:
+        try:
+            await send_contract_fully_executed_email(
+                to=client.email,
+                client_name=client.contact_name or client.business_name,
                 business_name=business_name,
-                contract_public_id=str(contract.public_id)
+                contract_title=contract.title,
+                contract_id=contract.id,
+                service_type=service_type,
+                start_date=start_date,
+                total_value=contract.total_value,
+                property_address=property_address,
+                business_phone=business_phone,
+                contract_pdf_url=pdf_url,
+                contract_public_id=contract.public_id
             )
-        )
-    except Exception:
-        pass  # Don't fail signature if email fails
+            logger.info(f"✅ Sent fully executed contract email to {client.email}")
+        except Exception as e:
+            logger.error(f"Failed to send client email: {e}")
+            # Don't fail the signing if email fails
     
-    # Return immediately - PDF generation happens in background
-    return {
-        "status": "success",
-        "message": "Contract signed successfully. PDF is being generated.",
-        "contract_id": contract.id,
-        "contract_status": contract.status
-    }
+    # Send confirmation email to provider
+    if current_user.email:
+        try:
+            await send_provider_contract_signed_confirmation(
+                to=current_user.email,
+                provider_name=current_user.full_name or "Provider",
+                contract_id=contract.id,
+                client_name=client.business_name,
+                property_address=property_address,
+                contract_pdf_url=pdf_url
+            )
+            logger.info(f"✅ Sent provider confirmation email to {current_user.email}")
+        except Exception as e:
+            logger.error(f"Failed to send provider email: {e}")
+            # Don't fail the signing if email fails
+    
+    logger.info(f"✅ Contract {contract_id} fully signed")
+    
+    pdf_url = get_pdf_url(contract.pdf_key, contract.public_id)
+    return ContractResponse(
+        id=contract.id,
+        public_id=contract.public_id,
+        clientId=contract.client_id,
+        clientPublicId=client.public_id,
+        clientName=client.business_name,
+        clientEmail=client.email,
+        title=contract.title,
+        description=contract.description,
+        contractType=contract.contract_type,
+        status=contract.status,
+        startDate=contract.start_date,
+        endDate=contract.end_date,
+        totalValue=contract.total_value,
+        paymentTerms=contract.payment_terms,
+        termsConditions=contract.terms_conditions,
+        pdfUrl=pdf_url,
+        hasPdf=bool(contract.pdf_key),
+        providerSignature=contract.provider_signature,
+        signedAt=contract.signed_at,
+        clientSignatureTimestamp=contract.client_signature_timestamp,
+        createdAt=contract.created_at
+    )
 
 
 @router.delete("/{contract_id}")
