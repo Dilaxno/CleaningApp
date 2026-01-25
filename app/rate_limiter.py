@@ -1,18 +1,31 @@
 """
-Redis-based rate limiting utilities
+Hybrid in-memory + Redis rate limiting utilities
+Optimized to minimize Redis commands and stay within Upstash limits
 """
 import redis
 import os
 import time
 import logging
-from typing import Optional
+from typing import Optional, Dict, Tuple
 from fastapi import HTTPException, Request
 from functools import wraps
+from collections import defaultdict
+from threading import Lock
 
 logger = logging.getLogger(__name__)
 
 # Redis connection
 redis_client: Optional[redis.Redis] = None
+
+# In-memory cache for rate limiting (dramatically reduces Redis usage)
+# Format: {key: {'count': int, 'reset_time': int, 'last_redis_sync': int}}
+memory_cache: Dict[str, Dict] = {}
+cache_lock = Lock()
+
+# Configuration
+MEMORY_CACHE_SYNC_INTERVAL = 10  # Sync to Redis every 10 seconds
+MEMORY_CACHE_CLEANUP_INTERVAL = 60  # Clean up expired entries every 60 seconds
+last_cleanup_time = 0
 
 def get_redis_client() -> redis.Redis:
     """
@@ -93,14 +106,40 @@ def get_redis_client() -> redis.Redis:
     return redis_client
 
 
+def cleanup_expired_cache():
+    """Remove expired entries from memory cache"""
+    global last_cleanup_time
+    current_time = int(time.time())
+    
+    if current_time - last_cleanup_time < MEMORY_CACHE_CLEANUP_INTERVAL:
+        return
+    
+    with cache_lock:
+        expired_keys = [
+            k for k, v in memory_cache.items()
+            if current_time >= v.get('reset_time', 0)
+        ]
+        for k in expired_keys:
+            del memory_cache[k]
+        
+        if expired_keys:
+            logger.debug(f"🧹 Cleaned up {len(expired_keys)} expired rate limit entries")
+    
+    last_cleanup_time = current_time
+
+
 def check_rate_limit(
     key: str,
     limit: int,
     window_seconds: int,
     redis_client: redis.Redis
 ) -> tuple[bool, int, int]:
-    """
-    Check if rate limit is exceeded using sliding window
+    """Check if rate limit is exceeded using hybrid in-memory + Redis approach
+    
+    This dramatically reduces Redis usage by:
+    1. Checking in-memory cache first (no Redis calls)
+    2. Only syncing to Redis every 10 seconds
+    3. Using simple INCR instead of sorted sets (1 command vs 6-7)
     
     Args:
         key: Redis key for this rate limit
@@ -113,40 +152,74 @@ def check_rate_limit(
     """
     try:
         current_time = int(time.time())
-        window_start = current_time - window_seconds
         
-        # Use Redis sorted set with timestamps as scores
-        pipe = redis_client.pipeline()
+        # Periodic cleanup of expired cache
+        cleanup_expired_cache()
         
-        # Remove old entries outside the window
-        pipe.zremrangebyscore(key, 0, window_start)
-        
-        # Count current requests in window
-        pipe.zcard(key)
-        
-        # Add current request
-        pipe.zadd(key, {str(current_time): current_time})
-        
-        # Set expiry on the key
-        pipe.expire(key, window_seconds)
-        
-        results = pipe.execute()
-        current_count = results[1]
-        
-        # Check if limit exceeded (check before we added the current request)
-        is_allowed = current_count < limit
-        
-        if not is_allowed:
-            # Remove the request we just added since it's not allowed
-            redis_client.zrem(key, str(current_time))
-        
-        ttl = redis_client.ttl(key)
-        
-        return is_allowed, current_count + 1, ttl if ttl > 0 else window_seconds
+        with cache_lock:
+            # Get or create cache entry
+            if key not in memory_cache:
+                # Initialize from Redis if exists, otherwise create new
+                try:
+                    redis_count = redis_client.get(key)
+                    redis_ttl = redis_client.ttl(key)
+                    
+                    if redis_count and redis_ttl > 0:
+                        memory_cache[key] = {
+                            'count': int(redis_count),
+                            'reset_time': current_time + redis_ttl,
+                            'last_redis_sync': current_time
+                        }
+                    else:
+                        # New window
+                        memory_cache[key] = {
+                            'count': 0,
+                            'reset_time': current_time + window_seconds,
+                            'last_redis_sync': current_time
+                        }
+                except Exception as e:
+                    logger.warning(f"⚠️ Failed to load from Redis, using memory only: {e}")
+                    memory_cache[key] = {
+                        'count': 0,
+                        'reset_time': current_time + window_seconds,
+                        'last_redis_sync': current_time
+                    }
+            
+            cache_entry = memory_cache[key]
+            
+            # Check if window has expired
+            if current_time >= cache_entry['reset_time']:
+                # Reset window
+                cache_entry['count'] = 0
+                cache_entry['reset_time'] = current_time + window_seconds
+                cache_entry['last_redis_sync'] = 0  # Force sync on next interval
+            
+            # Check limit
+            current_count = cache_entry['count']
+            is_allowed = current_count < limit
+            
+            if is_allowed:
+                cache_entry['count'] += 1
+            
+            # Sync to Redis periodically (not on every request!)
+            time_since_sync = current_time - cache_entry.get('last_redis_sync', 0)
+            if time_since_sync >= MEMORY_CACHE_SYNC_INTERVAL:
+                try:
+                    # Use simple INCR + EXPIRE (only 2 Redis commands!)
+                    pipe = redis_client.pipeline()
+                    pipe.set(key, cache_entry['count'], ex=window_seconds)
+                    pipe.execute()
+                    cache_entry['last_redis_sync'] = current_time
+                    logger.debug(f"📡 Synced {key} to Redis: {cache_entry['count']}/{limit}")
+                except Exception as e:
+                    logger.warning(f"⚠️ Failed to sync to Redis: {e}")
+            
+            ttl = cache_entry['reset_time'] - current_time
+            return is_allowed, cache_entry['count'], max(0, ttl)
         
     except Exception as e:
         logger.error(f"❌ Rate limit check failed: {str(e)}")
-        # Fail open - allow request if Redis is down
+        # Fail open - allow request if rate limiting fails
         return True, 0, 0
 
 
@@ -200,7 +273,10 @@ async def rate_limit_dependency(
                 headers={"Retry-After": str(retry_after)}
             )
         
-        logger.debug(f"✅ Rate limit check passed for {key} - {current_count}/{limit} requests used")
+        if current_count % 100 == 0:  # Log every 100 requests instead of every request
+            logger.info(f"📊 Rate limit status for {key} - {current_count}/{limit} requests used")
+        else:
+            logger.debug(f"✅ Rate limit check passed for {key} - {current_count}/{limit} requests used")
         
         # Add rate limit headers to response (will be added by middleware if needed)
         request.state.rate_limit_remaining = limit - current_count

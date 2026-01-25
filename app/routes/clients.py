@@ -635,15 +635,8 @@ async def submit_public_form(
     
     logger.info(f"📥 Public form submission for owner UID: {data.ownerUid} from IP: {client_ip}")
     
-    # Increment submission count (24 hour expiry) for monitoring
-    redis_client = get_redis_client()
-    ip_submission_key = f"submissions:ip:{client_ip}"
-    submission_count = redis_client.get(ip_submission_key)
-    submission_count = int(submission_count) if submission_count else 0
-    redis_client.incr(ip_submission_key)
-    redis_client.expire(ip_submission_key, 86400)  # 24 hours
-    
-    logger.info(f"📊 Submission count for IP {client_ip}: {submission_count + 1}")
+    # Note: Rate limiting handles submission abuse prevention
+    # No need for additional Redis tracking here
     
     # Strict input validation
     validation_errors = []
