@@ -472,10 +472,13 @@ async def generate_contract_html(
     if signature_url:
         provider_signature_html = f"<img src='{signature_url}' alt='Provider Signature'>"
     else:
+        provider_signature_html = ""
+    
     client_signature_html = ""
     if client_signature:
         client_signature_html = f"<img src='{client_signature}' alt='Client Signature'>"
     else:
+        client_signature_html = ""
     html = f"""
 <!DOCTYPE html>
 <html lang="en">
