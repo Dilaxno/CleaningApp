@@ -28,6 +28,10 @@ class User(Base):
     # Dodo subscription identifier for this user's active subscription; used for change/cancel flows
     subscription_id = Column(String(255), nullable=True)
     subscription_start_date = Column(DateTime, nullable=True)  # When subscription started (for billing cycle)
+    billing_cycle = Column(String(20), nullable=True)  # monthly, yearly - tracks subscription interval
+    last_payment_date = Column(DateTime, nullable=True)  # Last successful payment date for renewals
+    next_billing_date = Column(DateTime, nullable=True)  # Next scheduled billing date
+    subscription_status = Column(String(50), default="active", nullable=True)  # active, past_due, cancelled
     clients_this_month = Column(Integer, default=0, nullable=False)  # Counter for monthly client limit
     month_reset_date = Column(DateTime, nullable=True)  # Track when to reset the counter (30 days from subscription date)
     onboarding_completed = Column(Boolean, default=False)

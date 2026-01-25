@@ -304,9 +304,60 @@ async def status_automation_task(ctx):
         db.close()
 
 
+async def reset_monthly_client_limits_task(ctx):
+    """
+    Daily cron job to proactively reset monthly client limits for users
+    whose billing cycle has completed (every 30 days from subscription start).
+    This ensures limits are refreshed even when users are inactive.
+    """
+    from .plan_limits import check_and_reset_monthly_counter
+    
+    logger.info("🔄 Starting monthly client limit reset check")
+    
+    db = SessionLocal()
+    try:
+        # Get all users with active subscriptions
+        users = db.query(User).filter(User.plan.isnot(None)).all()
+        
+        reset_count = 0
+        checked_count = 0
+        
+        for user in users:
+            try:
+                # Record current count before check
+                before_count = user.clients_this_month
+                
+                # Check and reset if needed
+                check_and_reset_monthly_counter(user, db)
+                
+                # If counter was reset, increment our counter
+                if user.clients_this_month < before_count or (before_count > 0 and user.clients_this_month == 0):
+                    reset_count += 1
+                    logger.info(f"✅ Reset client limit for user {user.id} (plan: {user.plan}, was: {before_count}, now: {user.clients_this_month})")
+                
+                checked_count += 1
+                
+            except Exception as e:
+                logger.error(f"❌ Failed to check/reset limits for user {user.id}: {str(e)}")
+                continue
+        
+        logger.info(f"✅ Monthly limit reset complete: checked {checked_count} users, reset {reset_count} users")
+        
+        return {
+            "checked": checked_count,
+            "reset": reset_count
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Monthly limit reset failed: {str(e)}")
+        raise
+    finally:
+        db.close()
+
+
 class WorkerSettings:
     """ARQ Worker Settings - Optimized for Scale"""
-    functions = [generate_contract_pdf_task, send_form_notification_emails_task, smtp_health_check_task, status_automation_task]
+    functions = [generate_contract_pdf_task, send_form_notification_emails_task, smtp_health_check_task, status_automation_task, reset_monthly_client_limits_task]
     redis_settings = get_redis_settings()
     
     # Scalability settings - adjust based on server resources
@@ -326,6 +377,7 @@ class WorkerSettings:
     cron_jobs = [
         cron(smtp_health_check_task, hour=6, minute=0),  # 6 AM UTC
         cron(status_automation_task, hour=0, minute=5),  # 12:05 AM UTC - update statuses at start of day
+        cron(reset_monthly_client_limits_task, hour=0, minute=10),  # 12:10 AM UTC - reset monthly client limits
     ]
     
     logger.info(f"🔧 ARQ Worker configured: max_jobs={max_jobs}, timeout={job_timeout}s")

@@ -426,15 +426,18 @@ async def handle_dodopayments_webhook(
             if not user and email:
                 user = db.query(User).filter(User.email == email).first()
 
-            # Determine target plan from metadata selected_plan
+            # Determine target plan from metadata
             selected_plan = meta.get("selected_plan")
+            billing_cycle = meta.get("billing_cycle")  # "monthly" or "yearly"
             subscription_id = data.get("subscription_id") or data.get("id")
 
-            logger.info(f"Selected plan from metadata: {selected_plan}, user found: {user is not None}, sub_id={subscription_id}")
+            logger.info(f"Selected plan: {selected_plan}, billing_cycle: {billing_cycle}, user found: {user is not None}, sub_id={subscription_id}")
 
             if not user:
                 logger.warning("User not found for webhook event; skipping")
             else:
+                from datetime import datetime, timedelta
+                
                 # Persist subscription_id if provided
                 if subscription_id and getattr(user, "subscription_id", None) != subscription_id:
                     try:
@@ -445,17 +448,47 @@ async def handle_dodopayments_webhook(
                         db.rollback()
                         logger.warning(f"Failed to persist subscription_id for user {user.id}: {e}")
 
-                # Set subscription_start_date for new subscriptions (used for billing cycle reset)
+                # Handle new subscriptions
                 if event_type in ("subscription.active", "checkout.session.completed"):
-                    from datetime import datetime, timedelta
                     if not user.subscription_start_date:
                         user.subscription_start_date = datetime.utcnow()
-                        # Reset usage counter and set next reset date (30 days from now)
                         user.clients_this_month = 0
                         user.month_reset_date = datetime.utcnow() + timedelta(days=30)
-                        db.commit()
                         logger.info(f"Set subscription_start_date for user {user.id}")
+                    
+                    # Track billing cycle
+                    if billing_cycle and billing_cycle != "unknown":
+                        user.billing_cycle = billing_cycle
+                        logger.info(f"Set billing_cycle to {billing_cycle} for user {user.id}")
+                    
+                    # Set initial payment date and calculate next billing
+                    user.last_payment_date = datetime.utcnow()
+                    user.subscription_status = "active"
+                    
+                    # Calculate next billing date based on cycle
+                    if user.billing_cycle == "yearly":
+                        user.next_billing_date = datetime.utcnow() + timedelta(days=365)
+                    else:  # monthly or default
+                        user.next_billing_date = datetime.utcnow() + timedelta(days=30)
+                    
+                    db.commit()
+                    logger.info(f"💰 New subscription activated for user {user.id}: {user.billing_cycle}, next billing: {user.next_billing_date}")
+                
+                # Handle subscription renewals (recurring charges)
+                elif event_type == "subscription.renewed":
+                    user.last_payment_date = datetime.utcnow()
+                    user.subscription_status = "active"
+                    
+                    # Calculate next billing date based on cycle
+                    if user.billing_cycle == "yearly":
+                        user.next_billing_date = datetime.utcnow() + timedelta(days=365)
+                    else:  # monthly or default
+                        user.next_billing_date = datetime.utcnow() + timedelta(days=30)
+                    
+                    db.commit()
+                    logger.info(f"💰 Subscription renewed for user {user.id}: {user.billing_cycle}, next billing: {user.next_billing_date}")
 
+                # Update plan if provided
                 if selected_plan and selected_plan != "unknown":
                     user.plan = selected_plan
                     db.commit()
@@ -464,7 +497,7 @@ async def handle_dodopayments_webhook(
                     logger.info("No selected_plan in metadata; plan unchanged")
 
         elif event_type in ("subscription.cancelled", "subscription.canceled"):
-            # Cancelled subscription moves to null
+            # Cancelled subscription - revoke access
             meta = (data.get("metadata") or {})
             firebase_uid = meta.get("firebase_uid")
             email = (data.get("customer") or {}).get("email") or data.get("email")
@@ -477,6 +510,8 @@ async def handle_dodopayments_webhook(
 
             if user:
                 user.plan = None
+                user.subscription_status = "cancelled"
+                user.next_billing_date = None
                 # clear stored subscription_id as it's now cancelled
                 try:
                     if subscription_id and getattr(user, "subscription_id", None) == subscription_id:
@@ -484,10 +519,22 @@ async def handle_dodopayments_webhook(
                 except Exception:
                     pass
                 db.commit()
-                logger.info(f"User {user.id} plan revoked (cancelled)")
+                logger.info(f"❌ User {user.id} subscription cancelled, plan revoked")
 
         elif event_type == "invoice.paid":
-            # Optional: mark last invoice paid
+            # Track successful subscription invoice payment
+            meta = (data.get("metadata") or {})
+            firebase_uid = meta.get("firebase_uid")
+            
+            if firebase_uid:
+                user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
+                if user:
+                    from datetime import datetime
+                    user.last_payment_date = datetime.utcnow()
+                    user.subscription_status = "active"
+                    db.commit()
+                    logger.info(f"💰 Invoice paid for user {user.id}, subscription status: active")
+            
             logger.info("Invoice paid event processed")
 
         elif event_type == "payment.succeeded":
@@ -495,6 +542,22 @@ async def handle_dodopayments_webhook(
             await _handle_client_invoice_payment(data, db)
 
         elif event_type == "invoice.payment_failed":
+            # Handle subscription payment failures
+            meta = (data.get("metadata") or {})
+            firebase_uid = meta.get("firebase_uid")
+            email = (data.get("customer") or {}).get("email") or data.get("email")
+            
+            user: Optional[User] = None
+            if firebase_uid:
+                user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
+            if not user and email:
+                user = db.query(User).filter(User.email == email).first()
+            
+            if user:
+                user.subscription_status = "past_due"
+                db.commit()
+                logger.warning(f"⚠️ Payment failed for user {user.id}, subscription status: past_due")
+            
             logger.info("Invoice payment failed")
 
         else:
