@@ -398,6 +398,7 @@ async def generate_contract_html(
     if client_signature:
         if client_signature.startswith("data:image"):
             # Already base64, use as-is
+            pass
         elif client_signature.startswith("http"):
             # Download from URL
             logger.info(f"📥 Downloading client signature from URL: {client_signature[:100]}...")
@@ -408,6 +409,7 @@ async def generate_contract_html(
                 logger.warning("⚠️ Failed to download client signature from URL")
         # else: assume it's already in correct format
     else:
+        pass  # No client signature provided
     # Contract details - use passed date or current date for new contracts
     base_date = contract_created_at or datetime.now()
     contract_date = base_date.strftime("%B %d, %Y")
