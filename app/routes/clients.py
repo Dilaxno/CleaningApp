@@ -1,22 +1,25 @@
+import csv
 import logging
 import re
-import csv
 import uuid
-from io import StringIO
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, Request, Query
+from io import StringIO
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
 from pydantic import BaseModel, field_validator
-from typing import Optional, List
-from ..database import get_db
-from ..models import User, Client, BusinessConfig
+from sqlalchemy.orm import Session
+
 from ..auth import get_current_user
-from ..rate_limiter import create_rate_limiter, rate_limit_dependency, get_redis_client
+from ..database import get_db
+from ..models import BusinessConfig, Client, User
+from ..rate_limiter import create_rate_limiter, get_redis_client, rate_limit_dependency
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/clients", tags=["Clients"])
+
 
 def validate_uuid(value: str) -> bool:
     """Validate UUID format"""
@@ -26,20 +29,22 @@ def validate_uuid(value: str) -> bool:
     except (ValueError, AttributeError):
         return False
 
+
 # Rate limiters for public form submissions
 rate_limit_form_per_ip = create_rate_limiter(
     limit=5,
     window_seconds=60,  # 5 submissions per minute per IP
     key_prefix="form_submit_ip",
-    use_ip=True
+    use_ip=True,
 )
 
 rate_limit_form_global = create_rate_limiter(
     limit=15,
     window_seconds=60,  # 15 submissions per minute globally
     key_prefix="form_submit_global",
-    use_ip=False
+    use_ip=False,
 )
+
 
 def validate_us_phone(phone: str) -> str:
     """Validate and normalize US phone number"""
@@ -47,10 +52,10 @@ def validate_us_phone(phone: str) -> str:
         return phone
 
     # Remove all non-digit characters
-    digits = re.sub(r'\D', '', phone)
+    digits = re.sub(r"\D", "", phone)
 
     # Handle +1 prefix
-    if digits.startswith('1') and len(digits) == 11:
+    if digits.startswith("1") and len(digits) == 11:
         digits = digits[1:]
 
     # US phone numbers should have 10 digits
@@ -59,6 +64,7 @@ def validate_us_phone(phone: str) -> str:
 
     # Format as E.164 for storage
     return f"+1{digits}"
+
 
 class ClientCreate(BaseModel):
     businessName: str
@@ -70,12 +76,13 @@ class ClientCreate(BaseModel):
     frequency: Optional[str] = None
     notes: Optional[str] = None
 
-    @field_validator('phone')
+    @field_validator("phone")
     @classmethod
     def validate_phone(cls, v):
         if v:
             return validate_us_phone(v)
         return v
+
 
 class ClientUpdate(BaseModel):
     businessName: Optional[str] = None
@@ -88,12 +95,13 @@ class ClientUpdate(BaseModel):
     status: Optional[str] = None
     notes: Optional[str] = None
 
-    @field_validator('phone')
+    @field_validator("phone")
     @classmethod
     def validate_phone(cls, v):
         if v:
             return validate_us_phone(v)
         return v
+
 
 class ClientResponse(BaseModel):
     id: int
@@ -112,17 +120,19 @@ class ClientResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
 @router.get("", response_model=List[ClientResponse])
 async def get_clients(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
     """Get all clients for the current user (excludes pending_signature clients)"""
     # Filter out clients with "pending_signature" status - they haven't signed the contract yet
-    clients = db.query(Client).filter(
-        Client.user_id == current_user.id,
-        Client.status != "pending_signature"
-    ).order_by(Client.created_at.desc()).all()
+    clients = (
+        db.query(Client)
+        .filter(Client.user_id == current_user.id, Client.status != "pending_signature")
+        .order_by(Client.created_at.desc())
+        .all()
+    )
     return [
         ClientResponse(
             id=c.id,
@@ -134,22 +144,24 @@ async def get_clients(
             propertySize=c.property_size,
             frequency=c.frequency,
             status=c.status,
-            notes=c.notes
+            notes=c.notes,
         )
         for c in clients
     ]
+
 
 @router.get("/{client_id}", response_model=ClientResponse)
 async def get_client(
     client_id: int,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Get a specific client with detailed information including form_data"""
-    client = db.query(Client).filter(
-        Client.id == client_id,
-        Client.user_id == current_user.id
-    ).first()
+    client = (
+        db.query(Client)
+        .filter(Client.id == client_id, Client.user_id == current_user.id)
+        .first()
+    )
 
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -166,24 +178,28 @@ async def get_client(
         frequency=client.frequency,
         status=client.status,
         notes=client.notes,
-        form_data=client.form_data
+        form_data=client.form_data,
     )
+
 
 @router.post("", response_model=ClientResponse)
 async def create_client(
     data: ClientCreate,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Create a new client"""
     logger.info(f"📥 Creating client for user_id: {current_user.id}")
 
     # Check if user can add more clients (but don't increment yet - that happens when contract is signed)
     from ..plan_limits import can_add_client
+
     can_add, error_message = can_add_client(current_user, db)
 
     if not can_add:
-        logger.warning(f"⚠️ User {current_user.id} reached client limit: {error_message}")
+        logger.warning(
+            f"⚠️ User {current_user.id} reached client limit: {error_message}"
+        )
         raise HTTPException(status_code=403, detail=error_message)
 
     client = Client(
@@ -196,7 +212,7 @@ async def create_client(
         property_size=data.propertySize,
         frequency=data.frequency,
         notes=data.notes,
-        status="new_lead"
+        status="new_lead",
     )
     db.add(client)
     db.commit()
@@ -213,18 +229,23 @@ async def create_client(
         propertySize=client.property_size,
         frequency=client.frequency,
         status=client.status,
-        notes=client.notes
+        notes=client.notes,
     )
+
 
 @router.patch("/{client_id}", response_model=ClientResponse)
 async def update_client(
     client_id: int,
     data: ClientUpdate,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Update a client"""
-    client = db.query(Client).filter(Client.id == client_id, Client.user_id == current_user.id).first()
+    client = (
+        db.query(Client)
+        .filter(Client.id == client_id, Client.user_id == current_user.id)
+        .first()
+    )
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
 
@@ -260,27 +281,31 @@ async def update_client(
         propertySize=client.property_size,
         frequency=client.frequency,
         status=client.status,
-        notes=client.notes
+        notes=client.notes,
     )
+
 
 @router.delete("/{client_id}")
 async def delete_client(
     client_id: int,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Delete a client"""
     from ..plan_limits import decrement_client_count
 
-    client = db.query(Client).filter(Client.id == client_id, Client.user_id == current_user.id).first()
+    client = (
+        db.query(Client)
+        .filter(Client.id == client_id, Client.user_id == current_user.id)
+        .first()
+    )
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
 
     # Check if client had a fully signed contract (both parties signed)
     # This is when the count was incremented, so we need to decrement
     has_signed_contract = any(
-        c.client_signature_timestamp and c.signed_at
-        for c in client.contracts
+        c.client_signature_timestamp and c.signed_at for c in client.contracts
     )
 
     db.delete(client)
@@ -291,14 +316,16 @@ async def delete_client(
         decrement_client_count(current_user, db)
     return {"message": "Client deleted"}
 
+
 class BatchDeleteRequest(BaseModel):
     clientIds: List[int]
+
 
 @router.post("/batch-delete")
 async def batch_delete_clients(
     data: BatchDeleteRequest,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Batch delete multiple clients"""
     from ..models_invoice import Invoice
@@ -312,15 +339,15 @@ async def batch_delete_clients(
     signed_contracts_count = 0
 
     for client_id in data.clientIds:
-        client = db.query(Client).filter(
-            Client.id == client_id,
-            Client.user_id == current_user.id
-        ).first()
+        client = (
+            db.query(Client)
+            .filter(Client.id == client_id, Client.user_id == current_user.id)
+            .first()
+        )
         if client:
             # Check if client had a fully signed contract
             has_signed_contract = any(
-                c.client_signature_timestamp and c.signed_at
-                for c in client.contracts
+                c.client_signature_timestamp and c.signed_at for c in client.contracts
             )
             if has_signed_contract:
                 signed_contracts_count += 1
@@ -330,7 +357,9 @@ async def batch_delete_clients(
 
             # Delete invoices linked to these contracts first (FK constraint)
             if contract_ids:
-                db.query(Invoice).filter(Invoice.contract_id.in_(contract_ids)).delete(synchronize_session=False)
+                db.query(Invoice).filter(Invoice.contract_id.in_(contract_ids)).delete(
+                    synchronize_session=False
+                )
 
             db.delete(client)
             deleted_count += 1
@@ -343,8 +372,9 @@ async def batch_delete_clients(
 
     return {
         "message": f"Successfully deleted {deleted_count} client(s)",
-        "deletedCount": deleted_count
+        "deletedCount": deleted_count,
     }
+
 
 @router.get("/export")
 async def export_clients_csv(
@@ -358,8 +388,7 @@ async def export_clients_csv(
     """Export clients as CSV with optional filters"""
     # Base query - exclude pending_signature clients
     query = db.query(Client).filter(
-        Client.user_id == current_user.id,
-        Client.status != "pending_signature"
+        Client.user_id == current_user.id, Client.status != "pending_signature"
     )
 
     # Apply status filter
@@ -370,22 +399,22 @@ async def export_clients_csv(
     if search:
         search_term = f"%{search.lower()}%"
         query = query.filter(
-            (Client.business_name.ilike(search_term)) |
-            (Client.contact_name.ilike(search_term)) |
-            (Client.email.ilike(search_term))
+            (Client.business_name.ilike(search_term))
+            | (Client.contact_name.ilike(search_term))
+            | (Client.email.ilike(search_term))
         )
 
     # Apply date range filter
     if start_date:
         try:
-            start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+            start_dt = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
             query = query.filter(Client.created_at >= start_dt)
         except ValueError:
             pass
 
     if end_date:
         try:
-            end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+            end_dt = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
             query = query.filter(Client.created_at <= end_dt)
         except ValueError:
             pass
@@ -398,35 +427,41 @@ async def export_clients_csv(
     writer = csv.writer(output)
 
     # Write header
-    writer.writerow([
-        'ID',
-        'Business Name',
-        'Contact Name',
-        'Email',
-        'Phone',
-        'Property Type',
-        'Property Size (sq ft)',
-        'Frequency',
-        'Status',
-        'Notes',
-        'Created At'
-    ])
+    writer.writerow(
+        [
+            "ID",
+            "Business Name",
+            "Contact Name",
+            "Email",
+            "Phone",
+            "Property Type",
+            "Property Size (sq ft)",
+            "Frequency",
+            "Status",
+            "Notes",
+            "Created At",
+        ]
+    )
 
     # Write data
     for client in clients:
-        writer.writerow([
-            client.id,
-            client.business_name or '',
-            client.contact_name or '',
-            client.email or '',
-            client.phone or '',
-            client.property_type or '',
-            client.property_size or '',
-            client.frequency or '',
-            client.status or '',
-            client.notes or '',
-            client.created_at.strftime('%Y-%m-%d %H:%M:%S') if client.created_at else ''
-        ])
+        writer.writerow(
+            [
+                client.id,
+                client.business_name or "",
+                client.contact_name or "",
+                client.email or "",
+                client.phone or "",
+                client.property_type or "",
+                client.property_size or "",
+                client.frequency or "",
+                client.status or "",
+                client.notes or "",
+                client.created_at.strftime("%Y-%m-%d %H:%M:%S")
+                if client.created_at
+                else "",
+            ]
+        )
 
     # Prepare response
     output.seek(0)
@@ -435,11 +470,13 @@ async def export_clients_csv(
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
+
 
 class PublicClientCreate(BaseModel):
     """Schema for public form submission - uses owner's Firebase UID"""
+
     ownerUid: str
     templateId: str
     businessName: str
@@ -454,20 +491,24 @@ class PublicClientCreate(BaseModel):
     clientSignature: Optional[str] = None  # Base64 signature from client
     quoteAccepted: Optional[bool] = False  # Whether client accepted the quote
 
-    @field_validator('phone')
+    @field_validator("phone")
     @classmethod
     def validate_phone(cls, v):
         if v:
             return validate_us_phone(v)
         return v
 
+
 class QuotePreviewRequest(BaseModel):
     """Schema for quote preview - calculates quote without creating client"""
+
     ownerUid: str
     formData: dict
 
+
 class QuotePreviewResponse(BaseModel):
     """Response for quote preview"""
+
     basePrice: float
     discountPercent: float
     discountAmount: float
@@ -481,17 +522,17 @@ class QuotePreviewResponse(BaseModel):
     pricingExplanation: str
     quotePending: bool = False
 
+
 class PublicSubmitResponse(BaseModel):
     client: Optional[ClientResponse] = None
     contractPdfUrl: Optional[str] = None
     jobId: Optional[str] = None
     message: str
 
+
 @router.post("/public/quote-preview", response_model=QuotePreviewResponse)
 async def get_quote_preview(
-    data: QuotePreviewRequest,
-    request: Request,
-    db: Session = Depends(get_db)
+    data: QuotePreviewRequest, request: Request, db: Session = Depends(get_db)
 ):
     """
     Public endpoint to calculate and preview quote before form submission.
@@ -499,7 +540,9 @@ async def get_quote_preview(
     """
     from .contracts_pdf import calculate_quote
 
-    client_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "unknown")
+    client_ip = request.headers.get(
+        "X-Forwarded-For", request.client.host if request.client else "unknown"
+    )
     if client_ip and "," in client_ip:
         client_ip = client_ip.split(",")[0].strip()
     # Find the user by Firebase UID
@@ -524,7 +567,7 @@ async def get_quote_preview(
             pricingModel="",
             frequency=data.formData.get("cleaningFrequency", ""),
             pricingExplanation="Quote will be provided by the service provider.",
-            quotePending=True
+            quotePending=True,
         )
 
     # Calculate quote
@@ -533,7 +576,11 @@ async def get_quote_preview(
     # Build pricing explanation
     pricing_model = config.pricing_model or ""
     property_size = int(data.formData.get("squareFootage", 0) or 0)
-    num_rooms = int(data.formData.get("numberOfOffices", 0) or data.formData.get("numberOfRooms", 0) or 0)
+    num_rooms = int(
+        data.formData.get("numberOfOffices", 0)
+        or data.formData.get("numberOfRooms", 0)
+        or 0
+    )
     frequency = data.formData.get("cleaningFrequency", "")
 
     explanation_parts = []
@@ -545,35 +592,46 @@ async def get_quote_preview(
     else:
         # Base rate explanation - show business name and rate per metric
         if pricing_model == "sqft" and config.rate_per_sqft:
-            explanation_parts.append(f"{business_name} prices their jobs at ${config.rate_per_sqft:.2f} per sq ft")
+            explanation_parts.append(
+                f"{business_name} prices their jobs at ${config.rate_per_sqft:.2f} per sq ft"
+            )
         elif pricing_model == "room" and config.rate_per_room:
-            explanation_parts.append(f"{business_name} prices their jobs at ${config.rate_per_room:.2f} per room")
+            explanation_parts.append(
+                f"{business_name} prices their jobs at ${config.rate_per_room:.2f} per room"
+            )
         elif pricing_model == "hourly" and config.hourly_rate:
-            explanation_parts.append(f"{business_name} prices their jobs at ${config.hourly_rate:.2f} per hour")
+            explanation_parts.append(
+                f"{business_name} prices their jobs at ${config.hourly_rate:.2f} per hour"
+            )
         elif pricing_model == "flat" and config.flat_rate:
-            explanation_parts.append(f"{business_name} prices their jobs at a flat rate of ${config.flat_rate:,.2f}")
+            explanation_parts.append(
+                f"{business_name} prices their jobs at a flat rate of ${config.flat_rate:,.2f}"
+            )
         else:
             explanation_parts.append(f"Base service rate: ${quote['base_price']:,.2f}")
 
         # Discount explanation
-        if quote['discount_percent'] > 0:
-            explanation_parts.append(f"{quote['discount_percent']:.0f}% {frequency.lower()} discount applied")
+        if quote["discount_percent"] > 0:
+            explanation_parts.append(
+                f"{quote['discount_percent']:.0f}% {frequency.lower()} discount applied"
+            )
 
         explanation = " • ".join(explanation_parts)
     return QuotePreviewResponse(
-        basePrice=quote['base_price'],
-        discountPercent=quote['discount_percent'],
-        discountAmount=quote['discount_amount'],
-        addonAmount=quote.get('addon_amount', 0),
-        addonDetails=quote.get('addon_details', []),
-        finalPrice=quote['final_price'],
-        estimatedHours=quote['estimated_hours'],
-        cleaners=quote['cleaners'],
+        basePrice=quote["base_price"],
+        discountPercent=quote["discount_percent"],
+        discountAmount=quote["discount_amount"],
+        addonAmount=quote.get("addon_amount", 0),
+        addonDetails=quote.get("addon_details", []),
+        finalPrice=quote["final_price"],
+        estimatedHours=quote["estimated_hours"],
+        cleaners=quote["cleaners"],
         pricingModel=pricing_model,
         frequency=frequency,
         pricingExplanation=explanation,
-        quotePending=quote.get('quote_pending', False)
+        quotePending=quote.get("quote_pending", False),
     )
+
 
 @router.post("/public/submit")
 async def submit_public_form(
@@ -581,7 +639,7 @@ async def submit_public_form(
     request: Request,
     db: Session = Depends(get_db),
     _ip: None = Depends(rate_limit_form_per_ip),
-    _global: None = Depends(rate_limit_form_global)
+    _global: None = Depends(rate_limit_form_global),
 ):
     """
     Public endpoint for clients to submit intake forms.
@@ -591,16 +649,24 @@ async def submit_public_form(
     """
     from arq import create_pool
     from arq.connections import RedisSettings
+
+    from ..email_service import (
+        send_form_submission_confirmation,
+        send_new_client_notification,
+    )
     from ..worker import get_redis_settings
-    from ..email_service import send_new_client_notification, send_form_submission_confirmation
 
     # Capture client info
-    client_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "unknown")
+    client_ip = request.headers.get(
+        "X-Forwarded-For", request.client.host if request.client else "unknown"
+    )
     if client_ip and "," in client_ip:
         client_ip = client_ip.split(",")[0].strip()
     user_agent = request.headers.get("User-Agent", "unknown")
 
-    logger.info(f"📥 Public form submission for owner UID: {data.ownerUid} from IP: {client_ip}")
+    logger.info(
+        f"📥 Public form submission for owner UID: {data.ownerUid} from IP: {client_ip}"
+    )
 
     # Note: Rate limiting handles submission abuse prevention
     # No need for additional Redis tracking here
@@ -616,7 +682,7 @@ async def submit_public_form(
 
     # Validate email format if provided
     if data.email:
-        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        email_pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
         if not re.match(email_pattern, data.email):
             validation_errors.append("Invalid email format")
         elif len(data.email) > 255:
@@ -625,7 +691,7 @@ async def submit_public_form(
     # Validate phone format if provided
     if data.phone:
         # Remove all non-digit characters for validation
-        phone_digits = re.sub(r'\D', '', data.phone)
+        phone_digits = re.sub(r"\D", "", data.phone)
         if len(phone_digits) < 10 or len(phone_digits) > 15:
             validation_errors.append("Phone number must be between 10-15 digits")
 
@@ -644,6 +710,7 @@ async def submit_public_form(
     # Validate formData size (prevent DOS attacks)
     if data.formData:
         import json
+
         form_data_str = json.dumps(data.formData)
         if len(form_data_str) > 50000:  # 50KB limit
             validation_errors.append("Form data is too large (max 50KB)")
@@ -653,7 +720,7 @@ async def submit_public_form(
         logger.warning(f"❌ Validation failed for IP {client_ip}: {validation_errors}")
         raise HTTPException(
             status_code=422,
-            detail={"message": "Validation failed", "errors": validation_errors}
+            detail={"message": "Validation failed", "errors": validation_errors},
         )
 
     # Find the user by Firebase UID
@@ -670,11 +737,14 @@ async def submit_public_form(
     # If still no frequency, infer from property type (e.g., move-in-out is always one-time)
     if not frequency and data.propertyType:
         property_type_lower = data.propertyType.lower()
-        if 'move' in property_type_lower:
+        if "move" in property_type_lower:
             frequency = "One-time"
-        elif 'construction' in property_type_lower or 'post-construction' in property_type_lower:
+        elif (
+            "construction" in property_type_lower
+            or "post-construction" in property_type_lower
+        ):
             frequency = "One-time"
-        elif 'event' in property_type_lower:
+        elif "event" in property_type_lower:
             frequency = "One-time"
 
     # Create the client associated with the business owner
@@ -691,7 +761,7 @@ async def submit_public_form(
         frequency=frequency,
         notes=data.notes,
         form_data=data.formData,  # Store structured form data
-        status="pending_signature"  # Will change to "new_lead" after contract is signed
+        status="pending_signature",  # Will change to "new_lead" after contract is signed
     )
     db.add(client)
     db.commit()
@@ -701,7 +771,11 @@ async def submit_public_form(
     if data.formData:
         try:
             # Get business config to check if it exists
-            config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
+            config = (
+                db.query(BusinessConfig)
+                .filter(BusinessConfig.user_id == user.id)
+                .first()
+            )
 
             if config:
                 # Enqueue contract generation job
@@ -709,17 +783,19 @@ async def submit_public_form(
                 pool = await create_pool(redis_settings)
 
                 job = await pool.enqueue_job(
-                    'generate_contract_pdf_task',
+                    "generate_contract_pdf_task",
                     client.id,
                     data.ownerUid,
                     data.formData,
-                    data.clientSignature
+                    data.clientSignature,
                 )
 
                 job_id = job.job_id
                 logger.info(f"📋 Contract generation job queued: {job_id}")
             else:
-                logger.warning(f"⚠️ No business config found for user {user.id} - skipping contract generation")
+                logger.warning(
+                    f"⚠️ No business config found for user {user.id} - skipping contract generation"
+                )
 
         except Exception as queue_err:
             logger.error(f"❌ Failed to queue contract generation: {queue_err}")
@@ -732,10 +808,7 @@ async def submit_public_form(
 
         # Queue email notification job
         await pool.enqueue_job(
-            'send_form_notification_emails_task',
-            client.id,
-            user.id,
-            data.ownerUid
+            "send_form_notification_emails_task", client.id, user.id, data.ownerUid
         )
     except Exception as email_err:
         logger.warning(f"⚠️ Failed to queue email notifications: {email_err}")
@@ -753,32 +826,36 @@ async def submit_public_form(
             propertySize=client.property_size,
             frequency=client.frequency,
             status=client.status,
-            notes=client.notes
+            notes=client.notes,
         ),
         contractPdfUrl=None,  # Will be available via job status endpoint
         jobId=job_id,
-        message="Form submitted successfully - Contract generation in progress" if job_id else "Form submitted successfully"
+        message="Form submitted successfully - Contract generation in progress"
+        if job_id
+        else "Form submitted successfully",
     )
+
 
 class SignContractRequest(BaseModel):
     clientPublicId: str  # UUID for secure public access
-    contractPublicId: Optional[str] = None  # UUID for specific contract (optional for backwards compatibility)
+    contractPublicId: Optional[str] = (
+        None  # UUID for specific contract (optional for backwards compatibility)
+    )
     signature: str
+
 
 # Rate limiter for contract signing - 10 per hour per IP
 rate_limit_sign_contract = create_rate_limiter(
-    limit=10,
-    window_seconds=3600,
-    key_prefix="sign_contract",
-    use_ip=True
+    limit=10, window_seconds=3600, key_prefix="sign_contract", use_ip=True
 )
+
 
 @router.post("/public/sign-contract")
 async def sign_contract(
     data: SignContractRequest,
     request: Request,
     db: Session = Depends(get_db),
-    _: None = Depends(rate_limit_sign_contract)
+    _: None = Depends(rate_limit_sign_contract),
 ):
     """
     Public endpoint for clients to sign their contract after reviewing the PDF.
@@ -788,10 +865,11 @@ async def sign_contract(
     """
     import hashlib
     from datetime import datetime
+
+    from ..email_service import send_contract_signed_notification
     from ..models import Contract
     from .contracts_pdf import generate_contract_html, html_to_pdf
-    from .upload import get_r2_client, generate_presigned_url, R2_BUCKET_NAME
-    from ..email_service import send_contract_signed_notification
+    from .upload import R2_BUCKET_NAME, generate_presigned_url, get_r2_client
 
     # Validate UUID format
     if not validate_uuid(data.clientPublicId):
@@ -818,7 +896,10 @@ async def sign_contract(
         # Find specific contract by public_id
         contract = (
             db.query(Contract)
-            .filter(Contract.client_id == client.id, Contract.public_id == data.contractPublicId)
+            .filter(
+                Contract.client_id == client.id,
+                Contract.public_id == data.contractPublicId,
+            )
             .first()
         )
     else:
@@ -854,6 +935,7 @@ async def sign_contract(
         try:
             import base64
             import uuid
+
             # Extract base64 data from data URL
             header, encoded = data.signature.split(",", 1)
             signature_bytes = base64.b64decode(encoded)
@@ -865,28 +947,35 @@ async def sign_contract(
                 Bucket=R2_BUCKET_NAME,
                 Key=signature_key,
                 Body=signature_bytes,
-                ContentType="image/png"
+                ContentType="image/png",
             )
 
             # Generate presigned URL (7 days max for R2)
-            client_signature_url = generate_presigned_url(signature_key, expiration=604800)  # 7 days
+            client_signature_url = generate_presigned_url(
+                signature_key, expiration=604800
+            )  # 7 days
         except Exception as sig_err:
             logger.warning(f"⚠️ Failed to upload client signature to R2: {sig_err}")
 
     # Regenerate PDF with client signature
     try:
-        config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
+        config = (
+            db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
+        )
 
         if config and client.form_data:
             form_data = client.form_data
             old_pdf_key = contract.pdf_key
             # Calculate quote for regeneration
             from .contracts_pdf import calculate_quote
+
             quote = calculate_quote(config, form_data)
 
             # Get provider signature URL if exists
             provider_signature_url = None
-            if contract.provider_signature and contract.provider_signature.startswith("data:image"):
+            if contract.provider_signature and contract.provider_signature.startswith(
+                "data:image"
+            ):
                 # Provider signature is base64, need to upload it too if not already done
                 provider_signature_url = contract.provider_signature
 
@@ -896,14 +985,17 @@ async def sign_contract(
                 client,
                 form_data,
                 quote,
-                client_signature=client_signature_url or data.signature,  # Use URL if available
+                client_signature=client_signature_url
+                or data.signature,  # Use URL if available
                 provider_signature=provider_signature_url,
-                contract_created_at=contract.created_at
+                contract_created_at=contract.created_at,
             )
 
             # Verify signature URL is in HTML
             if client_signature_url and client_signature_url in html:
+                pass  # Signature URL found
             elif data.signature in html:
+                pass  # Signature data found
             else:
                 logger.warning("⚠️ Client signature NOT found in generated HTML!")
 
@@ -922,12 +1014,14 @@ async def sign_contract(
                     Bucket=R2_BUCKET_NAME,
                     Key=pdf_key,
                     Body=pdf_bytes,
-                    ContentType="application/pdf"
+                    ContentType="application/pdf",
                 )
 
                 contract.pdf_key = pdf_key
                 contract.pdf_hash = pdf_hash
-                logger.info(f"📝 Updated contract.pdf_key from {old_pdf_key} to {pdf_key}")
+                logger.info(
+                    f"📝 Updated contract.pdf_key from {old_pdf_key} to {pdf_key}"
+                )
             except Exception as upload_err:
                 logger.warning(f"⚠️ Failed to upload signed PDF: {upload_err}")
 
@@ -941,9 +1035,12 @@ async def sign_contract(
     if contract.pdf_key:
         try:
             from ..config import FRONTEND_URL
+
             # Determine the backend base URL based on the frontend URL
             if "localhost" in FRONTEND_URL:
-                backend_base = FRONTEND_URL.replace("localhost:5173", "localhost:8000").replace("localhost:5174", "localhost:8000")
+                backend_base = FRONTEND_URL.replace(
+                    "localhost:5173", "localhost:8000"
+                ).replace("localhost:5174", "localhost:8000")
             else:
                 backend_base = "https://api.cleanenroll.com"
 
@@ -953,7 +1050,9 @@ async def sign_contract(
 
     # Send notification to business owner
     try:
-        config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
+        config = (
+            db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
+        )
         business_name = config.business_name if config else "Your Business"
 
         if user.email:
@@ -969,19 +1068,19 @@ async def sign_contract(
     return {
         "success": True,
         "message": "Contract signed successfully. Awaiting service provider signature.",
-        "signedPdfUrl": signed_pdf_url
+        "signedPdfUrl": signed_pdf_url,
     }
+
 
 class ScheduleDecisionRequest(BaseModel):
     action: str  # 'confirm' or 'request_change'
     proposed_start_time: Optional[str] = None
     proposed_end_time: Optional[str] = None
 
+
 @router.post("/{client_id}/schedule-decision")
 async def handle_schedule_decision(
-    client_id: int,
-    data: ScheduleDecisionRequest,
-    db: Session = Depends(get_db)
+    client_id: int, data: ScheduleDecisionRequest, db: Session = Depends(get_db)
 ):
     """
     Handle provider's decision on client's scheduled time
@@ -996,12 +1095,16 @@ async def handle_schedule_decision(
             raise HTTPException(status_code=404, detail="Client not found")
 
         # Get business config for business name
-        config = db.query(BusinessConfig).filter(BusinessConfig.user_id == client.user_id).first()
+        config = (
+            db.query(BusinessConfig)
+            .filter(BusinessConfig.user_id == client.user_id)
+            .first()
+        )
         business_name = config.business_name if config else "Your Service Provider"
 
-        if data.action == 'confirm':
+        if data.action == "confirm":
             # Provider confirmed the client's selected time
-            client.scheduling_status = 'confirmed'
+            client.scheduling_status = "confirmed"
             db.commit()
 
             # Send confirmation email to client
@@ -1012,10 +1115,10 @@ async def handle_schedule_decision(
                 <div style="background: #f0fdf4; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #22c55e;">
                   <p style="color: #15803d; font-weight: 600; margin-bottom: 12px;">✓ Confirmed Cleaning Date & Time</p>
                   <p style="color: #15803d; font-size: 16px; margin: 8px 0;">
-                    📅 {datetime.fromisoformat(client.scheduled_start_time.replace('Z', '+00:00')).strftime('%A, %B %d, %Y')}
+                    📅 {datetime.fromisoformat(client.scheduled_start_time.replace("Z", "+00:00")).strftime("%A, %B %d, %Y")}
                   </p>
                   <p style="color: #15803d; font-size: 16px; margin: 8px 0;">
-                    ⏰ {datetime.fromisoformat(client.scheduled_start_time.replace('Z', '+00:00')).strftime('%I:%M %p')} - {datetime.fromisoformat(client.scheduled_end_time.replace('Z', '+00:00')).strftime('%I:%M %p')}
+                    ⏰ {datetime.fromisoformat(client.scheduled_start_time.replace("Z", "+00:00")).strftime("%I:%M %p")} - {datetime.fromisoformat(client.scheduled_end_time.replace("Z", "+00:00")).strftime("%I:%M %p")}
                   </p>
                 </div>
                 <p>Your first cleaning is all set! We look forward to serving you.</p>
@@ -1025,15 +1128,17 @@ async def handle_schedule_decision(
                     to=client.email,
                     subject=f"Cleaning Schedule Confirmed - {business_name}",
                     title="Your Cleaning is Scheduled! 🎉",
-                    content_html=content
+                    content_html=content,
                 )
-        elif data.action == 'request_change':
+        elif data.action == "request_change":
             # Provider requested a different time
             if not data.proposed_start_time or not data.proposed_end_time:
-                raise HTTPException(status_code=400, detail="Proposed times are required")
+                raise HTTPException(
+                    status_code=400, detail="Proposed times are required"
+                )
 
             # Update scheduling status
-            client.scheduling_status = 'provider_requested_change'
+            client.scheduling_status = "provider_requested_change"
 
             # Store proposed times temporarily (you might want to add these fields to the model)
             # For now, we'll send them via email
@@ -1041,8 +1146,12 @@ async def handle_schedule_decision(
 
             # Send notification to client with provider's proposed time
             if client.email:
-                proposed_start = datetime.fromisoformat(data.proposed_start_time.replace('Z', '+00:00'))
-                proposed_end = datetime.fromisoformat(data.proposed_end_time.replace('Z', '+00:00'))
+                proposed_start = datetime.fromisoformat(
+                    data.proposed_start_time.replace("Z", "+00:00")
+                )
+                proposed_end = datetime.fromisoformat(
+                    data.proposed_end_time.replace("Z", "+00:00")
+                )
 
                 content = f"""
                 <p>Hi {client.contact_name or client.business_name},</p>
@@ -1051,20 +1160,20 @@ async def handle_schedule_decision(
                 <div style="background: #fef3c7; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #f59e0b;">
                   <p style="color: #92400e; font-weight: 600; margin-bottom: 12px;">📅 Your Selected Time</p>
                   <p style="color: #92400e; font-size: 15px; margin: 8px 0;">
-                    {datetime.fromisoformat(client.scheduled_start_time.replace('Z', '+00:00')).strftime('%A, %B %d, %Y')}
+                    {datetime.fromisoformat(client.scheduled_start_time.replace("Z", "+00:00")).strftime("%A, %B %d, %Y")}
                   </p>
                   <p style="color: #92400e; font-size: 15px; margin: 8px 0;">
-                    {datetime.fromisoformat(client.scheduled_start_time.replace('Z', '+00:00')).strftime('%I:%M %p')} - {datetime.fromisoformat(client.scheduled_end_time.replace('Z', '+00:00')).strftime('%I:%M %p')}
+                    {datetime.fromisoformat(client.scheduled_start_time.replace("Z", "+00:00")).strftime("%I:%M %p")} - {datetime.fromisoformat(client.scheduled_end_time.replace("Z", "+00:00")).strftime("%I:%M %p")}
                   </p>
                 </div>
 
                 <div style="background: #dbeafe; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #3b82f6;">
                   <p style="color: #1e40af; font-weight: 600; margin-bottom: 12px;">✨ Provider's Proposed Time</p>
                   <p style="color: #1e40af; font-size: 16px; margin: 8px 0;">
-                    📅 {proposed_start.strftime('%A, %B %d, %Y')}
+                    📅 {proposed_start.strftime("%A, %B %d, %Y")}
                   </p>
                   <p style="color: #1e40af; font-size: 16px; margin: 8px 0;">
-                    ⏰ {proposed_start.strftime('%I:%M %p')} - {proposed_end.strftime('%I:%M %p')}
+                    ⏰ {proposed_start.strftime("%I:%M %p")} - {proposed_end.strftime("%I:%M %p")}
                   </p>
                 </div>
 
@@ -1078,14 +1187,14 @@ async def handle_schedule_decision(
                     to=client.email,
                     subject=f"Alternative Cleaning Time Proposed - {business_name}",
                     title="Schedule Change Request",
-                    content_html=content
+                    content_html=content,
                 )
         else:
             raise HTTPException(status_code=400, detail="Invalid action")
 
         return {
             "success": True,
-            "message": f"Schedule {data.action} processed successfully"
+            "message": f"Schedule {data.action} processed successfully",
         }
 
     except HTTPException:
