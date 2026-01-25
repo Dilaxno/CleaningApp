@@ -389,67 +389,86 @@ async def generate_contract_html(
     
     logger.info(f"🏢 Business config - name: {business_name}, logo_url key: {business_config.logo_url}")
     
-    # Download and convert logo to base64 for Playwright
-    if business_config.logo_url:
+    # Prepare all image download tasks for parallel execution
+    import asyncio
+    download_tasks = []
+    task_names = []
+    
+    # Task 1: Download logo
+    async def download_logo():
+        if not business_config.logo_url:
+            return None
         try:
-            # Check if logo_url is already a full URL (shouldn't be, but handle it)
             if business_config.logo_url.startswith('http'):
                 presigned_logo_url = business_config.logo_url
-                logger.info(f"ℹ️ Logo URL is already a full URL")
             else:
                 presigned_logo_url = generate_presigned_url(business_config.logo_url)
-            logger.info(f"✅ Generated presigned URL for logo: {presigned_logo_url[:100]}...")
-            logo_url = await download_image_as_base64(presigned_logo_url)
-            if logo_url:
-                logger.info(f"✅ Logo downloaded and converted to base64 ({len(logo_url)} chars)")
+            logger.info(f"📥 Downloading logo...")
+            return await download_image_as_base64(presigned_logo_url)
+        except Exception as e:
+            logger.error(f"❌ Failed to download logo: {e}")
+            return None
+    
+    # Task 2: Download provider signature
+    async def download_provider_sig():
+        if provider_signature:
+            if provider_signature.startswith("data:image"):
+                return provider_signature
+            elif provider_signature.startswith("http"):
+                logger.info(f"📥 Downloading provider signature...")
+                return await download_image_as_base64(provider_signature)
             else:
-                logger.warning(f"⚠️ Logo download returned None for URL: {presigned_logo_url[:100]}...")
-        except Exception as e:
-            logger.error(f"❌ Failed to generate/download logo: {type(e).__name__}: {e}")
-            import traceback
-            logger.error(f"❌ Traceback: {traceback.format_exc()}")
-    else:
-        logger.info("ℹ️ No logo_url configured in business config")
+                return provider_signature
+        elif business_config.signature_url:
+            try:
+                presigned_sig_url = generate_presigned_url(business_config.signature_url)
+                logger.info(f"📥 Downloading provider signature from config...")
+                return await download_image_as_base64(presigned_sig_url)
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to download signature: {e}")
+                return None
+        return None
     
-    # Download and convert provider signature to base64
-    if provider_signature:
-        # Check if it's already base64 or a URL
-        if provider_signature.startswith("data:image"):
-            signature_url = provider_signature
-        elif provider_signature.startswith("http"):
-            signature_url = await download_image_as_base64(provider_signature)
-            if signature_url:
-                logger.info("✅ Provider signature downloaded and converted to base64")
-        else:
-            signature_url = provider_signature
-    elif business_config.signature_url:
-        try:
-            presigned_sig_url = generate_presigned_url(business_config.signature_url)
-            logger.info(f"✅ Generated presigned URL for signature: {business_config.signature_url}")
-            signature_url = await download_image_as_base64(presigned_sig_url)
-            if signature_url:
-                logger.info("✅ Provider signature downloaded and converted to base64")
-        except Exception as e:
-            logger.warning(f"⚠️ Failed to generate signature URL: {e}")
-    
-    # Download and convert client signature to base64
-    if client_signature:
+    # Task 3: Download client signature
+    async def download_client_sig():
+        if not client_signature:
+            return None
         if client_signature.startswith("data:image"):
-            # Already base64, use as-is
-            logger.info("✅ Client signature is already base64 format")
+            return client_signature
         elif client_signature.startswith("http"):
-            # Download from URL
-            logger.info(f"📥 Downloading client signature from URL: {client_signature[:100]}...")
-            client_signature_b64 = await download_image_as_base64(client_signature)
-            if client_signature_b64:
-                client_signature = client_signature_b64
-                logger.info("✅ Client signature downloaded and converted to base64")
-            else:
-                logger.warning("⚠️ Failed to download client signature from URL")
-        # else: assume it's already in correct format
-        logger.info(f"📝 Final client signature format: {client_signature[:50]}...")
-    else:
-        logger.info("ℹ️ No client signature provided")
+            logger.info(f"📥 Downloading client signature...")
+            return await download_image_as_base64(client_signature)
+        else:
+            return client_signature
+    
+    # Execute all downloads in parallel
+    logger.info("🚀 Starting parallel image downloads...")
+    logo_url, signature_url, client_signature_result = await asyncio.gather(
+        download_logo(),
+        download_provider_sig(),
+        download_client_sig(),
+        return_exceptions=True
+    )
+    
+    # Handle exceptions from parallel downloads
+    if isinstance(logo_url, Exception):
+        logger.error(f"❌ Logo download failed: {logo_url}")
+        logo_url = None
+    elif logo_url:
+        logger.info(f"✅ Logo ready ({len(logo_url)} chars)")
+    
+    if isinstance(signature_url, Exception):
+        logger.error(f"❌ Provider signature download failed: {signature_url}")
+        signature_url = None
+    elif signature_url:
+        logger.info("✅ Provider signature ready")
+    
+    if isinstance(client_signature_result, Exception):
+        logger.error(f"❌ Client signature download failed: {client_signature_result}")
+        client_signature = None
+    elif client_signature_result:
+        client_signature = client_signature_result
+        logger.info("✅ Client signature ready")
     
     # Contract details - use passed date or current date for new contracts
     base_date = contract_created_at or datetime.now()
@@ -1026,7 +1045,7 @@ async def download_image_as_base64(url: str) -> str:
     
     try:
         logger.info(f"📥 Downloading image from: {url[:100]}...")
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as client:
             response = await client.get(url)
             logger.info(f"📥 Response status: {response.status_code}, content-type: {response.headers.get('content-type')}")
             response.raise_for_status()
