@@ -281,12 +281,24 @@ async def delete_client(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Delete a client"""
+    """Delete a client and all related data (contracts, schedules, invoices, proposals)"""
     from ..plan_limits import decrement_client_count
     
     client = db.query(Client).filter(Client.id == client_id, Client.user_id == current_user.id).first()
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
+    
+    # Count related records before deletion for logging
+    contracts_count = len(client.contracts)
+    schedules_count = len(client.schedules)
+    invoices_count = len(client.invoices)
+    proposals_count = len(client.scheduling_proposals)
+    
+    logger.info(f"🗑️ Deleting client {client_id} ({client.contact_name or client.business_name})")
+    logger.info(f"   📄 {contracts_count} contract(s)")
+    logger.info(f"   📅 {schedules_count} schedule(s)")
+    logger.info(f"   🧾 {invoices_count} invoice(s)")
+    logger.info(f"   📝 {proposals_count} scheduling proposal(s)")
     
     # Check if client had a fully signed contract (both parties signed)
     # This is when the count was incremented, so we need to decrement
@@ -295,8 +307,15 @@ async def delete_client(
         for c in client.contracts
     )
     
+    # Delete client - cascade will automatically delete:
+    # - contracts (and their invoices via cascade)
+    # - schedules
+    # - invoices
+    # - scheduling_proposals
     db.delete(client)
     db.commit()
+    
+    logger.info(f"✅ Client {client_id} and all related data deleted successfully")
     
     # Decrement client count if they had a signed contract
     if has_signed_contract:
@@ -326,6 +345,12 @@ async def batch_delete_clients(
     # Verify all clients belong to the current user and delete them
     deleted_count = 0
     signed_contracts_count = 0
+    total_contracts = 0
+    total_schedules = 0
+    total_invoices = 0
+    total_proposals = 0
+    
+    logger.info(f"🗑️ Batch deleting {len(data.clientIds)} client(s)")
     
     for client_id in data.clientIds:
         client = db.query(Client).filter(
@@ -333,6 +358,19 @@ async def batch_delete_clients(
             Client.user_id == current_user.id
         ).first()
         if client:
+            # Count related records before deletion
+            contracts_count = len(client.contracts)
+            schedules_count = len(client.schedules)
+            invoices_count = len(client.invoices)
+            proposals_count = len(client.scheduling_proposals)
+            
+            total_contracts += contracts_count
+            total_schedules += schedules_count
+            total_invoices += invoices_count
+            total_proposals += proposals_count
+            
+            logger.info(f"   Deleting client {client_id} ({client.contact_name or client.business_name}): {contracts_count} contracts, {schedules_count} schedules, {invoices_count} invoices, {proposals_count} proposals")
+            
             # Check if client had a fully signed contract
             has_signed_contract = any(
                 c.client_signature_timestamp and c.signed_at 
@@ -348,10 +386,13 @@ async def batch_delete_clients(
             if contract_ids:
                 db.query(Invoice).filter(Invoice.contract_id.in_(contract_ids)).delete(synchronize_session=False)
             
+            # Delete client - cascade will handle contracts, schedules, invoices, proposals
             db.delete(client)
             deleted_count += 1
     
     db.commit()
+    
+    logger.info(f"✅ Batch delete complete: {deleted_count} clients, {total_contracts} contracts, {total_schedules} schedules, {total_invoices} invoices, {total_proposals} proposals")
     
     # Decrement client count for each deleted client that had a signed contract
     for _ in range(signed_contracts_count):
@@ -362,7 +403,11 @@ async def batch_delete_clients(
     
     return {
         "message": f"Successfully deleted {deleted_count} client(s)",
-        "deletedCount": deleted_count
+        "deletedCount": deleted_count,
+        "deletedContracts": total_contracts,
+        "deletedSchedules": total_schedules,
+        "deletedInvoices": total_invoices,
+        "deletedProposals": total_proposals
     }
 
 
