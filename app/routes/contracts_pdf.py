@@ -1335,7 +1335,8 @@ async def view_contract_pdf_public(
                 "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Methods": "GET",
                 "Access-Control-Allow-Headers": "*",
-                "Cache-Control": "public, max-age=3600"
+                "Cache-Control": "no-cache, must-revalidate",
+                "ETag": contract.pdf_hash if contract.pdf_hash else None
             }
         )
     except Exception as e:
