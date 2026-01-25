@@ -365,6 +365,7 @@ async def generate_contract_html(
                 presigned_logo_url = generate_presigned_url(business_config.logo_url)
             logo_url = await download_image_as_base64(presigned_logo_url)
             if logo_url:
+                pass  # Logo successfully downloaded
             else:
                 logger.warning(f"⚠️ Logo download returned None for URL: {presigned_logo_url[:100]}...")
         except Exception as e:
@@ -372,6 +373,7 @@ async def generate_contract_html(
             import traceback
             logger.error(f"❌ Traceback: {traceback.format_exc()}")
     else:
+        pass  # No logo URL configured
     # Download and convert provider signature to base64
     if provider_signature:
         # Check if it's already base64 or a URL
@@ -380,6 +382,7 @@ async def generate_contract_html(
         elif provider_signature.startswith("http"):
             signature_url = await download_image_as_base64(provider_signature)
             if signature_url:
+                pass  # Signature successfully downloaded
         else:
             signature_url = provider_signature
     elif business_config.signature_url:
@@ -387,6 +390,7 @@ async def generate_contract_html(
             presigned_sig_url = generate_presigned_url(business_config.signature_url)
             signature_url = await download_image_as_base64(presigned_sig_url)
             if signature_url:
+                pass  # Signature successfully downloaded
         except Exception as e:
             logger.warning(f"⚠️ Failed to generate signature URL: {e}")
 
