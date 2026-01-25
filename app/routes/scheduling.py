@@ -265,34 +265,47 @@ async def create_client_booking(
     start_time_display = start_time.strftime("%I:%M %p")
     end_time_display = end_time.strftime("%I:%M %p")
     
-    # Create schedule entry with PENDING approval status
-    # Use contract info if available, otherwise use client info
-    title = f"Service Appointment - {client.contact_name or client.business_name}"
-    description = f"Service appointment for {client.business_name}"
-    price = None
+    # Check if schedule already exists to prevent duplicates
+    existing_schedule = db.query(Schedule).filter(
+        Schedule.client_id == client.id,
+        Schedule.scheduled_date == start_time.date(),
+        Schedule.start_time == start_time_24h,
+        Schedule.status == "scheduled"
+    ).first()
     
-    if contract:
-        title = f"{contract.title} - {client.contact_name or client.business_name}"
-        description = contract.description or description
-        price = contract.total_value
-    
-    schedule = Schedule(
-        user_id=client.user_id,
-        client_id=client.id,
-        title=title,
-        description=description,
-        service_type=contract.contract_type if contract else "standard",
-        scheduled_date=start_time.date(),
-        start_time=start_time_24h,
-        end_time=end_time_24h,
-        duration_minutes=duration_minutes,
-        status="scheduled",
-        approval_status="pending",  # Requires provider approval
-        address=client.form_data.get('address') if client.form_data else None,
-        price=price,
-        notes="Booked by client - awaiting provider approval" + ("" if contract else " (contract pending)")
-    )
-    db.add(schedule)
+    if existing_schedule:
+        logger.warning(f"⚠️ Schedule already exists for client {client.id} on {start_time.date()} at {start_time_24h}")
+        schedule = existing_schedule
+    else:
+        # Create schedule entry with PENDING approval status
+        # Use contract info if available, otherwise use client info
+        title = f"Service Appointment - {client.contact_name or client.business_name}"
+        description = f"Service appointment for {client.business_name}"
+        price = None
+        
+        if contract:
+            title = f"{contract.title} - {client.contact_name or client.business_name}"
+            description = contract.description or description
+            price = contract.total_value
+        
+        schedule = Schedule(
+            user_id=client.user_id,
+            client_id=client.id,
+            title=title,
+            description=description,
+            service_type=contract.contract_type if contract else "standard",
+            scheduled_date=start_time.date(),
+            start_time=start_time_24h,
+            end_time=end_time_24h,
+            duration_minutes=duration_minutes,
+            status="scheduled",
+            approval_status="pending",  # Requires provider approval
+            address=client.form_data.get('address') if client.form_data else None,
+            price=price,
+            notes="Booked by client - awaiting provider approval" + ("" if contract else " (contract pending)")
+        )
+        db.add(schedule)
+        logger.info(f"📅 Creating new schedule for client {client.id} on {start_time.date()} at {start_time_24h}")
     
     # Update client status to pending_approval
     client.status = "pending_approval"
@@ -522,22 +535,37 @@ async def client_accept_slot(
     
     # Note: Contract status stays as 'signed' - 'scheduled' is a client status, not contract status
     
-    # Create calendar event (Schedule)
-    schedule = Schedule(
-        user_id=proposal.user_id,
-        client_id=proposal.client_id,
-        title=f"{contract.title} - {client.contact_name or client.business_name}",
-        description=contract.description or f"Service appointment for {client.business_name}",
-        service_type=contract.contract_type or "standard",
-        scheduled_date=datetime.fromisoformat(data.slot_date),
-        start_time=data.slot_start_time,
-        end_time=data.slot_end_time,
-        status="scheduled",
-        address=getattr(client, 'address', None),
-        price=contract.total_value,
-        notes=f"Scheduled from proposal #{proposal_id}"
-    )
-    db.add(schedule)
+    # Check if schedule already exists to prevent duplicates
+    slot_date_obj = datetime.fromisoformat(data.slot_date)
+    existing_schedule = db.query(Schedule).filter(
+        Schedule.client_id == proposal.client_id,
+        Schedule.scheduled_date == slot_date_obj.date(),
+        Schedule.start_time == data.slot_start_time,
+        Schedule.status == "scheduled"
+    ).first()
+    
+    if existing_schedule:
+        logger.warning(f"⚠️ Schedule already exists for client {proposal.client_id} on {data.slot_date} at {data.slot_start_time}")
+        schedule = existing_schedule
+    else:
+        # Create calendar event (Schedule)
+        schedule = Schedule(
+            user_id=proposal.user_id,
+            client_id=proposal.client_id,
+            title=f"{contract.title} - {client.contact_name or client.business_name}",
+            description=contract.description or f"Service appointment for {client.business_name}",
+            service_type=contract.contract_type or "standard",
+            scheduled_date=slot_date_obj,
+            start_time=data.slot_start_time,
+            end_time=data.slot_end_time,
+            status="scheduled",
+            address=getattr(client, 'address', None),
+            price=contract.total_value,
+            notes=f"Scheduled from proposal #{proposal_id}"
+        )
+        db.add(schedule)
+        logger.info(f"📅 Creating new schedule for client {proposal.client_id} from proposal {proposal_id}")
+    
     db.commit()
     db.refresh(schedule)
     
@@ -892,24 +920,38 @@ async def create_direct_booking(
     start_time_display = format_time_12h(data.selected_time)
     end_time_display = format_time_12h(end_time)
     
-    # Create schedule entry
-    schedule = Schedule(
-        user_id=contract.user_id,
-        client_id=client.id,
-        title=f"{contract.title} - {client.contact_name or client.business_name}",
-        description=contract.description or f"Service appointment for {client.business_name}",
-        service_type=contract.contract_type or "standard",
-        scheduled_date=datetime.fromisoformat(data.selected_date),
-        start_time=start_time_display,
-        end_time=end_time_display,
-        duration_minutes=estimated_duration,
-        status="scheduled",
-        approval_status="accepted",
-        address=client.form_data.get('address') if client.form_data else None,
-        price=contract.total_value,
-        notes="Booked directly by client"
-    )
-    db.add(schedule)
+    # Check if schedule already exists to prevent duplicates
+    scheduled_date_obj = datetime.fromisoformat(data.selected_date)
+    existing_schedule = db.query(Schedule).filter(
+        Schedule.client_id == client.id,
+        Schedule.scheduled_date == scheduled_date_obj.date(),
+        Schedule.start_time == start_time_display,
+        Schedule.status == "scheduled"
+    ).first()
+    
+    if existing_schedule:
+        logger.warning(f"⚠️ Schedule already exists for client {client.id} on {data.selected_date} at {start_time_display}")
+        schedule = existing_schedule
+    else:
+        # Create schedule entry
+        schedule = Schedule(
+            user_id=contract.user_id,
+            client_id=client.id,
+            title=f"{contract.title} - {client.contact_name or client.business_name}",
+            description=contract.description or f"Service appointment for {client.business_name}",
+            service_type=contract.contract_type or "standard",
+            scheduled_date=scheduled_date_obj,
+            start_time=start_time_display,
+            end_time=end_time_display,
+            duration_minutes=estimated_duration,
+            status="scheduled",
+            approval_status="accepted",
+            address=client.form_data.get('address') if client.form_data else None,
+            price=contract.total_value,
+            notes="Booked directly by client"
+        )
+        db.add(schedule)
+        logger.info(f"📅 Creating new schedule for client {client.id} on {data.selected_date} at {start_time_display}")
     
     # Note: Contract status stays as 'signed' - 'scheduled' is a client status, not contract status
     
