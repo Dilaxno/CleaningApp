@@ -1265,17 +1265,20 @@ async def view_contract_pdf_public(
         response = r2.get_object(Bucket=R2_BUCKET_NAME, Key=contract.pdf_key)
         pdf_bytes = response['Body'].read()
 
+        headers = {
+            "Content-Disposition": f"inline; filename=contract-{contract.id}.pdf",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET",
+            "Access-Control-Allow-Headers": "*",
+            "Cache-Control": "no-cache, must-revalidate",
+        }
+        if contract.pdf_hash:
+            headers["ETag"] = contract.pdf_hash
+
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",
-            headers={
-                "Content-Disposition": f"inline; filename=contract-{contract.id}.pdf",
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET",
-                "Access-Control-Allow-Headers": "*",
-                "Cache-Control": "no-cache, must-revalidate",
-                "ETag": contract.pdf_hash if contract.pdf_hash else None
-            }
+            headers=headers
         )
     except Exception as e:
         logger.error(f"❌ Failed to serve PDF: {str(e)}")
