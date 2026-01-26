@@ -1147,8 +1147,9 @@ async def generate_contract_pdf(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error generating contract PDF: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"❌ Error generating contract PDF: {str(e)}", exc_info=True)
+        # Don't expose technical details to users in production
+        raise HTTPException(status_code=500, detail="Failed to generate contract. Please try again or contact support.")
 
 @router.get("/pdf/{contract_id}")
 async def get_contract_pdf(
