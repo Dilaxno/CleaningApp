@@ -7,6 +7,7 @@ class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     account_type: Optional[str] = None
     hear_about: Optional[str] = None
+    default_brand_color: Optional[str] = None
 
 
 class UserResponse(BaseModel):

@@ -12,9 +12,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
-# Default profile picture for users without one
-DEFAULT_PROFILE_PICTURE = "https://res.cloudinary.com/dxqum9ywx/image/upload/v1768518062/pfp_dvk6gi.jpg"
-
 def validate_firebase_uid(firebase_uid: str) -> bool:
     """Validate firebase_uid format to prevent injection"""
     if not firebase_uid or len(firebase_uid) > 128:
@@ -83,20 +80,19 @@ def create_or_update_user(data: UserCreate, db: Session = Depends(get_db)):
             # Set profile picture from Google if provided and user doesn't have one
             if data.profilePictureUrl and not user.profile_picture_url:
                 user.profile_picture_url = data.profilePictureUrl
-            # Set default profile picture if user still doesn't have one
-            elif not user.profile_picture_url:
-                user.profile_picture_url = DEFAULT_PROFILE_PICTURE
+            # Remove the default profile picture assignment
+            # elif not user.profile_picture_url:
+            #     user.profile_picture_url = DEFAULT_PROFILE_PICTURE
         else:
             logger.info(f"🆕 Creating new user for firebase_uid: {data.firebaseUid}")
-            # Use provided profile picture, or default if none provided
-            profile_picture = data.profilePictureUrl or DEFAULT_PROFILE_PICTURE
+            # Only set profile picture if explicitly provided
             user = User(
                 firebase_uid=data.firebaseUid,
                 email=data.email,
                 full_name=data.fullName,
                 account_type=data.accountType,
                 hear_about=data.hearAbout,
-                profile_picture_url=profile_picture,
+                profile_picture_url=data.profilePictureUrl,  # Only set if provided, otherwise None
                 plan=None,  # Users must select a paid plan after onboarding
             )
             db.add(user)
@@ -173,6 +169,7 @@ def get_user(
         "plan": current_user.plan,
         "hear_about": current_user.hear_about,
         "onboarding_completed": current_user.onboarding_completed,
+        "default_brand_color": current_user.default_brand_color,
     }
 
 @router.put("/{firebase_uid}")
@@ -205,6 +202,8 @@ def update_user(
             current_user.hear_about = data.hearAbout
         if data.plan is not None:
             current_user.plan = data.plan
+        if data.default_brand_color is not None:
+            current_user.default_brand_color = data.default_brand_color
             logger.info(f"📋 User plan updated to: {data.plan}")
 
         db.commit()
