@@ -43,6 +43,7 @@ class UserUpdate(BaseModel):
     accountType: Optional[str] = None
     hearAbout: Optional[str] = None
     plan: Optional[str] = None
+    default_brand_color: Optional[str] = None
 
 class UserResponse(BaseModel):
     id: int
@@ -202,9 +203,12 @@ def update_user(
             current_user.hear_about = data.hearAbout
         if data.plan is not None:
             current_user.plan = data.plan
+            logger.info(f"📋 User plan updated to: {data.plan}")
         if data.default_brand_color is not None:
             current_user.default_brand_color = data.default_brand_color
-            logger.info(f"📋 User plan updated to: {data.plan}")
+            logger.info(
+                f"🎨 User default brand color updated to: {data.default_brand_color}"
+            )
 
         db.commit()
         db.refresh(current_user)
@@ -229,6 +233,7 @@ def update_user(
             "plan": current_user.plan,
             "hear_about": current_user.hear_about,
             "onboarding_completed": current_user.onboarding_completed,
+            "default_brand_color": current_user.default_brand_color,
         }
 
     except Exception as e:
