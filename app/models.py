@@ -270,6 +270,17 @@ class Client(Base):
     status = Column(String(50), default="pending")
     notes = Column(String(1000), nullable=True)
     form_data = Column(JSON, nullable=True)  # Store structured form submission data
+    
+    # Pending contract fields - stored until client completes signing and scheduling
+    pending_contract_title = Column(String(255), nullable=True)
+    pending_contract_description = Column(String(2000), nullable=True)
+    pending_contract_type = Column(String(100), nullable=True)
+    pending_contract_start_date = Column(DateTime, nullable=True)
+    pending_contract_end_date = Column(DateTime, nullable=True)
+    pending_contract_total_value = Column(Float, nullable=True)
+    pending_contract_payment_terms = Column(String(255), nullable=True)
+    pending_contract_terms_conditions = Column(String(5000), nullable=True)
+    
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
@@ -313,6 +324,9 @@ class Contract(Base):
     # cancelled: Owner manually cancelled the contract (manual only)
     # completed: Contract term finished (automatic transition when end_date passes)
     status = Column(String(50), default="new")
+    client_onboarding_status = Column(
+        String(50), default="pending_signature"
+    )  # pending_signature, pending_scheduling, completed
     start_date = Column(DateTime, nullable=True)
     end_date = Column(DateTime, nullable=True)
     total_value = Column(Float, nullable=True)

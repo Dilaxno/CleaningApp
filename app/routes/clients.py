@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from ..auth import get_current_user
 from ..database import get_db
-from ..models import BusinessConfig, Client, User
+from ..models import BusinessConfig, Client, User, Contract
 from ..rate_limiter import create_rate_limiter, get_redis_client, rate_limit_dependency
 
 logger = logging.getLogger(__name__)
@@ -891,7 +891,7 @@ async def sign_contract(
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
 
-    # Find the contract for this client
+    # Find or create the contract for this client
     if data.contractPublicId:
         # Find specific contract by public_id
         contract = (
@@ -910,8 +910,38 @@ async def sign_contract(
             .order_by(Contract.created_at.desc())
             .first()
         )
+    
+    # If no contract exists, create one from pending contract data
     if not contract:
-        raise HTTPException(status_code=404, detail="Contract not found")
+        if not client.pending_contract_title:
+            raise HTTPException(status_code=404, detail="No contract or pending contract data found")
+        
+        # Create contract from pending data
+        contract = Contract(
+            user_id=client.user_id,
+            client_id=client.id,
+            title=client.pending_contract_title,
+            description=client.pending_contract_description,
+            contract_type=client.pending_contract_type,
+            start_date=client.pending_contract_start_date,
+            end_date=client.pending_contract_end_date,
+            total_value=client.pending_contract_total_value,
+            payment_terms=client.pending_contract_payment_terms,
+            terms_conditions=client.pending_contract_terms_conditions,
+            status="new"
+        )
+        db.add(contract)
+        db.flush()  # Get the ID without committing
+        
+        # Clear pending contract data
+        client.pending_contract_title = None
+        client.pending_contract_description = None
+        client.pending_contract_type = None
+        client.pending_contract_start_date = None
+        client.pending_contract_end_date = None
+        client.pending_contract_total_value = None
+        client.pending_contract_payment_terms = None
+        client.pending_contract_terms_conditions = None
 
     # Get the user (business owner)
     user = db.query(User).filter(User.id == client.user_id).first()
@@ -924,6 +954,9 @@ async def sign_contract(
     contract.client_signature_user_agent = user_agent[:500] if user_agent else None
     contract.client_signature_timestamp = datetime.now()
     # Status remains 'new' until both parties sign (provider signs last)
+
+    # Update client onboarding status
+    contract.client_onboarding_status = "pending_scheduling"
 
     # Update client status from "pending_signature" to "new_lead"
     # Now the client will appear in the provider's client list

@@ -304,7 +304,11 @@ async def approve_schedule(
         client = db.query(Client).filter(Client.id == schedule.client_id).first()
         if client:
             client.status = "scheduled"
-        # Note: Contract status stays as 'signed' - 'scheduled' is a client status, not contract status
+
+        # Update onboarding status on the associated contract
+        contract = db.query(Contract).filter(Contract.client_id == schedule.client_id).order_by(Contract.created_at.desc()).first()
+        if contract:
+            contract.client_onboarding_status = "completed"
          
         db.commit()
         # Send confirmation email to client

@@ -303,6 +303,12 @@ async def create_client_booking(
     # Update client status to pending_approval
     client.status = "pending_approval"
     
+    # Update contract status to "scheduled" and mark onboarding as completed if it exists
+    if contract and contract.status == "new":
+        contract.status = "scheduled"
+        contract.client_onboarding_status = "completed"  # Contract now appears in provider's list
+        logger.info(f"📋 Updated contract {contract.id} status to 'scheduled' and onboarding to 'completed'")
+    
     db.commit()
     db.refresh(schedule)
     # Send notification email to provider about pending booking
@@ -511,6 +517,9 @@ async def client_accept_slot(
     # Update client status to 'scheduled'
     client.status = "scheduled"
     # Note: Contract status stays as 'signed' - 'scheduled' is a client status, not contract status
+
+    # Update client onboarding status to 'completed'
+    contract.client_onboarding_status = "completed"
     
     # Check if schedule already exists to prevent duplicates
     slot_date_obj = datetime.fromisoformat(data.slot_date)

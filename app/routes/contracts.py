@@ -99,7 +99,10 @@ async def get_contracts(
     client_id: Optional[int] = Query(None, description="Filter contracts by client ID")
 ):
     """Get all contracts for the current user, optionally filtered by client_id"""
-    query = db.query(Contract).filter(Contract.user_id == current_user.id)
+    query = db.query(Contract).filter(
+        Contract.user_id == current_user.id,
+        Contract.client_onboarding_status == "completed"
+    )
     
     if client_id:
         query = query.filter(Contract.client_id == client_id)
@@ -144,6 +147,50 @@ async def get_contracts(
             defaultSignatureUrl=default_signature_url
         ))
     return result
+
+@router.post("/initiate", response_model=dict)
+async def initiate_contract_process(
+    data: ContractCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Initiate contract process by sending form to client.
+    Contract will only be created after client signs and schedules.
+    """
+    logger.info(f"📥 Initiating contract process for user_id: {current_user.id}")
+    
+    # Verify client belongs to user
+    client = db.query(Client).filter(Client.id == data.clientId, Client.user_id == current_user.id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    
+    # Store contract template data in client record for later use
+    client.pending_contract_title = data.title
+    client.pending_contract_description = data.description
+    client.pending_contract_type = data.contractType
+    client.pending_contract_start_date = data.startDate
+    client.pending_contract_end_date = data.endDate
+    client.pending_contract_total_value = data.totalValue
+    client.pending_contract_payment_terms = data.paymentTerms
+    client.pending_contract_terms_conditions = data.termsConditions
+    
+    # Update client status to indicate contract process initiated
+    client.status = "contract_sent"
+    
+    db.commit()
+    
+    # TODO: Send email to client with form link
+    # For now, return success with form URL
+    form_url = f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/form/{current_user.public_id}/office?clientId={client.public_id}"
+    
+    return {
+        "success": True,
+        "message": "Contract process initiated. Client will receive form link.",
+        "formUrl": form_url,
+        "clientId": client.id
+    }
+
 
 @router.post("", response_model=ContractResponse)
 async def create_contract(
