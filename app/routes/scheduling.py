@@ -118,12 +118,30 @@ async def get_scheduling_info_by_client(
     
     # Check if provider has Calendly integration
     from ..models import CalendlyIntegration
-    has_calendly = db.query(CalendlyIntegration).filter(
+    calendly_integration = db.query(CalendlyIntegration).filter(
         CalendlyIntegration.user_id == client.user_id
-    ).first() is not None
-    
+    ).first()
+    has_calendly = calendly_integration is not None
+
     # Check if meetings are required
     meetings_required = business_config.meetings_required if business_config else False
+
+    # When provider has Calendly + meetings_required, client must book consultation before scheduling
+    consultation_required = False
+    consultation_booking_url = None
+    if calendly_integration and business_config and business_config.meetings_required and calendly_integration.default_event_type_url:
+        consultation_required = True
+        from ..services.calendly_service import CalendlyService
+        calendly_service = CalendlyService()
+        prefill_data = {
+            "name": client.contact_name or client.business_name or "",
+            "email": client.email or "",
+            "phone": client.phone or ""
+        }
+        consultation_booking_url = calendly_service.generate_scheduling_link(
+            calendly_integration.default_event_type_url,
+            prefill_data
+        )
     
     return {
         "business_name": business_name,
@@ -135,7 +153,9 @@ async def get_scheduling_info_by_client(
         "off_work_periods": off_work_periods,
         "buffer_time": buffer_time,
         "meetings_required": meetings_required,
-        "has_calendly": has_calendly
+        "has_calendly": has_calendly,
+        "consultation_required": consultation_required,
+        "consultation_booking_url": consultation_booking_url
     }
 
 @router.get("/client/{client_id}/latest")
