@@ -57,6 +57,11 @@ class BusinessConfigCreate(BaseModel):
     discountWeekly: Optional[str] = None
     discountMonthly: Optional[str] = None
     discountLongTerm: Optional[str] = None
+
+    # First cleaning discount (applied only to the first cleaning session)
+    firstCleaningDiscountType: Optional[str] = None  # percent | fixed
+    firstCleaningDiscountValue: Optional[str] = None
+
     addonWindows: Optional[str] = None
     addonCarpets: Optional[str] = None  # Legacy - deprecated
     addonCarpetSmall: Optional[str] = None
@@ -155,6 +160,7 @@ def get_current_user_business_config(
             signature_presigned_url = generate_presigned_url(config.signature_url)
         except Exception as e:
             logger.warning(f"⚠️ Failed to generate presigned URL for signature: {e}")
+
     return {
         "businessName": config.business_name,
         "logoKey": config.logo_url,
@@ -192,6 +198,8 @@ def get_current_user_business_config(
         "discountWeekly": config.discount_weekly,
         "discountMonthly": config.discount_monthly,
         "discountLongTerm": config.discount_long_term,
+        "firstCleaningDiscountType": config.first_cleaning_discount_type,
+        "firstCleaningDiscountValue": config.first_cleaning_discount_value,
         "addonWindows": config.addon_windows,
         "addonCarpets": config.addon_carpets,
         "paymentDueDays": config.payment_due_days,
@@ -224,13 +232,16 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
         if not user:
             logger.error(f"❌ User not found for firebase_uid: {data.firebaseUid}")
             raise HTTPException(status_code=404, detail="User not found")
+
         existing = (
             db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
         )
+
         if existing:
             logger.info(
                 f"📝 Current DB values: logo_url={existing.logo_url}, rate_per_sqft={existing.rate_per_sqft}, pricing_model={existing.pricing_model}"
             )
+
             # Only update fields that are explicitly provided (not None and not empty string)
             if is_provided(data.businessName):
                 existing.business_name = data.businessName
@@ -266,22 +277,20 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 existing.supplies_provided = data.suppliesProvided
             if data.availableSupplies is not None:
                 existing.available_supplies = data.availableSupplies
+
             if is_provided(data.ratePerSqft):
-                converted_rate = to_float(data.ratePerSqft)
-                existing.rate_per_sqft = converted_rate
+                existing.rate_per_sqft = to_float(data.ratePerSqft)
             if is_provided(data.ratePerRoom):
-                converted_rate = to_float(data.ratePerRoom)
-                existing.rate_per_room = converted_rate
+                existing.rate_per_room = to_float(data.ratePerRoom)
             if is_provided(data.hourlyRate):
-                converted_rate = to_float(data.hourlyRate)
-                existing.hourly_rate = converted_rate
+                existing.hourly_rate = to_float(data.hourlyRate)
             if is_provided(data.flatRate):
-                converted_rate = to_float(data.flatRate)
-                existing.flat_rate = converted_rate
+                existing.flat_rate = to_float(data.flatRate)
             if is_provided(data.minimumCharge):
                 existing.minimum_charge = to_float(data.minimumCharge)
             if is_provided(data.cleaningTimePerSqft):
                 existing.cleaning_time_per_sqft = to_int(data.cleaningTimePerSqft)
+
             # New three-category time estimation system
             if is_provided(data.timeSmallJob):
                 existing.time_small_job = to_float(data.timeSmallJob)
@@ -295,6 +304,7 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 existing.cleaners_large_job = to_int(data.cleanersLargeJob) or 2
             if is_provided(data.bufferTime):
                 existing.buffer_time = to_int(data.bufferTime) or 30
+
             if is_provided(data.premiumEveningWeekend):
                 existing.premium_evening_weekend = to_float(data.premiumEveningWeekend)
             if is_provided(data.premiumDeepClean):
@@ -305,6 +315,14 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 existing.discount_monthly = to_float(data.discountMonthly)
             if is_provided(data.discountLongTerm):
                 existing.discount_long_term = to_float(data.discountLongTerm)
+
+            if is_provided(data.firstCleaningDiscountType):
+                existing.first_cleaning_discount_type = data.firstCleaningDiscountType
+            if is_provided(data.firstCleaningDiscountValue):
+                existing.first_cleaning_discount_value = to_float(
+                    data.firstCleaningDiscountValue
+                )
+
             if is_provided(data.addonWindows):
                 existing.addon_windows = to_float(data.addonWindows)
             if is_provided(data.addonCarpets):
@@ -315,10 +333,12 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 existing.addon_carpet_medium = to_float(data.addonCarpetMedium)
             if is_provided(data.addonCarpetLarge):
                 existing.addon_carpet_large = to_float(data.addonCarpetLarge)
+
             if is_provided(data.paymentDueDays):
                 existing.payment_due_days = to_int(data.paymentDueDays) or 15
             if is_provided(data.lateFeePercent):
                 existing.late_fee_percent = to_float(data.lateFeePercent) or 1.5
+
             if data.standardInclusions is not None:
                 existing.standard_inclusions = data.standardInclusions
             if data.standardExclusions is not None:
@@ -329,6 +349,7 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 existing.custom_exclusions = data.customExclusions
             if is_provided(data.preferredUnits):
                 existing.preferred_units = data.preferredUnits
+
             db.commit()
             config = existing
         else:
@@ -370,6 +391,8 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 discount_weekly=to_float(data.discountWeekly),
                 discount_monthly=to_float(data.discountMonthly),
                 discount_long_term=to_float(data.discountLongTerm),
+                first_cleaning_discount_type=data.firstCleaningDiscountType,
+                first_cleaning_discount_value=to_float(data.firstCleaningDiscountValue),
                 addon_windows=to_float(data.addonWindows),
                 addon_carpets=to_float(data.addonCarpets),  # Legacy
                 addon_carpet_small=to_float(data.addonCarpetSmall),
@@ -392,6 +415,7 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
             else user.onboarding_completed
         )
         db.commit()
+
         return {"message": "Business configuration saved", "id": config.id}
 
     except HTTPException:
@@ -439,6 +463,7 @@ def get_business_config(firebase_uid: str, db: Session = Depends(get_db)):
             signature_presigned_url = generate_presigned_url(config.signature_url)
         except Exception as e:
             logger.warning(f"⚠️ Failed to generate presigned URL for signature: {e}")
+
     return {
         "businessName": config.business_name,
         "logoKey": config.logo_url,  # The R2 key
@@ -469,6 +494,8 @@ def get_business_config(firebase_uid: str, db: Session = Depends(get_db)):
         "discountWeekly": config.discount_weekly,
         "discountMonthly": config.discount_monthly,
         "discountLongTerm": config.discount_long_term,
+        "firstCleaningDiscountType": config.first_cleaning_discount_type,
+        "firstCleaningDiscountValue": config.first_cleaning_discount_value,
         "addonWindows": config.addon_windows,
         "addonCarpets": config.addon_carpets,
         "paymentDueDays": config.payment_due_days,
@@ -655,13 +682,10 @@ def get_public_business_info(firebase_uid: str, db: Session = Depends(get_db)):
 
                 off_work_periods = json.loads(config.off_work_periods)
         except Exception as e:
-            logger.warning(
-                f"⚠️ Failed to parse off_work_periods for {firebase_uid}: {e}"
-            )
+            logger.warning(f"⚠️ Failed to parse off_work_periods for {firebase_uid}: {e}")
         except Exception as e:
-            logger.warning(
-                f"⚠️ Failed to parse off_work_periods for {firebase_uid}: {e}"
-            )
+            logger.warning(f"⚠️ Failed to parse off_work_periods for {firebase_uid}: {e}")
+
     return {
         "business_name": config.business_name or "Business",
         "working_hours": working_hours,

@@ -216,6 +216,9 @@ class BusinessConfig(Base):
     discount_weekly = Column(Float, nullable=True)
     discount_monthly = Column(Float, nullable=True)
     discount_long_term = Column(Float, nullable=True)
+    # First cleaning discount (applied only to the first cleaning session)
+    first_cleaning_discount_type = Column(String(20), nullable=True)  # percent | fixed
+    first_cleaning_discount_value = Column(Float, nullable=True)
     addon_windows = Column(Float, nullable=True)
     addon_carpets = Column(
         Float, nullable=True

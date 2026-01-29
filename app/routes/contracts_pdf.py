@@ -253,6 +253,26 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
 
     discount_amount = base_price * (discount_percent / 100) if discount_percent else 0
     discounted_base_price = base_price - discount_amount
+
+    # Apply first cleaning discount ONLY on the first visit.
+    # This is controlled by a flag sent from the client form/quote preview.
+    is_first_cleaning = bool(form_data.get("isFirstCleaning", False))
+    first_cleaning_discount_amount = 0.0
+    first_cleaning_discount_type = None
+    first_cleaning_discount_value = None
+
+    if is_first_cleaning and getattr(config, "first_cleaning_discount_value", None):
+        first_cleaning_discount_type = getattr(config, "first_cleaning_discount_type", None) or "percent"
+        first_cleaning_discount_value = float(getattr(config, "first_cleaning_discount_value") or 0)
+
+        if first_cleaning_discount_type == "fixed":
+            first_cleaning_discount_amount = min(first_cleaning_discount_value, discounted_base_price)
+        else:
+            # Default to percent
+            first_cleaning_discount_amount = discounted_base_price * (first_cleaning_discount_value / 100.0)
+
+        discounted_base_price = max(0.0, discounted_base_price - first_cleaning_discount_amount)
+
     final_price = discounted_base_price + addon_total
 
     # Determine number of cleaners
@@ -311,6 +331,9 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
         "base_price": round(base_price, 2),
         "discount_percent": discount_percent,
         "discount_amount": round(discount_amount, 2),
+        "first_cleaning_discount_type": first_cleaning_discount_type,
+        "first_cleaning_discount_value": round(first_cleaning_discount_value, 2) if first_cleaning_discount_value is not None else None,
+        "first_cleaning_discount_amount": round(first_cleaning_discount_amount, 2),
         "addon_amount": round(addon_total, 2),
         "addon_details": addon_details,
         "final_price": round(final_price, 2),
