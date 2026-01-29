@@ -115,6 +115,7 @@ class ClientResponse(BaseModel):
     frequency: Optional[str]
     status: str
     notes: Optional[str]
+    created_at: Optional[datetime] = None
     form_data: Optional[dict] = None  # Include form_data for detailed view
 
     class Config:
@@ -145,6 +146,7 @@ async def get_clients(
             frequency=c.frequency,
             status=c.status,
             notes=c.notes,
+            created_at=c.created_at,
         )
         for c in clients
     ]
@@ -178,6 +180,7 @@ async def get_client(
         frequency=client.frequency,
         status=client.status,
         notes=client.notes,
+        created_at=client.created_at,
         form_data=client.form_data,
     )
 
@@ -230,6 +233,7 @@ async def create_client(
         frequency=client.frequency,
         status=client.status,
         notes=client.notes,
+        created_at=client.created_at,
     )
 
 
@@ -282,6 +286,7 @@ async def update_client(
         frequency=client.frequency,
         status=client.status,
         notes=client.notes,
+        created_at=client.created_at,
     )
 
 
@@ -827,6 +832,7 @@ async def submit_public_form(
             frequency=client.frequency,
             status=client.status,
             notes=client.notes,
+            created_at=client.created_at,
         ),
         contractPdfUrl=None,  # Will be available via job status endpoint
         jobId=job_id,
