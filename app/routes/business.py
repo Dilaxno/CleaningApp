@@ -42,6 +42,9 @@ class BusinessConfigCreate(BaseModel):
     ratePerRoom: Optional[str] = None
     hourlyRate: Optional[str] = None
     flatRate: Optional[str] = None
+    flatRateSmall: Optional[str] = None
+    flatRateMedium: Optional[str] = None
+    flatRateLarge: Optional[str] = None
     minimumCharge: Optional[str] = None
     # Legacy field - kept for backward compatibility
     cleaningTimePerSqft: Optional[str] = None
@@ -286,6 +289,12 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 existing.hourly_rate = to_float(data.hourlyRate)
             if is_provided(data.flatRate):
                 existing.flat_rate = to_float(data.flatRate)
+            if is_provided(data.flatRateSmall):
+                existing.flat_rate_small = to_float(data.flatRateSmall)
+            if is_provided(data.flatRateMedium):
+                existing.flat_rate_medium = to_float(data.flatRateMedium)
+            if is_provided(data.flatRateLarge):
+                existing.flat_rate_large = to_float(data.flatRateLarge)
             if is_provided(data.minimumCharge):
                 existing.minimum_charge = to_float(data.minimumCharge)
             if is_provided(data.cleaningTimePerSqft):
@@ -377,6 +386,9 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 rate_per_room=to_float(data.ratePerRoom),
                 hourly_rate=to_float(data.hourlyRate),
                 flat_rate=to_float(data.flatRate),
+                flat_rate_small=to_float(data.flatRateSmall),
+                flat_rate_medium=to_float(data.flatRateMedium),
+                flat_rate_large=to_float(data.flatRateLarge),
                 minimum_charge=to_float(data.minimumCharge),
                 cleaning_time_per_sqft=to_int(data.cleaningTimePerSqft),
                 # New three-category time estimation system

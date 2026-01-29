@@ -108,16 +108,43 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
         # Use new three-category time estimation system
         estimated_hours = calculate_estimated_hours(config, property_size)
         base_price = estimated_hours * config.hourly_rate
-    elif pricing_model == "flat" and config.flat_rate:
-        base_price = config.flat_rate
-        # Use new three-category time estimation system
-        estimated_hours = calculate_estimated_hours(config, property_size)
+    elif pricing_model == "flat":
+        # Flat-fee pricing can be configured either as a single legacy flat_rate
+        # or as 3 size-based rates (small/medium/large).
+        # Prefer the size-based rates when available.
+        def _pick_size_flat_rate() -> float:
+            if property_size < 1000:
+                return config.flat_rate_small or 0.0
+            elif 1500 <= property_size <= 2500:
+                return config.flat_rate_medium or 0.0
+            elif property_size > 2500:
+                return config.flat_rate_large or 0.0
+            # Gap ranges: choose the closest configured value.
+            if property_size < 1500:
+                return config.flat_rate_small or config.flat_rate_medium or config.flat_rate_large or 0.0
+            return config.flat_rate_medium or config.flat_rate_large or config.flat_rate_small or 0.0
+
+        base_price = _pick_size_flat_rate() or (config.flat_rate or 0.0)
+        if base_price:
+            # Use new three-category time estimation system
+            estimated_hours = calculate_estimated_hours(config, property_size)
 
     # If no pricing model matched or base_price is still 0, try fallbacks
     if base_price == 0:
         logger.warning(f"⚠️ Base price is 0 - trying fallback rates")
         # Try each rate type as fallback
-        if config.flat_rate and config.flat_rate > 0:
+        if (config.flat_rate_small or config.flat_rate_medium or config.flat_rate_large) and property_size > 0:
+            # Use size-based flat rates as first fallback when property size is known
+            if property_size < 1000:
+                base_price = config.flat_rate_small or 0.0
+            elif 1500 <= property_size <= 2500:
+                base_price = config.flat_rate_medium or 0.0
+            elif property_size > 2500:
+                base_price = config.flat_rate_large or 0.0
+            else:
+                base_price = config.flat_rate_small or config.flat_rate_medium or config.flat_rate_large or 0.0
+            estimated_hours = calculate_estimated_hours(config, property_size) if base_price else 0.0
+        elif config.flat_rate and config.flat_rate > 0:
             base_price = config.flat_rate
             estimated_hours = 2
         elif config.hourly_rate and config.hourly_rate > 0:

@@ -201,6 +201,10 @@ class BusinessConfig(Base):
     rate_per_room = Column(Float, nullable=True)
     hourly_rate = Column(Float, nullable=True)
     flat_rate = Column(Float, nullable=True)
+    # Flat fee by job size (used when pricing_model == "flat")
+    flat_rate_small = Column(Float, nullable=True)
+    flat_rate_medium = Column(Float, nullable=True)
+    flat_rate_large = Column(Float, nullable=True)
     minimum_charge = Column(Float, nullable=True)
     # Legacy field - kept for backward compatibility
     cleaning_time_per_sqft = Column(Integer, nullable=True)
