@@ -534,12 +534,12 @@ async def client_accept_slot(
     proposal.selected_slot_end_time = data.slot_end_time
     proposal.responded_at = datetime.utcnow()
     
-    # Update client status to 'scheduled'
-    client.status = "scheduled"
-    # Note: Contract status stays as 'signed' - 'scheduled' is a client status, not contract status
-
-    # Update client onboarding status to 'completed'
-    contract.client_onboarding_status = "completed"
+    # IMPORTANT:
+    # Do NOT consider the client "scheduled" (or onboarding "completed") just because they
+    # picked a time from a proposal.
+    # The provider must still approve/accept the schedule (or propose another time), and the
+    # contract must be fully signed by BOTH parties.
+    client.status = "pending_approval"
     
     # Check if schedule already exists to prevent duplicates
     slot_date_obj = datetime.fromisoformat(data.slot_date)
@@ -842,10 +842,13 @@ async def create_direct_booking(
     if not contract:
         raise HTTPException(status_code=404, detail="Contract not found")
     
-    # Check contract status - booking allowed only after provider has signed (fully executed)
-    # (Client can still be in the signing flow, but scheduling should not be treated as verified until signed.)
+    # Scheduling is allowed only after the contract is fully signed by BOTH parties.
+    # Provider must sign in the dashboard to execute the agreement.
     if contract.status != "signed":
-        raise HTTPException(status_code=400, detail=f"Contract status is '{contract.status}', booking not allowed")
+        raise HTTPException(
+            status_code=400,
+            detail="Contract must be signed by the provider before scheduling can be submitted.",
+        )
     
     # Get client and user
     client = db.query(Client).filter(Client.id == contract.client_id).first()
@@ -935,7 +938,7 @@ async def create_direct_booking(
             end_time=end_time_display,
             duration_minutes=estimated_duration,
             status="scheduled",
-            approval_status="accepted",
+            approval_status="pending",  # Requires provider approval
             address=client.form_data.get('address') if client.form_data else None,
             price=contract.total_value,
             notes="Booked directly by client"
@@ -952,21 +955,23 @@ async def create_direct_booking(
     
     db.commit()
     db.refresh(schedule)
-    # Send confirmation email to provider
+    # Send notification email to provider about pending booking (requires approval)
     try:
+        from ..email_service import send_pending_booking_notification
+
         if user.email:
-            await send_scheduling_accepted_email(
+            await send_pending_booking_notification(
                 provider_email=user.email,
                 provider_name=user.full_name or "Service Provider",
                 client_name=client.contact_name or client.business_name,
-                contract_id=contract.id,
-                selected_date=data.selected_date,
+                scheduled_date=data.selected_date,
                 start_time=start_time_display,
                 end_time=end_time_display,
-                property_address=client.form_data.get('address') if client.form_data else None
+                property_address=client.form_data.get('address') if client.form_data else None,
+                schedule_id=schedule.id,
             )
     except Exception as e:
-        logger.error(f"Failed to send booking confirmation email: {e}")
+        logger.error(f"Failed to send pending booking notification: {e}")
     
     # Generate contract PDF URL if available
     contract_pdf_url = None
@@ -980,7 +985,7 @@ async def create_direct_booking(
         contract_pdf_url = f"{backend_base}/contracts/pdf/public/{contract.public_id}"
     
     return {
-        "message": "Booking confirmed",
+        "message": "Booking request submitted - awaiting provider approval",
         "schedule_id": schedule.id,
         "scheduled_date": data.selected_date,
         "start_time": start_time_display,

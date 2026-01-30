@@ -311,13 +311,13 @@ async def approve_schedule(
         # Accept the appointment
         schedule.approval_status = "accepted"
         
-        # Update client status to 'scheduled'
+        # Only the provider accepting the schedule should mark the client as scheduled.
+        # The contract must already be fully signed (checked above).
         client = db.query(Client).filter(Client.id == schedule.client_id).first()
         if client:
             client.status = "scheduled"
 
-        # Update onboarding status on the associated contract
-        # (contract is already loaded/validated above)
+        # Mark onboarding complete ONLY after provider acceptance.
         contract.client_onboarding_status = "completed"
          
         db.commit()
@@ -505,12 +505,17 @@ async def client_accept_proposal(
             detail="Contract must be signed by the provider before confirming a schedule."
         )
 
-    # Update client status to 'scheduled'
+    # Do NOT mark the client as scheduled here.
+    # At this point the CLIENT accepted the provider's proposal via a public link.
+    # The provider must still explicitly accept the schedule in the dashboard.
+    # Also, the contract must be signed by the provider before any confirmation.
+    #
+    # Keep client in pending_approval until provider accepts.
     if client:
-        client.status = "scheduled"
+        client.status = "pending_approval"
 
-    # Mark onboarding complete once both contract is signed and schedule is accepted
-    contract.client_onboarding_status = "completed"
+    # Do not mark onboarding completed here.
+    # contract.client_onboarding_status remains unchanged until provider accepts.
     # Note: Contract status stays as 'signed' - 'scheduled' is a client status, not contract status
     
     db.commit()
