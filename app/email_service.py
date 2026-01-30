@@ -118,7 +118,7 @@ THEME = {
     "danger": "#ef4444",       # Red
 }
 
-LOGO_URL = "https://res.cloudinary.com/dxqum9ywx/image/upload/v1767444587/CleaningAPP_logo_black_z96svy.png"
+LOGO_URL = "https://cleanenroll.com/CleaningAPP%20logo%20black%20new.png"
 
 # Base HTML email template - Modern Akkio-style with clean top bar
 BASE_TEMPLATE = """
