@@ -1124,6 +1124,9 @@ async def handle_schedule_decision(
     """
     Handle provider's decision on client's scheduled time
     Provider can confirm or propose a different time
+
+    Automated email notifications:
+    - Provider action (confirm/request_change): notify client AND provider.
     """
     from ..email_service import send_email
 
@@ -1146,6 +1149,23 @@ async def handle_schedule_decision(
             client.scheduling_status = "confirmed"
             db.commit()
 
+            # Parse times once (also used for provider confirmation email)
+            start_dt = None
+            end_dt = None
+            try:
+                if client.scheduled_start_time:
+                    start_dt = datetime.fromisoformat(
+                        client.scheduled_start_time.replace("Z", "+00:00")
+                    )
+                if client.scheduled_end_time:
+                    end_dt = datetime.fromisoformat(
+                        client.scheduled_end_time.replace("Z", "+00:00")
+                    )
+            except Exception:
+                # Keep emails resilient even if stored datetimes are malformed
+                start_dt = None
+                end_dt = None
+
             # Send confirmation email to client
             if client.email:
                 content = f"""
@@ -1154,10 +1174,10 @@ async def handle_schedule_decision(
                 <div style="background: #f0fdf4; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #22c55e;">
                   <p style="color: #15803d; font-weight: 600; margin-bottom: 12px;">✓ Confirmed Cleaning Date & Time</p>
                   <p style="color: #15803d; font-size: 16px; margin: 8px 0;">
-                    📅 {datetime.fromisoformat(client.scheduled_start_time.replace("Z", "+00:00")).strftime("%A, %B %d, %Y")}
+                    📅 {(start_dt.strftime("%A, %B %d, %Y") if start_dt else "Confirmed")}
                   </p>
                   <p style="color: #15803d; font-size: 16px; margin: 8px 0;">
-                    ⏰ {datetime.fromisoformat(client.scheduled_start_time.replace("Z", "+00:00")).strftime("%I:%M %p")} - {datetime.fromisoformat(client.scheduled_end_time.replace("Z", "+00:00")).strftime("%I:%M %p")}
+                    ⏰ {(start_dt.strftime("%I:%M %p") if start_dt else "")}{(" - " + end_dt.strftime("%I:%M %p")) if start_dt and end_dt else ""}
                   </p>
                 </div>
                 <p>Your first cleaning is all set! We look forward to serving you.</p>
@@ -1169,6 +1189,27 @@ async def handle_schedule_decision(
                     title="Your Cleaning is Scheduled! 🎉",
                     content_html=content,
                 )
+
+            # Send confirmation email to provider (same action, other side)
+            provider = db.query(User).filter(User.id == client.user_id).first()
+            if provider and provider.email:
+                provider_content = f"""
+                <p>Hi {provider.full_name or business_name},</p>
+                <p>You confirmed a cleaning schedule for <strong>{client.contact_name or client.business_name}</strong>.</p>
+                <div style="background: #f8fafc; border-radius: 12px; padding: 20px; margin: 20px 0;">
+                  <p style="margin:0; color:#334155; font-size: 14px;">
+                    📅 {(start_dt.strftime("%A, %B %d, %Y") if start_dt else "Confirmed")}
+                    {(start_dt.strftime("%I:%M %p") if start_dt else "")}{(" - " + end_dt.strftime("%I:%M %p")) if start_dt and end_dt else ""}
+                  </p>
+                </div>
+                """
+                await send_email(
+                    to=provider.email,
+                    subject=f"Schedule Confirmed for {client.contact_name or client.business_name}",
+                    title="Schedule Confirmed",
+                    content_html=provider_content,
+                    is_user_email=True,
+                )
         elif data.action == "request_change":
             # Provider requested a different time
             if not data.proposed_start_time or not data.proposed_end_time:
@@ -1179,19 +1220,33 @@ async def handle_schedule_decision(
             # Update scheduling status
             client.scheduling_status = "provider_requested_change"
 
-            # Store proposed times temporarily (you might want to add these fields to the model)
-            # For now, we'll send them via email
             db.commit()
+
+            # Parse original + proposed times once
+            original_start = None
+            original_end = None
+            try:
+                if client.scheduled_start_time:
+                    original_start = datetime.fromisoformat(
+                        client.scheduled_start_time.replace("Z", "+00:00")
+                    )
+                if client.scheduled_end_time:
+                    original_end = datetime.fromisoformat(
+                        client.scheduled_end_time.replace("Z", "+00:00")
+                    )
+            except Exception:
+                original_start = None
+                original_end = None
+
+            proposed_start = datetime.fromisoformat(
+                data.proposed_start_time.replace("Z", "+00:00")
+            )
+            proposed_end = datetime.fromisoformat(
+                data.proposed_end_time.replace("Z", "+00:00")
+            )
 
             # Send notification to client with provider's proposed time
             if client.email:
-                proposed_start = datetime.fromisoformat(
-                    data.proposed_start_time.replace("Z", "+00:00")
-                )
-                proposed_end = datetime.fromisoformat(
-                    data.proposed_end_time.replace("Z", "+00:00")
-                )
-
                 content = f"""
                 <p>Hi {client.contact_name or client.business_name},</p>
                 <p><strong>{business_name}</strong> has reviewed your preferred cleaning schedule and would like to propose an alternative time that better fits their availability.</p>
@@ -1199,10 +1254,10 @@ async def handle_schedule_decision(
                 <div style="background: #fef3c7; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #f59e0b;">
                   <p style="color: #92400e; font-weight: 600; margin-bottom: 12px;">📅 Your Selected Time</p>
                   <p style="color: #92400e; font-size: 15px; margin: 8px 0;">
-                    {datetime.fromisoformat(client.scheduled_start_time.replace("Z", "+00:00")).strftime("%A, %B %d, %Y")}
+                    {(original_start.strftime("%A, %B %d, %Y") if original_start else "Selected")}
                   </p>
                   <p style="color: #92400e; font-size: 15px; margin: 8px 0;">
-                    {datetime.fromisoformat(client.scheduled_start_time.replace("Z", "+00:00")).strftime("%I:%M %p")} - {datetime.fromisoformat(client.scheduled_end_time.replace("Z", "+00:00")).strftime("%I:%M %p")}
+                    {(original_start.strftime("%I:%M %p") if original_start else "")}{(" - " + original_end.strftime("%I:%M %p")) if original_start and original_end else ""}
                   </p>
                 </div>
 
@@ -1227,6 +1282,27 @@ async def handle_schedule_decision(
                     subject=f"Alternative Cleaning Time Proposed - {business_name}",
                     title="Schedule Change Request",
                     content_html=content,
+                )
+
+            # Send confirmation email to provider (same action, other side)
+            provider = db.query(User).filter(User.id == client.user_id).first()
+            if provider and provider.email:
+                provider_content = f"""
+                <p>Hi {provider.full_name or business_name},</p>
+                <p>You proposed an alternative time for <strong>{client.contact_name or client.business_name}</strong>.</p>
+
+                <div style="background: #f8fafc; border-radius: 12px; padding: 20px; margin: 20px 0;">
+                  <p style="margin:0; color:#334155; font-size: 14px;">
+                    Proposed: {proposed_start.strftime("%A, %B %d, %Y")} {proposed_start.strftime("%I:%M %p")} - {proposed_end.strftime("%I:%M %p")}
+                  </p>
+                </div>
+                """
+                await send_email(
+                    to=provider.email,
+                    subject=f"Alternative Time Sent to {client.contact_name or client.business_name}",
+                    title="Alternative Time Proposed",
+                    content_html=provider_content,
+                    is_user_email=True,
                 )
         else:
             raise HTTPException(status_code=400, detail="Invalid action")

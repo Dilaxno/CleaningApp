@@ -287,6 +287,17 @@ async def approve_schedule(
         raise HTTPException(status_code=404, detail="Schedule not found")
     
     if request.action == "accept":
+        # Require a fully signed contract before a provider can accept/verify scheduling.
+        # This prevents clients from being marked as scheduled/verified before provider signature.
+        contract = db.query(Contract).filter(
+            Contract.client_id == schedule.client_id
+        ).order_by(Contract.created_at.desc()).first()
+        if not contract or contract.status != "signed":
+            raise HTTPException(
+                status_code=400,
+                detail="Contract must be signed by the provider before accepting a schedule."
+            )
+
         # If this is a client counter-proposal, use the client's proposed time
         if schedule.approval_status == "client_counter" and schedule.proposed_date:
             schedule.scheduled_date = schedule.proposed_date
@@ -306,9 +317,8 @@ async def approve_schedule(
             client.status = "scheduled"
 
         # Update onboarding status on the associated contract
-        contract = db.query(Contract).filter(Contract.client_id == schedule.client_id).order_by(Contract.created_at.desc()).first()
-        if contract:
-            contract.client_onboarding_status = "completed"
+        # (contract is already loaded/validated above)
+        contract.client_onboarding_status = "completed"
          
         db.commit()
         # Send confirmation email to client
@@ -485,9 +495,22 @@ async def client_accept_proposal(
     client = db.query(Client).filter(Client.id == schedule.client_id).first()
     user = db.query(User).filter(User.id == schedule.user_id).first()
     
+    # Require a fully signed contract before confirming a schedule.
+    contract = db.query(Contract).filter(
+        Contract.client_id == schedule.client_id
+    ).order_by(Contract.created_at.desc()).first()
+    if not contract or contract.status != "signed":
+        raise HTTPException(
+            status_code=400,
+            detail="Contract must be signed by the provider before confirming a schedule."
+        )
+
     # Update client status to 'scheduled'
     if client:
         client.status = "scheduled"
+
+    # Mark onboarding complete once both contract is signed and schedule is accepted
+    contract.client_onboarding_status = "completed"
     # Note: Contract status stays as 'signed' - 'scheduled' is a client status, not contract status
     
     db.commit()

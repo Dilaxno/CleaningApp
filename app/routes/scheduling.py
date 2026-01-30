@@ -323,11 +323,11 @@ async def create_client_booking(
     # Update client status to pending_approval
     client.status = "pending_approval"
     
-    # Update contract status to "scheduled" and mark onboarding as completed if it exists
-    if contract and contract.status == "new":
-        contract.status = "scheduled"
-        contract.client_onboarding_status = "completed"  # Contract now appears in provider's list
-        logger.info(f"📋 Updated contract {contract.id} status to 'scheduled' and onboarding to 'completed'")
+    # IMPORTANT:
+    # Do NOT mark the contract as "scheduled" (or the client as fully onboarded/verified)
+    # until the provider has accepted the schedule AND the contract is fully signed.
+    # This endpoint only creates a pending schedule request.
+    # Contract status should remain "new" or "signed" and the provider must take action.
     
     db.commit()
     db.refresh(schedule)
@@ -842,8 +842,9 @@ async def create_direct_booking(
     if not contract:
         raise HTTPException(status_code=404, detail="Contract not found")
     
-    # Check contract status - must be signed
-    if contract.status not in ["signed", "new"]:
+    # Check contract status - booking allowed only after provider has signed (fully executed)
+    # (Client can still be in the signing flow, but scheduling should not be treated as verified until signed.)
+    if contract.status != "signed":
         raise HTTPException(status_code=400, detail=f"Contract status is '{contract.status}', booking not allowed")
     
     # Get client and user
@@ -944,8 +945,10 @@ async def create_direct_booking(
     
     # Note: Contract status stays as 'signed' - 'scheduled' is a client status, not contract status
     
-    # Update client status to scheduled
-    client.status = "scheduled"
+    # Scheduling is only considered "verified" after provider explicitly approves/accepts.
+    # Even though this direct booking flow creates an accepted schedule, we still should not
+    # advance client status beyond pending_approval here.
+    client.status = "pending_approval"
     
     db.commit()
     db.refresh(schedule)
