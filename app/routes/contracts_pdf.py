@@ -926,6 +926,7 @@ async def generate_contract_html(
                     <td style="text-align: right;">{"Quote Pending" if quote.get('quote_pending') else f"USD ${quote['base_price']:,.2f}"}</td>
                 </tr>
                 {"<tr><td>Frequency Discount</td><td>" + str(quote['discount_percent']) + "% off for " + frequency.lower() + " service</td><td style='text-align: right; color: #10B981;'>-USD $" + f"{quote['discount_amount']:,.2f}" + "</td></tr>" if quote['discount_amount'] > 0 else ""}
+                {"<tr><td>First Cleaning Discount</td><td>" + (f"${quote['first_cleaning_discount_value']:.2f} off" if quote.get('first_cleaning_discount_type') == 'fixed' else f"{quote['first_cleaning_discount_value']:.0f}% off") + " for first visit</td><td style='text-align: right; color: #10B981;'>-USD $" + f"{quote['first_cleaning_discount_amount']:,.2f}" + "</td></tr>" if quote.get('first_cleaning_discount_amount', 0) > 0 else ""}
                 {"".join([f"<tr><td>{addon['name']}</td><td>{addon['quantity']} × ${addon['unit_price']:,.2f} {addon['pricing_metric']}</td><td style='text-align: right;'>USD ${addon['total_price']:,.2f}</td></tr>" for addon in quote.get('addon_details', [])]) if quote.get('addon_details') else ""}
                 <tr class="total-row">
                     <td><strong>{"Total" if frequency in ["One-time", "One-time deep clean", "Per turnover", "On-demand", "As needed", "one-time"] else "Total Per Visit"}</strong></td>

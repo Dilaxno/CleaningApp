@@ -576,6 +576,19 @@ async def get_quote_preview(
             quotePending=True,
         )
 
+    # Check if this IP has any signed contracts with this business (first cleaning detection)
+    existing_signed_contract = db.query(Contract).filter(
+        Contract.user_id == user.id,
+        Contract.client_signature_ip == client_ip,
+        Contract.client_signature.isnot(None)
+    ).first()
+    
+    # Auto-set isFirstCleaning based on IP - if no signed contracts from this IP, it's their first cleaning
+    is_first_cleaning = existing_signed_contract is None
+    data.formData["isFirstCleaning"] = is_first_cleaning
+    
+    logger.info(f"🔍 First cleaning check for IP {client_ip}: {is_first_cleaning} (existing signed contracts: {'none' if is_first_cleaning else 'found'})")
+
     # Calculate quote
     quote = calculate_quote(config, data.formData)
 
@@ -734,6 +747,20 @@ async def submit_public_form(
     if not user:
         logger.error(f"❌ User not found for Firebase UID: {data.ownerUid}")
         raise HTTPException(status_code=404, detail="Business not found")
+
+    # Check if this IP has any signed contracts with this business (first cleaning detection)
+    existing_signed_contract = db.query(Contract).filter(
+        Contract.user_id == user.id,
+        Contract.client_signature_ip == client_ip,
+        Contract.client_signature.isnot(None)
+    ).first()
+    
+    # Auto-set isFirstCleaning based on IP - if no signed contracts from this IP, it's their first cleaning
+    is_first_cleaning = existing_signed_contract is None
+    if data.formData:
+        data.formData["isFirstCleaning"] = is_first_cleaning
+    
+    logger.info(f"🔍 First cleaning check for IP {client_ip}: {is_first_cleaning} (existing signed contracts: {'none' if is_first_cleaning else 'found'})")
 
     # Extract frequency from formData if not provided directly
     frequency = data.frequency
