@@ -23,7 +23,6 @@ from .routes.calendly import router as calendly_router
 from .routes.calendly_webhooks import router as calendly_webhooks_router
 from .routes.scheduling_calendly import router as scheduling_calendly_router
 from .routes.status_automation import router as status_router
-from .routes.trial import router as trial_router
 from .routes.verification import router as verification_router
 from .routes.security import router as security_router
 from .routes.notifications import router as notifications_router
@@ -136,7 +135,6 @@ app.include_router(calendly_router)
 app.include_router(calendly_webhooks_router)
 app.include_router(scheduling_calendly_router)
 app.include_router(status_router)
-app.include_router(trial_router)
 app.include_router(notifications_router)
 app.include_router(jobs_router)
 app.include_router(invoices_router)
@@ -206,10 +204,10 @@ async def get_csrf_token(request: Request, response: Response):
     response.set_cookie(
         key=CSRF_COOKIE_NAME,
         value=new_token,
-        httponly=False,  # Must be readable by JavaScript
-        secure=True,  # Only send over HTTPS (set to False for local dev)
+        httponly=True,
+        secure=True,
         samesite="strict",
-        max_age=86400,  # 24 hours
+        max_age=86400,
         path="/",
     )
     return {"csrf_token": new_token}

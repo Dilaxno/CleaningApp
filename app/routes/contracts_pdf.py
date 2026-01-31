@@ -15,7 +15,7 @@ from ..database import get_db
 from ..models import User, BusinessConfig, Client, Contract
 from ..auth import get_current_user
 from .upload import generate_presigned_url, get_r2_client
-from ..config import R2_BUCKET_NAME
+from ..config import R2_BUCKET_NAME, FRONTEND_URL
 from ..rate_limiter import create_rate_limiter, rate_limit_dependency
 
 logger = logging.getLogger(__name__)
@@ -1274,9 +1274,9 @@ async def download_contract_pdf(
             media_type="application/pdf",
             headers={
                 "Content-Disposition": f"attachment; filename=contract-{contract.id}.pdf",
-                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Origin": FRONTEND_URL,
                 "Access-Control-Allow-Methods": "GET",
-                "Access-Control-Allow-Headers": "*"
+                "Access-Control-Allow-Headers": "Content-Type, Authorization"
             }
         )
     except Exception as e:
@@ -1317,9 +1317,9 @@ async def view_contract_pdf_public(
 
         headers = {
             "Content-Disposition": f"inline; filename=contract-{contract.id}.pdf",
-            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Origin": FRONTEND_URL,
             "Access-Control-Allow-Methods": "GET",
-            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
             "Cache-Control": "no-cache, must-revalidate",
         }
         if contract.pdf_hash:

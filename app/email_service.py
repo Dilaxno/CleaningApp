@@ -325,7 +325,7 @@ def render_email(
     is_user_email: bool = False,
 ) -> str:
     """Render the email template with provided content"""
-    template = Template(BASE_TEMPLATE)
+    template = Template(BASE_TEMPLATE, autoescape=True)
     return template.render(
         subject=subject,
         title=title,

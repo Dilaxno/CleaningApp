@@ -15,6 +15,7 @@ from ..auth import get_current_user
 from ..database import get_db
 from ..models import BusinessConfig, Client, User, Contract
 from ..rate_limiter import create_rate_limiter, get_redis_client, rate_limit_dependency
+from ..utils.sanitization import sanitize_string
 
 logger = logging.getLogger(__name__)
 
@@ -1097,9 +1098,9 @@ async def sign_contract(
         if user.email:
             await send_contract_signed_notification(
                 to=user.email,
-                business_name=business_name,
-                client_name=client.contact_name or client.business_name,
-                contract_title=contract.title,
+                business_name=sanitize_string(business_name),
+                client_name=sanitize_string(client.contact_name or client.business_name),
+                contract_title=sanitize_string(contract.title),
             )
     except Exception as email_err:
         logger.warning(f"⚠️ Failed to send contract signed notification: {email_err}")

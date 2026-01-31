@@ -3,11 +3,12 @@ Email Routes - For testing and manual email operations
 """
 import logging
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional
 from ..auth import get_current_user
 from ..models import User
 from ..email_service import send_email, send_welcome_email
+from ..utils.sanitization import sanitize_string, validate_and_sanitize_input
 
 logger = logging.getLogger(__name__)
 
@@ -33,12 +34,12 @@ async def send_custom_email(
     """Send a custom email (authenticated users only)"""
     result = await send_email(
         to=data.to,
-        subject=data.subject,
-        title=data.title,
-        content_html=data.content_html,
-        intro=data.intro,
+        subject=sanitize_string(data.subject),
+        title=sanitize_string(data.title),
+        content_html=sanitize_string(data.content_html),
+        intro=sanitize_string(data.intro) if data.intro else None,
         cta_url=data.cta_url,
-        cta_label=data.cta_label,
+        cta_label=sanitize_string(data.cta_label) if data.cta_label else None,
     )
     return {"success": True, "result": result}
 

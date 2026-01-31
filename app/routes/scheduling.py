@@ -12,6 +12,7 @@ from ..email_service import (
     send_scheduling_accepted_email,
     send_scheduling_counter_proposal_email
 )
+from ..utils.sanitization import sanitize_string, sanitize_dict
 
 logger = logging.getLogger(__name__)
 
@@ -144,7 +145,7 @@ async def get_scheduling_info_by_client(
         )
     
     return {
-        "business_name": business_name,
+        "business_name": sanitize_string(business_name),
         "logo_url": logo_url,
         "estimated_duration": estimated_duration,
         "working_hours": working_hours,
@@ -210,11 +211,11 @@ async def get_client_latest_appointment(
         return {
             "scheduledDate": schedule.scheduled_date.isoformat() if schedule.scheduled_date else None,
             "scheduledTime": schedule.start_time,
-            "businessName": business_name,
-            "clientName": client.contact_name or client.business_name,
+            "businessName": sanitize_string(business_name),
+            "clientName": sanitize_string(client.contact_name or client.business_name),
             "contractPdfUrl": contract_pdf_url,
-            "estimatedDuration": schedule.duration_minutes or 120,  # Default 2 hours
-            "serviceType": schedule.service_type or "Cleaning Service",
+            "estimatedDuration": schedule.duration_minutes or 120,
+            "serviceType": sanitize_string(schedule.service_type or "Cleaning Service"),
             "status": schedule.status
         }
         
@@ -336,12 +337,12 @@ async def create_client_booking(
         if user.email:
             await send_pending_booking_notification(
                 provider_email=user.email,
-                provider_name=user.full_name or "Service Provider",
-                client_name=client.contact_name or client.business_name,
+                provider_name=sanitize_string(user.full_name or "Service Provider"),
+                client_name=sanitize_string(client.contact_name or client.business_name),
                 scheduled_date=start_time.strftime("%Y-%m-%d"),
                 start_time=start_time_display,
                 end_time=end_time_display,
-                property_address=client.form_data.get('address') if client.form_data else None,
+                property_address=sanitize_string(client.form_data.get('address')) if client.form_data and client.form_data.get('address') else None,
                 schedule_id=schedule.id
             )
     except Exception as e:
@@ -351,8 +352,8 @@ async def create_client_booking(
         "message": "Booking request submitted - awaiting provider approval",
         "schedule_id": schedule.id,
         "scheduled_date": start_time.strftime("%Y-%m-%d"),
-        "start_time": start_time_display,
-        "end_time": end_time_display,
+        "start_time": sanitize_string(start_time_display),
+        "end_time": sanitize_string(end_time_display),
         "duration_minutes": duration_minutes,
         "status": "pending"
     }
@@ -388,9 +389,12 @@ class ClientAcceptSlot(BaseModel):
     slot_end_time: str
 
 class ClientCounterProposal(BaseModel):
-    preferred_days: str  # "M,T,W,Th,F"
-    preferred_time_window: str  # "18:00-20:00"
+    preferred_days: str
+    preferred_time_window: str
     client_notes: Optional[str] = None
+    
+    class Config:
+        max_anystr_length = 500
 
 @router.post("/proposals")
 async def create_scheduling_proposal(
@@ -447,10 +451,10 @@ async def create_scheduling_proposal(
         try:
             await send_scheduling_proposal_email(
                 client_email=client.email,
-                client_name=client.contact_name or client.business_name,
-                provider_name=current_user.full_name or "Your Service Provider",
+                client_name=sanitize_string(client.contact_name or client.business_name),
+                provider_name=sanitize_string(current_user.full_name or "Your Service Provider"),
                 contract_id=contract.id,
-                time_slots=proposal.time_slots,
+                time_slots=[sanitize_dict(slot) for slot in proposal.time_slots] if proposal.time_slots else [],
                 expires_at=proposal.expires_at.isoformat() if proposal.expires_at else ""
             )
         except Exception as e:
@@ -460,7 +464,7 @@ async def create_scheduling_proposal(
         "id": proposal.id,
         "contract_id": proposal.contract_id,
         "status": proposal.status,
-        "time_slots": proposal.time_slots,
+        "time_slots": [sanitize_dict(slot) for slot in proposal.time_slots] if proposal.time_slots else [],
         "expires_at": proposal.expires_at.isoformat() if proposal.expires_at else None
     }
 
@@ -489,11 +493,11 @@ async def get_contract_proposals(
         "contract_id": p.contract_id,
         "status": p.status,
         "proposal_round": p.proposal_round,
-        "proposed_by": p.proposed_by,
-        "time_slots": p.time_slots,
+        "proposed_by": sanitize_string(p.proposed_by),
+        "time_slots": [sanitize_dict(slot) for slot in p.time_slots] if p.time_slots else [],
         "selected_slot_date": p.selected_slot_date.isoformat() if p.selected_slot_date else None,
-        "selected_slot_start_time": p.selected_slot_start_time,
-        "selected_slot_end_time": p.selected_slot_end_time,
+        "selected_slot_start_time": sanitize_string(p.selected_slot_start_time),
+        "selected_slot_end_time": sanitize_string(p.selected_slot_end_time),
         "expires_at": p.expires_at.isoformat() if p.expires_at else None,
         "created_at": p.created_at.isoformat()
     } for p in proposals]
@@ -594,7 +598,7 @@ async def client_accept_slot(
         "message": "Time slot accepted", 
         "proposal_id": proposal_id,
         "schedule_id": schedule.id,
-        "client_status": client.status
+        "client_status": sanitize_string(client.status)
     }
 
 @router.post("/proposals/{proposal_id}/counter")
@@ -672,7 +676,7 @@ async def get_public_contract_proposals(
         "contract_id": p.contract_id,
         "status": p.status,
         "proposal_round": p.proposal_round,
-        "time_slots": p.time_slots,
+        "time_slots": [sanitize_dict(slot) for slot in p.time_slots] if p.time_slots else [],
         "expires_at": p.expires_at.isoformat() if p.expires_at else None,
         "created_at": p.created_at.isoformat()
     } for p in proposals]
@@ -803,9 +807,9 @@ async def get_public_scheduling_info(
     return {
         "contract_id": contract.id,
         "contract_public_id": contract.public_id,
-        "contract_title": contract.title,
-        "client_name": client.contact_name or client.business_name,
-        "business_name": business_name,
+        "contract_title": sanitize_string(contract.title),
+        "client_name": sanitize_string(client.contact_name or client.business_name),
+        "business_name": sanitize_string(business_name),
         "logo_url": logo_url,
         "estimated_duration": estimated_duration,
         "working_hours": working_hours,
@@ -1054,12 +1058,12 @@ async def create_direct_booking(
         if user.email:
             await send_pending_booking_notification(
                 provider_email=user.email,
-                provider_name=user.full_name or "Service Provider",
-                client_name=client.contact_name or client.business_name,
+                provider_name=sanitize_string(user.full_name or "Service Provider"),
+                client_name=sanitize_string(client.contact_name or client.business_name),
                 scheduled_date=data.selected_date,
                 start_time=start_time_display,
                 end_time=end_time_display,
-                property_address=client.form_data.get('address') if client.form_data else None,
+                property_address=sanitize_string(client.form_data.get('address')) if client.form_data and client.form_data.get('address') else None,
                 schedule_id=schedule.id,
             )
     except Exception as e:
@@ -1080,8 +1084,8 @@ async def create_direct_booking(
         "message": "Booking request submitted - awaiting provider approval",
         "schedule_id": schedule.id,
         "scheduled_date": data.selected_date,
-        "start_time": start_time_display,
-        "end_time": end_time_display,
+        "start_time": sanitize_string(start_time_display),
+        "end_time": sanitize_string(end_time_display),
         "duration_minutes": estimated_duration,
         "contract_pdf_url": contract_pdf_url
     }

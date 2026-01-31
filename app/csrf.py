@@ -43,7 +43,6 @@ EXEMPT_PATHS: List[str] = [
     "/verification",  # Email verification (authenticated via JWT)
     "/security",  # Security settings (authenticated via JWT)
     "/notifications",  # Notifications (authenticated via JWT)
-    "/trial/",  # Trial endpoints (already rate-limited)
     "/health",  # Health check
     "/docs",  # API docs
     "/openapi.json",  # OpenAPI spec
@@ -124,10 +123,10 @@ class CSRFMiddleware(BaseHTTPMiddleware):
             response.set_cookie(
                 key=CSRF_COOKIE_NAME,
                 value=new_token,
-                httponly=False,  # Must be readable by JavaScript
-                secure=True,  # Only send over HTTPS
-                samesite="strict",  # Strict same-site policy
-                max_age=86400,  # 24 hours
+                httponly=True,
+                secure=True,
+                samesite="strict",
+                max_age=86400,
                 path="/",
             )
             logger.debug(f"🔑 CSRF: Set new token cookie")
@@ -152,7 +151,7 @@ def get_csrf_token_endpoint():
         response.set_cookie(
             key=CSRF_COOKIE_NAME,
             value=new_token,
-            httponly=False,
+            httponly=True,
             secure=True,
             samesite="strict",
             max_age=86400,

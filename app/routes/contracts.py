@@ -10,6 +10,7 @@ from ..models import User, Client, Contract, BusinessConfig
 from ..auth import get_current_user
 from .upload import generate_presigned_url
 from ..email_service import send_contract_fully_executed_email, send_provider_contract_signed_confirmation
+from ..utils.sanitization import sanitize_string
 
 logger = logging.getLogger(__name__)
 
@@ -305,9 +306,9 @@ async def update_contract(
                     from ..email_service import send_contract_cancelled_email
                     await send_contract_cancelled_email(
                         client_email=client.email,
-                        client_name=client.contact_name or client.business_name,
-                        contract_title=contract.title,
-                        business_name=business_name,
+                        client_name=sanitize_string(client.contact_name or client.business_name),
+                        contract_title=sanitize_string(contract.title),
+                        business_name=sanitize_string(business_name),
                         business_config=business_config
                     )
                     logger.info(f"👤 Client {client.id} status updated to cancelled")

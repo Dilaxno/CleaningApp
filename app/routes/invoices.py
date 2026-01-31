@@ -15,6 +15,7 @@ from ..models import User, Client, Contract, Schedule, BusinessConfig
 from ..models_invoice import Invoice, Payout
 from ..auth import get_current_user
 from ..config import DODO_PAYMENTS_API_KEY, DODO_PAYMENTS_ENVIRONMENT, FRONTEND_URL, DODO_DEFAULT_TAX_CATEGORY, DODO_ADHOC_PRODUCT_ID
+from ..utils.sanitization import sanitize_string
 
 logger = logging.getLogger(__name__)
 
@@ -389,16 +390,16 @@ async def send_invoice_to_client(
     try:
         await send_invoice_payment_link_email(
             to=client.email,
-            client_name=client.contact_name or client.business_name,
-            business_name=business_name,
-            invoice_number=invoice.invoice_number,
-            invoice_title=invoice.title,
+            client_name=sanitize_string(client.contact_name or client.business_name),
+            business_name=sanitize_string(business_name),
+            invoice_number=sanitize_string(invoice.invoice_number),
+            invoice_title=sanitize_string(invoice.title),
             total_amount=invoice.total_amount,
             currency=invoice.currency,
             due_date=invoice.due_date.strftime("%B %d, %Y") if invoice.due_date else None,
             payment_link=invoice.dodo_payment_link,
             is_recurring=invoice.is_recurring,
-            recurrence_pattern=invoice.recurrence_pattern
+            recurrence_pattern=sanitize_string(invoice.recurrence_pattern) if invoice.recurrence_pattern else None
         )
         
         invoice.status = "sent"
