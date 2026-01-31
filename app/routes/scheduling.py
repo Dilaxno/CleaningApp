@@ -823,6 +823,98 @@ class DirectBookingRequest(BaseModel):
     selected_date: str  # YYYY-MM-DD
     selected_time: str  # HH:MM
 
+@router.get("/public/busy")
+async def get_public_busy_intervals(
+    contract_public_id: str,
+    date: str,  # YYYY-MM-DD
+    db: Session = Depends(get_db),
+):
+    """Public endpoint to get provider busy intervals for a given date.
+
+    Returns existing Schedule entries (including pending approvals) as ISO intervals.
+    This is used by the client scheduler to disable conflicting time slots based on
+    job duration.
+    """
+
+    # Find contract by public_id (used only to resolve provider/user)
+    contract = db.query(Contract).filter(Contract.public_id == contract_public_id).first()
+    if not contract:
+      raise HTTPException(status_code=404, detail="Contract not found")
+
+    try:
+      day = datetime.fromisoformat(date).date()
+    except Exception:
+      raise HTTPException(status_code=400, detail="Invalid date format. Expected YYYY-MM-DD")
+
+    # Get all schedules for that provider on that day.
+    # We include any schedules that represent a blocked time on the calendar.
+    schedules = (
+      db.query(Schedule)
+      .filter(
+          Schedule.user_id == contract.user_id,
+          Schedule.scheduled_date == day,
+          Schedule.status.in_(["scheduled", "in-progress", "pending", "confirmed"])
+          if hasattr(Schedule, "status")
+          else True,
+      )
+      .all()
+    )
+
+    busy = []
+    for s in schedules:
+      # Schedules may store time as "HH:MM" or "HH:MM AM" depending on flow.
+      start_raw = (s.start_time or "").strip()
+      end_raw = (s.end_time or "").strip()
+
+      def parse_time(t: str):
+        if not t:
+          return None
+        # 24h format
+        try:
+          return datetime.strptime(t, "%H:%M").time()
+        except Exception:
+          pass
+        # 12h format
+        try:
+          return datetime.strptime(t, "%I:%M %p").time()
+        except Exception:
+          return None
+
+      start_t = parse_time(start_raw)
+      end_t = parse_time(end_raw)
+
+      # If end time missing but we have duration_minutes, derive end
+      if start_t and (not end_t) and getattr(s, "duration_minutes", None):
+        start_dt = datetime.combine(day, start_t)
+        end_dt = start_dt + timedelta(minutes=int(s.duration_minutes))
+        end_t = end_dt.time()
+
+      if not start_t or not end_t:
+        # Can't form an interval; skip
+        continue
+
+      start_dt = datetime.combine(day, start_t)
+      end_dt = datetime.combine(day, end_t)
+
+      # If end is before start (cross-midnight), clamp to end-of-day
+      if end_dt <= start_dt:
+        end_dt = datetime.combine(day, datetime.max.time())
+
+      busy.append({
+        "start": start_dt.isoformat(),
+        "end": end_dt.isoformat(),
+        "schedule_id": s.id,
+        "status": getattr(s, "status", None),
+        "approval_status": getattr(s, "approval_status", None),
+      })
+
+    return {
+      "contract_public_id": contract_public_id,
+      "date": date,
+      "busy": busy,
+    }
+
+
 @router.post("/public/book")
 async def create_direct_booking(
     data: DirectBookingRequest,
