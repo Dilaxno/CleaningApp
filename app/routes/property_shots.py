@@ -88,12 +88,53 @@ async def upload_property_shot_public(
 
     # Determine extension
     ext = os.path.splitext(file.filename)[1].lower()
+
+    # Accept common image MIME types even if the filename extension is missing or uncommon.
+    # Some devices/browsers upload HEIC/HEIF/AVIF with unexpected extensions or none at all.
+    allowed_exts = {
+        ".jpg",
+        ".jpeg",
+        ".jfif",
+        ".png",
+        ".webp",
+        ".gif",
+        ".bmp",
+        ".tif",
+        ".tiff",
+        ".heic",
+        ".heif",
+        ".avif",
+    }
+    allowed_content_types = {
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+        "image/webp",
+        "image/gif",
+        "image/bmp",
+        "image/tiff",
+        "image/heic",
+        "image/heif",
+        "image/avif",
+    }
+
     if not ext:
         guessed = mimetypes.guess_extension(content_type) or ".jpg"
-        ext = guessed
+        ext = (guessed or ".jpg").lower()
 
-    if ext not in [".jpg", ".jpeg", ".png", ".webp", ".gif", ".heic", ".heif"]:
-        # Keep a conservative allowlist
+    # If the extension is unknown but the MIME type is a supported image type,
+    # we still accept it and pick a safe extension based on the MIME type.
+    if ext not in allowed_exts:
+        if content_type in allowed_content_types:
+            ext = (mimetypes.guess_extension(content_type) or ".jpg").lower()
+            # mimetypes may return '.jpe' for image/jpeg
+            if ext == ".jpe":
+                ext = ".jpg"
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported image type")
+
+    # Final guard
+    if ext not in allowed_exts:
         raise HTTPException(status_code=400, detail="Unsupported image type")
 
     # Build key
