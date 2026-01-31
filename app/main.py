@@ -12,6 +12,7 @@ from .routes.business import router as business_router
 from .routes.users import router as users_router
 from .routes.clients import router as clients_router
 from .routes.upload import router as upload_router
+from .routes.property_shots import router as property_shots_router
 from .routes.contracts import router as contracts_router
 from .routes.contract_revisions import router as contract_revisions_router
 from .routes.schedules import router as schedules_router
@@ -123,6 +124,7 @@ app.include_router(security_router)
 app.include_router(business_router, prefix="/business")
 app.include_router(clients_router)
 app.include_router(upload_router)
+app.include_router(property_shots_router)
 app.include_router(contracts_router)
 app.include_router(contract_revisions_router)
 app.include_router(contracts_pdf_router)
