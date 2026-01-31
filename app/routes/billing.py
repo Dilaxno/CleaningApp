@@ -28,13 +28,39 @@ logger = logging.getLogger(__name__)
 # Do not hardcode product IDs server-side.
 
 # Initialize Dodo Payments client once
+#
+# IMPORTANT:
+# The Dodo SDK expects environment values like "test_mode" or "live_mode".
+# Some deployments accidentally set "live", which will crash the app at import time.
+# We normalize common aliases to keep the service bootable.
 if not DODO_PAYMENTS_API_KEY:
-    logger.warning("DODO_PAYMENTS_API_KEY not set; billing endpoints will fail until configured")
+    logger.warning(
+        "DODO_PAYMENTS_API_KEY not set; billing endpoints will fail until configured"
+    )
 
-dodo_client = AsyncDodoPayments(
-    bearer_token=DODO_PAYMENTS_API_KEY or "",
-    environment=DODO_PAYMENTS_ENVIRONMENT or "test_mode",
-)
+def _normalize_dodo_environment(env: Optional[str]) -> str:
+    value = (env or "test_mode").strip().lower()
+    if value in {"live", "production", "prod"}:
+        return "live_mode"
+    if value in {"test", "sandbox", "staging", "dev", "development"}:
+        return "test_mode"
+    if value in {"test_mode", "live_mode"}:
+        return value
+    logger.warning(f"Unknown DODO environment '{env}', defaulting to test_mode")
+    return "test_mode"
+
+
+DODO_ENV = _normalize_dodo_environment(DODO_PAYMENTS_ENVIRONMENT)
+
+try:
+    dodo_client = AsyncDodoPayments(
+        bearer_token=DODO_PAYMENTS_API_KEY or "",
+        environment=DODO_ENV,
+    )
+except Exception as e:
+    # Do NOT crash the whole API if billing is misconfigured
+    logger.error(f"Failed to initialize Dodo client (env={DODO_ENV}): {e}")
+    dodo_client = None
 
 router = APIRouter(prefix="/billing", tags=["Billing"])
 webhooks_router = APIRouter(tags=["Webhooks"])
@@ -222,7 +248,7 @@ async def create_checkout_session(
       - Create Checkout Session: https://github.com/dodopayments/dodo-docs/blob/main/developer-resources/subscription-integration-guide.mdx
       - FastAPI example: https://github.com/dodopayments/dodo-docs/blob/main/developer-resources/fastapi-boilerplate.mdx
     """
-    if not DODO_PAYMENTS_API_KEY:
+    if not DODO_PAYMENTS_API_KEY or dodo_client is None:
         raise HTTPException(status_code=500, detail="Billing not configured")
 
     # Frontend supplies product_id from env; validate presence
