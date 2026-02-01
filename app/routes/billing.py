@@ -230,6 +230,7 @@ async def get_current_plan(
     
     return {
         "plan": user.plan,
+        "subscription_status": user.subscription_status,
         "subscription_start_date": subscription_start.isoformat() if subscription_start else None,
         "next_billing_date": next_billing_date.isoformat(),
     }
@@ -423,7 +424,7 @@ async def handle_dodopayments_webhook(
 
     try:
         # Python 3.9 compatible if/elif instead of match
-        if event_type in ("subscription.active", "subscription.renewed", "subscription.plan_changed", "checkout.session.completed"):
+        if event_type in ("subscription.active", "subscription.renewed", "subscription.plan_changed"):
             # Identify the user
             meta = (data.get("metadata") or {})
             logger.info(f"Webhook metadata: {meta}")
@@ -564,6 +565,25 @@ async def handle_dodopayments_webhook(
             
             logger.info("Invoice payment failed")
 
+        elif event_type in ("payment.failed", "checkout.session.failed", "subscription.payment_failed"):
+            # Handle initial checkout/payment failures (non-invoice paths)
+            meta = (data.get("metadata") or {})
+            firebase_uid = meta.get("firebase_uid")
+            email = (data.get("customer") or {}).get("email") or data.get("email")
+
+            user: Optional[User] = None
+            if firebase_uid:
+                user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
+            if not user and email:
+                user = db.query(User).filter(User.email == email).first()
+
+            if user:
+                user.subscription_status = "past_due"
+                # Do NOT set or grant plan here; keep existing value
+                db.commit()
+                logger.warning(f"⚠️ Checkout/payment failed for user {user.id}; keeping plan as {user.plan}")
+
+            logger.info("Payment/checkout failed event processed")
         else:
             logger.info(f"Event {event_type} received and ignored (no handler)")
 
