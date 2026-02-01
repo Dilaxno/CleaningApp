@@ -39,15 +39,26 @@ def decrypt_password(encrypted: str) -> str:
 def get_sender_email(business_config=None, business_name: str = "CleanEnroll") -> str:
     """
     Get the appropriate sender email address.
-    Uses custom SMTP email if configured and live, otherwise falls back to CleanEnroll default.
+    Priority order:
+    1. Verified subdomain email (e.g., bookings@mail.preclean.com)
+    2. Custom SMTP email if configured and live
+    3. CleanEnroll default address
     
     Args:
-        business_config: BusinessConfig object with smtp settings
+        business_config: BusinessConfig object with smtp and subdomain settings
         business_name: Business name for the sender display name
     
     Returns:
         Formatted sender email string
     """
+    # Check if verified subdomain is available
+    if (business_config and 
+        business_config.subdomain_verification_status == "verified" and 
+        business_config.email_subdomain):
+        # Use subdomain for email address (e.g., bookings@mail.preclean.com)
+        subdomain_email = f"bookings@{business_config.email_subdomain}"
+        return f"{business_name} <{subdomain_email}>"
+    
     # Check if custom SMTP is configured and live
     if business_config and business_config.smtp_status == "live" and business_config.smtp_email:
         return f"{business_name} <{business_config.smtp_email}>"

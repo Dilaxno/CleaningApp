@@ -31,6 +31,7 @@ from .routes.jobs import router as jobs_router
 from .routes.invoices import router as invoices_router
 from .routes.payouts import router as payouts_router
 from .routes.smtp import router as smtp_router
+from .routes.subdomain import router as subdomain_router
 from .routes.integration_requests import router as integration_requests_router
 from .routes.geocoding import router as geocoding_router
 
@@ -143,6 +144,7 @@ app.include_router(jobs_router)
 app.include_router(invoices_router)
 app.include_router(payouts_router)
 app.include_router(smtp_router)
+app.include_router(subdomain_router)
 app.include_router(integration_requests_router)
 app.include_router(geocoding_router)
 

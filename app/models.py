@@ -254,6 +254,14 @@ class BusinessConfig(Base):
     smtp_last_test_success = Column(Boolean, nullable=True)
     smtp_error_message = Column(String(500), nullable=True)
 
+    # Subdomain verification for automated emails
+    email_subdomain = Column(String(255), nullable=True)  # e.g., mail.preclean.com
+    subdomain_verification_status = Column(String(50), nullable=True)  # pending, verified, failed
+    subdomain_dns_records = Column(JSON, nullable=True)  # Required DNS records for verification
+    subdomain_verified_at = Column(DateTime, nullable=True)
+    subdomain_last_check_at = Column(DateTime, nullable=True)
+    subdomain_verification_token = Column(String(255), nullable=True)  # Unique token for TXT record
+
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
