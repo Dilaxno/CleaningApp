@@ -106,6 +106,9 @@ class CheckoutRequest(BaseModel):
             raise ValueError("quantity must be at least 1")
         return v
 
+class UpdatePlanRequest(BaseModel):
+    plan: str  # "solo", "team", "enterprise"
+
 class CancelRequest(BaseModel):
     # When true, subscription remains active until the end of the current billing period
     cancel_at_period_end: bool = True
@@ -192,8 +195,24 @@ async def get_usage_stats(
         "reset_date": reset_date.isoformat(),
     }
 
-# Plan is set only by billing webhooks (payment.succeeded / subscription.active).
-# There is no POST /update-plan; frontend must not grant plan without webhook confirmation.
+@router.post("/update-plan")
+async def update_user_plan(
+    body: UpdatePlanRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Manually update user's plan. Used after successful checkout verification.
+    In production, this should verify the subscription status with Dodo Payments.
+    """
+    allowed_plans = {"solo", "team", "enterprise"}
+    if body.plan not in allowed_plans:
+        raise HTTPException(status_code=400, detail=f"Invalid plan. Must be one of: {allowed_plans}")
+    
+    user.plan = body.plan
+    db.commit()
+    logger.info(f"User {user.id} plan manually updated to {body.plan}")
+    return {"message": f"Plan updated to {body.plan}", "plan": body.plan}
 
 @router.get("/current-plan")
 async def get_current_plan(
@@ -211,7 +230,6 @@ async def get_current_plan(
     
     return {
         "plan": user.plan,
-        "subscription_status": user.subscription_status,
         "subscription_start_date": subscription_start.isoformat() if subscription_start else None,
         "next_billing_date": next_billing_date.isoformat(),
     }
@@ -405,30 +423,8 @@ async def handle_dodopayments_webhook(
 
     try:
         # Python 3.9 compatible if/elif instead of match
-        # Only grant plan on payment success (subscription.active / renewed / plan_changed).
-        # Do NOT grant on checkout.session.completed - wait for payment.succeeded / subscription.active.
-        if event_type == "checkout.session.completed":
-            # Persist subscription_id only; do not set plan or subscription dates until payment succeeds
-            meta = (data.get("metadata") or {})
-            firebase_uid = meta.get("firebase_uid")
-            email = (data.get("customer") or {}).get("email") or data.get("email")
-            subscription_id = data.get("subscription_id") or data.get("id")
-            user: Optional[User] = None
-            if firebase_uid:
-                user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
-            if not user and email:
-                user = db.query(User).filter(User.email == email).first()
-            if user and subscription_id and getattr(user, "subscription_id", None) != subscription_id:
-                try:
-                    setattr(user, "subscription_id", subscription_id)
-                    db.commit()
-                    logger.info(f"Persisted subscription_id for user {user.id} (checkout completed, plan not set until payment.succeeded)")
-                except Exception as e:
-                    db.rollback()
-                    logger.warning(f"Failed to persist subscription_id for user {user.id}: {e}")
-
-        elif event_type in ("subscription.active", "subscription.renewed", "subscription.plan_changed"):
-            # Grant plan only when subscription is active / renewed / plan changed (payment succeeded)
+        if event_type in ("subscription.active", "subscription.renewed", "subscription.plan_changed", "checkout.session.completed"):
+            # Identify the user
             meta = (data.get("metadata") or {})
             logger.info(f"Webhook metadata: {meta}")
             logger.info(f"Webhook data: {data}")
@@ -464,8 +460,8 @@ async def handle_dodopayments_webhook(
                         db.rollback()
                         logger.warning(f"Failed to persist subscription_id for user {user.id}: {e}")
 
-                # Handle new subscriptions (payment succeeded)
-                if event_type == "subscription.active":
+                # Handle new subscriptions
+                if event_type in ("subscription.active", "checkout.session.completed"):
                     if not user.subscription_start_date:
                         user.subscription_start_date = datetime.utcnow()
                         user.clients_this_month = 0
@@ -546,38 +542,8 @@ async def handle_dodopayments_webhook(
             logger.info("Invoice paid event processed")
 
         elif event_type == "payment.succeeded":
-            # Handle client invoice payment (has invoice_id in metadata)
+            # Handle client invoice payment
             await _handle_client_invoice_payment(data, db)
-            # Handle subscription payment: grant plan only when payment.succeeded (no invoice_id = subscription)
-            meta = (data.get("metadata") or {})
-            invoice_id = meta.get("invoice_id")
-            if not invoice_id:
-                firebase_uid = meta.get("firebase_uid")
-                selected_plan = meta.get("selected_plan")
-                billing_cycle = meta.get("billing_cycle") or "monthly"
-                email = (data.get("customer") or {}).get("email") or data.get("email")
-                user: Optional[User] = None
-                if firebase_uid:
-                    user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
-                if not user and email:
-                    user = db.query(User).filter(User.email == email).first()
-                if user and selected_plan and selected_plan != "unknown":
-                    from datetime import datetime, timedelta
-                    if not user.subscription_start_date:
-                        user.subscription_start_date = datetime.utcnow()
-                        user.clients_this_month = 0
-                        user.month_reset_date = datetime.utcnow() + timedelta(days=30)
-                    if billing_cycle and billing_cycle != "unknown":
-                        user.billing_cycle = billing_cycle
-                    user.last_payment_date = datetime.utcnow()
-                    user.subscription_status = "active"
-                    user.plan = selected_plan
-                    if user.billing_cycle == "yearly":
-                        user.next_billing_date = datetime.utcnow() + timedelta(days=365)
-                    else:
-                        user.next_billing_date = datetime.utcnow() + timedelta(days=30)
-                    db.commit()
-                    logger.info(f"User {user.id} plan set to {selected_plan} via payment.succeeded (subscription)")
 
         elif event_type == "invoice.payment_failed":
             # Handle subscription payment failures
@@ -597,64 +563,6 @@ async def handle_dodopayments_webhook(
                 logger.warning(f"⚠️ Payment failed for user {user.id}, subscription status: past_due")
             
             logger.info("Invoice payment failed")
-
-        elif event_type == "payment.failed":
-            # Do not grant/keep plan when payment fails
-            meta = (data.get("metadata") or {})
-            firebase_uid = meta.get("firebase_uid")
-            email = (data.get("customer") or {}).get("email") or data.get("email")
-            user: Optional[User] = None
-            if firebase_uid:
-                user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
-            if not user and email:
-                user = db.query(User).filter(User.email == email).first()
-            if user:
-                user.subscription_status = "past_due"
-                # Revoke plan so user does not get access without successful payment
-                user.plan = None
-                db.commit()
-                logger.warning(f"⚠️ payment.failed: user {user.id} plan revoked, subscription_status=past_due")
-            logger.info("payment.failed event processed")
-
-        elif event_type == "subscription.failed":
-            # Do not give the user the plan
-            meta = (data.get("metadata") or {})
-            firebase_uid = meta.get("firebase_uid")
-            email = (data.get("customer") or {}).get("email") or data.get("email")
-            subscription_id = data.get("subscription_id") or data.get("id")
-            user: Optional[User] = None
-            if firebase_uid:
-                user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
-            if not user and email:
-                user = db.query(User).filter(User.email == email).first()
-            if user:
-                user.plan = None
-                user.subscription_status = "failed"
-                try:
-                    if subscription_id and getattr(user, "subscription_id", None) == subscription_id:
-                        setattr(user, "subscription_id", None)
-                except Exception:
-                    pass
-                db.commit()
-                logger.warning(f"⚠️ subscription.failed: user {user.id} plan revoked")
-            logger.info("subscription.failed event processed")
-
-        elif event_type == "payment.cancelled":
-            # Do not give the user the plan
-            meta = (data.get("metadata") or {})
-            firebase_uid = meta.get("firebase_uid")
-            email = (data.get("customer") or {}).get("email") or data.get("email")
-            user: Optional[User] = None
-            if firebase_uid:
-                user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
-            if not user and email:
-                user = db.query(User).filter(User.email == email).first()
-            if user:
-                user.plan = None
-                user.subscription_status = "cancelled"
-                db.commit()
-                logger.warning(f"⚠️ payment.cancelled: user {user.id} plan revoked")
-            logger.info("payment.cancelled event processed")
 
         else:
             logger.info(f"Event {event_type} received and ignored (no handler)")
