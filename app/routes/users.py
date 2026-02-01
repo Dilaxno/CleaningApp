@@ -42,7 +42,7 @@ class UserUpdate(BaseModel):
     profilePictureUrl: Optional[str] = None
     accountType: Optional[str] = None
     hearAbout: Optional[str] = None
-    plan: Optional[str] = None
+    # plan is set only by billing webhooks (payment.succeeded / subscription.active), not by frontend
     default_brand_color: Optional[str] = None
 
 class UserResponse(BaseModel):
@@ -168,6 +168,7 @@ def get_user(
         "profile_picture_url": profile_picture_presigned,
         "account_type": current_user.account_type,
         "plan": current_user.plan,
+        "subscription_status": current_user.subscription_status,
         "hear_about": current_user.hear_about,
         "onboarding_completed": current_user.onboarding_completed,
         "default_brand_color": current_user.default_brand_color,
@@ -201,9 +202,6 @@ def update_user(
             current_user.account_type = data.accountType
         if data.hearAbout is not None:
             current_user.hear_about = data.hearAbout
-        if data.plan is not None:
-            current_user.plan = data.plan
-            logger.info(f"📋 User plan updated to: {data.plan}")
         if data.default_brand_color is not None:
             current_user.default_brand_color = data.default_brand_color
             logger.info(
