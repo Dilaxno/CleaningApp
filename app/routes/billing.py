@@ -214,6 +214,25 @@ async def update_user_plan(
     logger.info(f"User {user.id} plan manually updated to {body.plan}")
     return {"message": f"Plan updated to {body.plan}", "plan": body.plan}
 
+@router.get("/debug/user-status")
+async def debug_user_status(
+    user: User = Depends(get_current_user),
+):
+    """Debug endpoint to check user's current subscription status"""
+    return {
+        "user_id": user.id,
+        "firebase_uid": user.firebase_uid,
+        "email": user.email,
+        "plan": user.plan,
+        "subscription_status": user.subscription_status,
+        "subscription_id": getattr(user, "subscription_id", None),
+        "subscription_start_date": user.subscription_start_date.isoformat() if user.subscription_start_date else None,
+        "last_payment_date": user.last_payment_date.isoformat() if user.last_payment_date else None,
+        "next_billing_date": user.next_billing_date.isoformat() if user.next_billing_date else None,
+        "billing_cycle": user.billing_cycle,
+    }
+
+
 @router.get("/current-plan")
 async def get_current_plan(
     user: User = Depends(get_current_user),
@@ -413,42 +432,55 @@ async def handle_dodopayments_webhook(
 
     try:
         event = json.loads(raw_body.decode("utf-8"))
-    except Exception:
+    except Exception as e:
+        logger.error(f"Failed to parse webhook JSON: {e}")
         raise HTTPException(status_code=400, detail="Invalid JSON payload")
 
     event_type = event.get("type")
     data = event.get("data") or {}
     logger.info(
-        f"Webhook received id={webhook_id} ts={webhook_timestamp} type={event_type}"
+        f"🔔 Webhook received id={webhook_id} ts={webhook_timestamp} type={event_type}"
     )
+    logger.info(f"📋 Webhook data keys: {list(data.keys())}")
+    
+    # Log metadata for debugging
+    meta = (data.get("metadata") or {})
+    if meta:
+        logger.info(f"🏷️ Webhook metadata: {meta}")
+    else:
+        logger.warning("⚠️ No metadata found in webhook")
 
     try:
         # Python 3.9 compatible if/elif instead of match
         if event_type in ("subscription.active", "subscription.renewed", "subscription.plan_changed"):
             # Identify the user
             meta = (data.get("metadata") or {})
-            logger.info(f"Webhook metadata: {meta}")
-            logger.info(f"Webhook data: {data}")
+            logger.info(f"🔍 Processing {event_type} - metadata: {meta}")
             
             firebase_uid = meta.get("firebase_uid")
             email = (data.get("customer") or {}).get("email") or data.get("email")
+            
+            logger.info(f"👤 Looking for user - firebase_uid: {firebase_uid}, email: {email}")
 
             user: Optional[User] = None
             if firebase_uid:
                 user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
+                logger.info(f"🔍 User lookup by firebase_uid: {'found' if user else 'not found'}")
             if not user and email:
                 user = db.query(User).filter(User.email == email).first()
+                logger.info(f"🔍 User lookup by email: {'found' if user else 'not found'}")
 
             # Determine target plan from metadata
             selected_plan = meta.get("selected_plan")
             billing_cycle = meta.get("billing_cycle")  # "monthly" or "yearly"
             subscription_id = data.get("subscription_id") or data.get("id")
 
-            logger.info(f"Selected plan: {selected_plan}, billing_cycle: {billing_cycle}, user found: {user is not None}, sub_id={subscription_id}")
+            logger.info(f"📋 Plan details - selected_plan: {selected_plan}, billing_cycle: {billing_cycle}, sub_id: {subscription_id}")
 
             if not user:
-                logger.warning("User not found for webhook event; skipping")
+                logger.warning("❌ User not found for webhook event; skipping")
             else:
+                logger.info(f"✅ Processing webhook for user {user.id} ({user.email})")
                 from datetime import datetime, timedelta
                 
                 # Persist subscription_id if provided
@@ -456,27 +488,29 @@ async def handle_dodopayments_webhook(
                     try:
                         setattr(user, "subscription_id", subscription_id)
                         db.commit()
-                        logger.info(f"Persisted subscription_id for user {user.id}: {subscription_id}")
+                        logger.info(f"💾 Persisted subscription_id for user {user.id}: {subscription_id}")
                     except Exception as e:
                         db.rollback()
-                        logger.warning(f"Failed to persist subscription_id for user {user.id}: {e}")
+                        logger.error(f"❌ Failed to persist subscription_id for user {user.id}: {e}")
 
                 # Handle new subscriptions
                 if event_type in ("subscription.active", "checkout.session.completed"):
+                    logger.info(f"🆕 Processing new subscription for user {user.id}")
                     if not user.subscription_start_date:
                         user.subscription_start_date = datetime.utcnow()
                         user.clients_this_month = 0
                         user.month_reset_date = datetime.utcnow() + timedelta(days=30)
-                        logger.info(f"Set subscription_start_date for user {user.id}")
+                        logger.info(f"📅 Set subscription_start_date for user {user.id}")
                     
                     # Track billing cycle
                     if billing_cycle and billing_cycle != "unknown":
                         user.billing_cycle = billing_cycle
-                        logger.info(f"Set billing_cycle to {billing_cycle} for user {user.id}")
+                        logger.info(f"🔄 Set billing_cycle to {billing_cycle} for user {user.id}")
                     
                     # Set initial payment date and calculate next billing
                     user.last_payment_date = datetime.utcnow()
                     user.subscription_status = "active"
+                    logger.info(f"✅ Set subscription_status to active for user {user.id}")
                     
                     # Calculate next billing date based on cycle
                     if user.billing_cycle == "yearly":
@@ -485,8 +519,11 @@ async def handle_dodopayments_webhook(
                         user.next_billing_date = datetime.utcnow() + timedelta(days=30)
                     
                     db.commit()
+                    logger.info(f"💾 Committed subscription changes for user {user.id}")
+                    
                 # Handle subscription renewals (recurring charges)
                 elif event_type == "subscription.renewed":
+                    logger.info(f"🔄 Processing subscription renewal for user {user.id}")
                     user.last_payment_date = datetime.utcnow()
                     user.subscription_status = "active"
                     
@@ -497,13 +534,16 @@ async def handle_dodopayments_webhook(
                         user.next_billing_date = datetime.utcnow() + timedelta(days=30)
                     
                     db.commit()
+                    logger.info(f"💾 Committed renewal changes for user {user.id}")
+                    
                 # Update plan if provided
                 if selected_plan and selected_plan != "unknown":
+                    logger.info(f"📋 Updating plan from {user.plan} to {selected_plan} for user {user.id}")
                     user.plan = selected_plan
                     db.commit()
-                    logger.info(f"User {user.id} plan updated to {selected_plan} via webhook")
+                    logger.info(f"✅ User {user.id} plan updated to {selected_plan} via webhook")
                 else:
-                    logger.info("No selected_plan in metadata; plan unchanged")
+                    logger.info("ℹ️ No selected_plan in metadata; plan unchanged")
 
         elif event_type in ("subscription.cancelled", "subscription.canceled"):
             # Cancelled subscription - revoke access

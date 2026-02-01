@@ -197,6 +197,76 @@ async def delete_custom_template(
     return {"message": "Template deleted successfully"}
 
 
+@router.get("/public/{business_id}/templates")
+async def get_public_custom_templates(
+    business_id: str,
+    db: Session = Depends(get_db)
+):
+    """Get active custom templates for a business (public endpoint for forms)"""
+    # First get the user ID from the business firebase UID
+    user = db.query(User).filter(User.firebase_uid == business_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Business not found")
+    
+    # Get active custom templates for this business
+    templates = db.query(CustomTemplate).filter(
+        CustomTemplate.user_id == user.id,
+        CustomTemplate.is_active == True
+    ).all()
+    
+    # Convert to public format (without internal IDs)
+    public_templates = []
+    for template in templates:
+        public_templates.append({
+            "id": f"custom_{template.id}",  # Prefix to distinguish from base templates
+            "name": template.name,
+            "description": template.description,
+            "base_template_id": template.base_template_id,
+            "sections": template.template_config.get("sections", [])
+        })
+    
+    return public_templates
+
+
+@router.get("/public/{business_id}/template/{template_id}")
+async def get_public_template(
+    business_id: str,
+    template_id: str,
+    db: Session = Depends(get_db)
+):
+    """Get a specific template for a business (public endpoint for forms)"""
+    # First get the user ID from the business firebase UID
+    user = db.query(User).filter(User.firebase_uid == business_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Business not found")
+    
+    # Check if it's a custom template (prefixed with custom_)
+    if template_id.startswith("custom_"):
+        custom_template_id = int(template_id.replace("custom_", ""))
+        template = db.query(CustomTemplate).filter(
+            CustomTemplate.id == custom_template_id,
+            CustomTemplate.user_id == user.id,
+            CustomTemplate.is_active == True
+        ).first()
+        
+        if not template:
+            raise HTTPException(status_code=404, detail="Custom template not found")
+        
+        return {
+            "id": template_id,
+            "name": template.name,
+            "description": template.description,
+            "base_template_id": template.base_template_id,
+            "sections": template.template_config.get("sections", []),
+            "color": "#1a1a1a",  # Default color, could be customized later
+            "image": ""  # Could be customized later
+        }
+    else:
+        # Return base template info - this would need to be implemented
+        # For now, return a 404 to indicate it should use the frontend templates
+        raise HTTPException(status_code=404, detail="Use base template from frontend")
+
+
 @router.get("/base/{base_template_id}/fields")
 async def get_base_template_fields(
     base_template_id: str,
