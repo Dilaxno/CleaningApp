@@ -238,6 +238,10 @@ class BusinessConfig(Base):
     custom_exclusions = Column(JSON, default=list)  # Custom user-added exclusions
     preferred_units = Column(String(20), default="sqft")
 
+    # Custom forms domain (white-labeled public form links)
+    # Example: forms.cleaningco.com (CNAME forms -> api.cleanenroll.com)
+    custom_forms_domain = Column(String(255), nullable=True)
+
     # Custom SMTP settings (standard SMTP, not Resend)
     smtp_email = Column(String(255), nullable=True)  # e.g., bookings@preclean.com
     smtp_host = Column(String(255), nullable=True)  # e.g., smtp.gmail.com

@@ -23,6 +23,8 @@ class BusinessConfigCreate(BaseModel):
     signatureUrl: Optional[str] = None
     onboardingComplete: Optional[bool] = None
     formEmbeddingEnabled: Optional[bool] = None
+    # White-label public form links
+    customFormsDomain: Optional[str] = None  # e.g., forms.cleaningco.com
     # Pricing
     pricingModel: Optional[str] = None
     meetingsRequired: Optional[bool] = None
@@ -172,6 +174,7 @@ def get_current_user_business_config(
         "signatureUrl": signature_presigned_url,
         "onboardingComplete": config.onboarding_complete,
         "formEmbeddingEnabled": config.form_embedding_enabled,
+        "customFormsDomain": config.custom_forms_domain,
         "pricingModel": config.pricing_model,
         "meetingsRequired": config.meetings_required,
         "paymentHandling": config.payment_handling,
@@ -259,6 +262,8 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 existing.onboarding_complete = data.onboardingComplete
             if data.formEmbeddingEnabled is not None:
                 existing.form_embedding_enabled = data.formEmbeddingEnabled
+            if is_provided(data.customFormsDomain):
+                existing.custom_forms_domain = data.customFormsDomain
             if is_provided(data.pricingModel):
                 existing.pricing_model = data.pricingModel
             if data.meetingsRequired is not None:
@@ -373,6 +378,7 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 signature_url=data.signatureUrl,
                 onboarding_complete=data.onboardingComplete,
                 form_embedding_enabled=data.formEmbeddingEnabled,
+                custom_forms_domain=data.customFormsDomain,
                 pricing_model=data.pricingModel,
                 meetings_required=data.meetingsRequired,
                 payment_handling=data.paymentHandling,
@@ -483,6 +489,7 @@ def get_business_config(firebase_uid: str, db: Session = Depends(get_db)):
         "businessName": config.business_name,
         "logoKey": config.logo_url,  # The R2 key
         "logoUrl": logo_presigned_url,  # Presigned URL for display
+        "customFormsDomain": config.custom_forms_domain,
         "signatureKey": config.signature_url,  # The R2 key
         "signatureUrl": signature_presigned_url,  # Presigned URL for display
         "pricingModel": config.pricing_model,
