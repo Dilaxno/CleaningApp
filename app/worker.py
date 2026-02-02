@@ -184,12 +184,19 @@ async def send_form_notification_emails_task(ctx, client_id: int, user_id: int, 
         
         # Send notification to business owner
         if user.email:
+            # Extract property shots from form data
+            form_data = client.form_data or {}
+            property_shots_keys = form_data.get("propertyShots", [])
+            if isinstance(property_shots_keys, str):
+                property_shots_keys = [property_shots_keys]
+            
             await send_new_client_notification(
                 to=user.email,
                 business_name=business_name,
                 client_name=client.contact_name or client.business_name,
                 client_email=client.email or "Not provided",
                 property_type=client.property_type or "Not specified",
+                property_shots_keys=property_shots_keys,
             )
             pass
         

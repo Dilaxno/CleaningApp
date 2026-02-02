@@ -500,17 +500,8 @@ async def generate_contract_html(
     if not isinstance(property_shots_keys, list):
         property_shots_keys = []
 
-    # Convert keys to base64 data URLs for embedding in PDF (Playwright cannot fetch external URLs)
+    # Property shots are no longer embedded in PDFs - they are sent to provider via email
     property_shots_b64 = []
-    if property_shots_keys:
-        for k in property_shots_keys[:12]:
-            try:
-                presigned = generate_presigned_url(k, expiration=3600)
-                b64 = await download_image_as_base64(presigned)
-                if b64:
-                    property_shots_b64.append(b64)
-            except Exception as e:
-                logger.warning(f"⚠️ Failed to load property shot for PDF: {e}")
 
     # Special requests from client form
     special_requests = form_data.get("specialRequests", "").strip() if form_data.get("specialRequests") else None
@@ -830,27 +821,6 @@ async def generate_contract_html(
             margin-top: 8px;
         }}
 
-        .property-shots-grid {{
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-top: 12px;
-        }}
-        .property-shot {{
-            width: 100%;
-            border: 1px solid #E2E8F0;
-            border-radius: 8px;
-            overflow: hidden;
-            background: #ffffff;
-            page-break-inside: avoid;
-        }}
-        .property-shot img {{
-            width: 100%;
-            height: 180px;
-            object-fit: cover;
-            display: block;
-        }}
-
         /* Print-specific styles */
         @media print {{
             * {{
@@ -943,13 +913,10 @@ async def generate_contract_html(
         </div>
     </div>
 
-    <!-- 4. Property shots -->
-    {"<div class='section'><div class='section-title'><span class='section-number'>4.</span>Property shots</div><div class='section-content'>Client provided the following property photos to help clarify expectations.</div><div class='property-shots-grid'>" + "".join(["<div class='property-shot'><img src='" + img + "' alt='Property photo'></div>" for img in property_shots_b64]) + "</div></div>" if property_shots_b64 else ""}
+    <!-- 4. Special Requests & Notes -->
+    {"<div class='section'><div class='section-title'><span class='section-number'>4.</span>Special Requests & Client Notes</div><div class='info-box' style='background: #FEF3C7; border-left: 4px solid #F59E0B; margin-top: 12px;'><h4 style='color: #92400E; margin-bottom: 8px;'>⚠️ Important Client Requirements</h4><p style='color: #92400E; font-size: 10pt; line-height: 1.6; white-space: pre-wrap;'>" + special_requests + "</p></div></div>" if special_requests else ""}
 
-    <!-- 5. Special Requests & Notes -->
-    {"<div class='section'><div class='section-title'><span class='section-number'>5.</span>Special Requests & Client Notes</div><div class='info-box' style='background: #FEF3C7; border-left: 4px solid #F59E0B; margin-top: 12px;'><h4 style='color: #92400E; margin-bottom: 8px;'>⚠️ Important Client Requirements</h4><p style='color: #92400E; font-size: 10pt; line-height: 1.6; white-space: pre-wrap;'>" + special_requests + "</p></div></div>" if special_requests else ""}
-
-    <!-- 6. Payment and Pricing -->
+    <!-- 5. Payment and Pricing -->
     <div class="section">
         <div class="section-title"><span class="section-number">5.</span>Payment and Pricing</div>
         <p class="section-content" style="margin-bottom: 12px;">

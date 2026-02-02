@@ -6,8 +6,13 @@ import resend
 import smtplib
 import ssl
 import logging
+import zipfile
+import io
+import aiohttp
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
 from datetime import datetime
 from typing import Optional, Union, List
 from jinja2 import Template
@@ -72,7 +77,8 @@ def send_via_custom_smtp(
     to: Union[str, List[str]],
     subject: str,
     html_content: str,
-    from_address: str
+    from_address: str,
+    attachments: Optional[List[dict]] = None
 ) -> dict:
     """
     Send email via user's custom SMTP server.
@@ -86,11 +92,25 @@ def send_via_custom_smtp(
         use_tls = business_config.smtp_use_tls if business_config.smtp_use_tls is not None else True
         
         # Create message
-        msg = MIMEMultipart("alternative")
+        msg = MIMEMultipart("mixed")
         msg["Subject"] = subject
         msg["From"] = from_address
         msg["To"] = to if isinstance(to, str) else ", ".join(to)
+        
+        # Add HTML content
         msg.attach(MIMEText(html_content, "html"))
+        
+        # Add attachments if provided
+        if attachments:
+            for attachment in attachments:
+                part = MIMEBase('application', 'octet-stream')
+                part.set_payload(attachment['content'])
+                encoders.encode_base64(part)
+                part.add_header(
+                    'Content-Disposition',
+                    f'attachment; filename= {attachment["filename"]}'
+                )
+                msg.attach(part)
         
         recipients = [to] if isinstance(to, str) else to
         
@@ -114,6 +134,66 @@ def send_via_custom_smtp(
     except Exception as e:
         logger.error(f"❌ Custom SMTP send failed: {e}")
         raise Exception(f"Custom SMTP failed: {str(e)}")
+
+
+async def create_property_shots_zip(property_shots_keys: List[str], client_name: str) -> Optional[bytes]:
+    """
+    Create a zip file containing property shots from R2 storage.
+    
+    Args:
+        property_shots_keys: List of R2 object keys for property shots
+        client_name: Client name for file naming
+        
+    Returns:
+        Zip file bytes or None if no images or error
+    """
+    if not property_shots_keys:
+        return None
+        
+    try:
+        from .routes.upload import generate_presigned_url
+        
+        zip_buffer = io.BytesIO()
+        
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            for i, key in enumerate(property_shots_keys[:12]):  # Limit to 12 images
+                try:
+                    # Generate presigned URL
+                    presigned_url = generate_presigned_url(key, expiration=3600)
+                    
+                    # Download image
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(presigned_url) as response:
+                            if response.status == 200:
+                                image_data = await response.read()
+                                
+                                # Extract file extension from key
+                                file_ext = key.split('.')[-1] if '.' in key else 'jpg'
+                                filename = f"property_shot_{i+1:02d}.{file_ext}"
+                                
+                                # Add to zip
+                                zip_file.writestr(filename, image_data)
+                            else:
+                                logger.warning(f"Failed to download property shot {key}: HTTP {response.status}")
+                                
+                except Exception as e:
+                    logger.warning(f"Failed to process property shot {key}: {e}")
+                    continue
+        
+        zip_buffer.seek(0)
+        zip_data = zip_buffer.getvalue()
+        
+        if len(zip_data) > 0:
+            logger.info(f"Created property shots zip with {len(property_shots_keys)} images for {client_name}")
+            return zip_data
+        else:
+            logger.warning("Property shots zip is empty")
+            return None
+            
+    except Exception as e:
+        logger.error(f"Failed to create property shots zip: {e}")
+        return None
+
 
 # App theme colors
 THEME = {
@@ -362,6 +442,7 @@ async def send_email(
     from_address: Optional[str] = None,
     business_config=None,
     is_user_email: bool = False,
+    attachments: Optional[List[dict]] = None,
 ) -> dict:
     """
     Send an email using custom SMTP (if configured) or Resend (fallback)
@@ -377,6 +458,7 @@ async def send_email(
         from_address: Optional custom from address
         business_config: Optional BusinessConfig for custom SMTP
         is_user_email: Whether this email is to a CleanEnroll user (not a client)
+        attachments: Optional list of attachments [{"filename": str, "content": bytes, "content_type": str}]
     
     Returns:
         Send response dict
@@ -404,7 +486,8 @@ async def send_email(
                 to=recipients,
                 subject=subject,
                 html_content=html_content,
-                from_address=sender
+                from_address=sender,
+                attachments=attachments
             )
             return response
         except Exception as e:
@@ -418,12 +501,24 @@ async def send_email(
     
     try:
         pass
-        response = resend.Emails.send({
+        email_data = {
             "from": sender,
             "to": recipients,
             "subject": subject,
             "html": html_content,
-        })
+        }
+        
+        # Add attachments if provided (Resend format)
+        if attachments:
+            email_data["attachments"] = [
+                {
+                    "filename": attachment["filename"],
+                    "content": attachment["content"]
+                }
+                for attachment in attachments
+            ]
+        
+        response = resend.Emails.send(email_data)
         pass
         return response
     except Exception as e:
@@ -466,17 +561,44 @@ async def send_new_client_notification(
     client_name: str,
     client_email: str,
     property_type: str,
+    property_shots_keys: Optional[List[str]] = None,
 ) -> dict:
     """Notify business owner of new client submission"""
+    
+    # Create property shots zip if available
+    attachments = None
+    property_shots_info = ""
+    
+    if property_shots_keys and len(property_shots_keys) > 0:
+        try:
+            zip_data = await create_property_shots_zip(property_shots_keys, client_name)
+            if zip_data:
+                # Create safe filename
+                safe_client_name = "".join(c for c in client_name if c.isalnum() or c in (' ', '-', '_')).rstrip()
+                filename = f"property_shots_{safe_client_name.replace(' ', '_')}.zip"
+                
+                attachments = [{
+                    "filename": filename,
+                    "content": zip_data,
+                    "content_type": "application/zip"
+                }]
+                
+                property_shots_info = f"<div style='background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;'><p style='margin: 0; color: #166534; font-size: 14px; font-weight: 600;'>📸 Property photos attached as ZIP file ({len(property_shots_keys)} images)</p></div>"
+        except Exception as e:
+            logger.warning(f"Failed to create property shots zip for {client_name}: {e}")
+            property_shots_info = f"<div style='background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;'><p style='margin: 0; color: #92400e; font-size: 14px;'>⚠️ Property photos available in dashboard ({len(property_shots_keys)} images)</p></div>"
+    
     content = f"""
     <p>Hi {business_name},</p>
     <p>{client_name} ({client_email}) completed a {property_type} cleaning intake form for {business_name}.</p>
+    
+    {property_shots_info}
     
     <div style="background: {THEME['background']}; border-radius: 12px; padding: 20px; margin: 20px 0;">
       <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: {THEME['text_primary']};">Key Details Captured:</h3>
       <div style="margin-bottom: 12px;">
         <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 4px;">Property type: {property_type}</div>
-        <div style="font-size: 14px; color: {THEME['text_muted']};">Full intake details available in dashboard (sq ft, peak hours, security codes, fragile displays, photos?)</div>
+        <div style="font-size: 14px; color: {THEME['text_muted']};">Full intake details available in dashboard (sq ft, peak hours, security codes, fragile displays)</div>
       </div>
     </div>
     
@@ -495,6 +617,7 @@ async def send_new_client_notification(
         title="New Client Property Intake Submission",
         content_html=content,
         is_user_email=True,
+        attachments=attachments,
     )
 
 
