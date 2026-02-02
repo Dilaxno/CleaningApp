@@ -48,6 +48,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Reduce verbosity of third-party libraries
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+
 # Security settings from environment
 # CSRF is DISABLED by default until frontend integration is complete
 # Set CSRF_ENABLED=true to enable once frontend sends X-CSRF-Token headers

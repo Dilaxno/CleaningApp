@@ -59,7 +59,7 @@ async def handle_calendly_webhook(
         event_type = payload.get("event")
         event_data = payload.get("payload", {})
         
-        logger.info(f"📥 Received Calendly webhook: {event_type}")
+        logger.debug(f"📥 Received Calendly webhook: {event_type}")
         logger.debug(f"Webhook payload: {json.dumps(event_data, indent=2)}")
         
         if event_type == "invitee.created":
@@ -68,7 +68,7 @@ async def handle_calendly_webhook(
             await handle_invitee_canceled(event_data, db)
         else:
             # Handle other event types or ignore them
-            logger.info(f"Unhandled event type: {event_type}")
+            logger.debug(f"Unhandled event type: {event_type}")
         
         return {"status": "ok"}
     

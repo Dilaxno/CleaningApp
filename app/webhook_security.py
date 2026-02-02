@@ -102,7 +102,7 @@ async def verify_dodo_webhook(
     webhook_id = request.headers.get("webhook-id", "unknown")
     
     # Log webhook receipt (without sensitive data)
-    logger.info(f"📥 Dodo webhook received: id={webhook_id}")
+    logger.debug(f"📥 Dodo webhook received: id={webhook_id}")
     
     # Verify timestamp if provided
     if timestamp and not verify_timestamp(timestamp):
@@ -120,7 +120,7 @@ async def verify_dodo_webhook(
             raise HTTPException(status_code=401, detail="Invalid webhook signature")
         return False, raw_body
     
-    logger.info(f"✅ Dodo webhook signature verified: id={webhook_id}")
+    logger.debug(f"✅ Dodo webhook signature verified: id={webhook_id}")
     return True, raw_body
 
 
@@ -146,7 +146,7 @@ async def verify_calendly_webhook(
     raw_body = await request.body()
     signature_header = request.headers.get("Calendly-Webhook-Signature", "")
     
-    logger.info("📥 Calendly webhook received")
+    logger.debug("📥 Calendly webhook received")
     
     if not signature_header:
         logger.warning("🚫 Calendly webhook missing signature header")
@@ -164,7 +164,7 @@ async def verify_calendly_webhook(
             raise HTTPException(status_code=401, detail="Invalid webhook signature")
         return False, raw_body
     
-    logger.info("✅ Calendly webhook signature verified")
+    logger.debug("✅ Calendly webhook signature verified")
     return True, raw_body
 
 
@@ -190,7 +190,7 @@ async def verify_stripe_webhook(
     raw_body = await request.body()
     signature_header = request.headers.get("Stripe-Signature", "")
     
-    logger.info("📥 Stripe webhook received")
+    logger.debug("📥 Stripe webhook received")
     
     if not signature_header:
         logger.warning("🚫 Stripe webhook missing signature header")
@@ -225,7 +225,7 @@ async def verify_stripe_webhook(
             raise HTTPException(status_code=401, detail="Invalid webhook signature")
         return False, raw_body
     
-    logger.info("✅ Stripe webhook signature verified")
+    logger.debug("✅ Stripe webhook signature verified")
     return True, raw_body
 
 
