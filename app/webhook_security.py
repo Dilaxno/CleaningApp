@@ -147,12 +147,16 @@ async def verify_dodo_webhook(
     
     received_signature = signature_header[3:]  # Remove "v1," prefix
     
-    # Use webhook secret as-is
+    # Use webhook secret - for Svix (which Dodo uses), we need the base64 part after whsec_
     webhook_secret = secret
+    if secret.startswith("whsec_"):
+        # Svix uses the base64-decoded portion after whsec_ prefix
+        webhook_secret = secret[6:]
+    
     logger.info(f"🔑 Webhook secret length = {len(webhook_secret or '')}")
     logger.info(f"🔑 Using webhook secret (first 10 chars): {webhook_secret[:10]}...")
     
-    # Build signed payload according to Dodo's Standard Webhooks spec:
+    # Build signed message according to Svix/Standard Webhooks spec:
     # webhook-id.webhook-timestamp.payload (separated by periods)
     signed_message = f"{webhook_id}.{timestamp}.{raw_body.decode('utf-8')}"
     
