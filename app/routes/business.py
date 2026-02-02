@@ -613,6 +613,8 @@ def get_public_addons(firebase_uid: str, db: Session = Depends(get_db)):
             "addonCarpetSmall": None,
             "addonCarpetMedium": None,
             "addonCarpetLarge": None,
+            "discountWeekly": None,
+            "discountMonthly": None,
         }
     return {
         "customAddons": config.custom_addons or [],
@@ -621,6 +623,8 @@ def get_public_addons(firebase_uid: str, db: Session = Depends(get_db)):
         "addonCarpetSmall": config.addon_carpet_small,
         "addonCarpetMedium": config.addon_carpet_medium,
         "addonCarpetLarge": config.addon_carpet_large,
+        "discountWeekly": config.discount_weekly,
+        "discountMonthly": config.discount_monthly,
     }
 
 
