@@ -4,7 +4,8 @@ import time
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from .database import engine, Base
+from sqlalchemy.orm import Session
+from .database import engine, Base, get_db
 from .csrf import CSRFMiddleware, get_csrf_token_endpoint, CSRF_COOKIE_NAME, generate_csrf_token
 from .security_headers import SecurityHeadersMiddleware
 from .routes import auth_router
@@ -83,6 +84,57 @@ app = FastAPI(title="CleanEnroll API", version="1.0.0", lifespan=lifespan)
 
 
 @app.middleware("http")
+async def custom_domain_resolver(request: Request, call_next):
+    """
+    Middleware to resolve custom domains to user IDs for template access.
+    This enables secure access to templates via custom domains like forms.cleaningco.com
+    """
+    host = request.headers.get("host", "").lower()
+    
+    # Skip resolution for main domain and localhost
+    if (host.startswith("localhost") or 
+        host.startswith("127.0.0.1") or 
+        host.endswith("cleanenroll.com") or
+        host.endswith("api.cleanenroll.com")):
+        return await call_next(request)
+    
+    # Only resolve for template-related endpoints
+    path = request.url.path
+    if not (path.startswith("/templates/public/") or 
+            path.startswith("/form/") or 
+            path.startswith("/embed/") or
+            path.startswith("/business/public/") or
+            path.startswith("/clients/public/")):
+        return await call_next(request)
+    
+    try:
+        # Look up user by custom domain
+        db: Session = next(get_db())
+        from .models import BusinessConfig, User
+        
+        business_config = db.query(BusinessConfig).filter(
+            BusinessConfig.custom_forms_domain == host
+        ).first()
+        
+        if business_config and business_config.user:
+            # Add resolved user info to request state for use in endpoints
+            request.state.custom_domain_user_id = business_config.user.id
+            request.state.custom_domain_user_uid = business_config.user.firebase_uid
+            request.state.is_custom_domain = True
+        else:
+            # Custom domain not found - this could be a security issue
+            logger.warning(f"Unknown custom domain attempted: {host} for path {path}")
+            request.state.is_custom_domain = False
+            
+        db.close()
+    except Exception as e:
+        logger.error(f"Custom domain resolution failed for {host}: {e}")
+        request.state.is_custom_domain = False
+    
+    return await call_next(request)
+
+
+@app.middleware("http")
 async def log_requests(request: Request, call_next):
     try:
         response = await call_next(request)
@@ -107,18 +159,12 @@ else:
 
 
 # CORS - must expose csrf_token cookie and allow X-CSRF-Token header
+# Allow all origins for custom domain support, but validate in middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://localhost:3000",
-        "https://cleanenroll.com",
-        "https://www.cleanenroll.com",
-        "https://coming-soon.cleanenroll.com"
-    ],
+    allow_origins=["*"],  # Allow all origins for custom domain support
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*", "X-CSRF-Token"],
     expose_headers=["X-CSRF-Token"],
 )

@@ -1,7 +1,7 @@
 import logging
 from typing import Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -111,9 +111,28 @@ def is_provided(val) -> bool:
 
 
 @router.get("/public/{firebase_uid}")
-def get_public_business_info(firebase_uid: str, db: Session = Depends(get_db)):
+def get_public_business_info(
+    firebase_uid: str, 
+    request: Request,
+    db: Session = Depends(get_db)
+):
     """Get public business info for embedding (no authentication required)"""
     logger.info(f"📥 Getting public business info for firebase_uid: {firebase_uid}")
+
+    # Custom domain security validation
+    if hasattr(request.state, 'is_custom_domain') and request.state.is_custom_domain:
+        # If this is a custom domain request, validate that the domain belongs to the requested user
+        if (not hasattr(request.state, 'custom_domain_user_uid') or 
+            request.state.custom_domain_user_uid != firebase_uid):
+            logger.warning(
+                f"🚫 Custom domain security violation in business info: Domain user {getattr(request.state, 'custom_domain_user_uid', 'unknown')} "
+                f"does not match requested user {firebase_uid}"
+            )
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied: Custom domain does not match requested user"
+            )
+        logger.info(f"✅ Custom domain validation passed for business info {firebase_uid}")
 
     # Find user by firebase_uid
     user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
@@ -537,12 +556,32 @@ def get_business_config(firebase_uid: str, db: Session = Depends(get_db)):
 
 
 @router.get("/public/branding/{firebase_uid}")
-def get_public_branding(firebase_uid: str, db: Session = Depends(get_db)):
+def get_public_branding(
+    firebase_uid: str, 
+    request: Request,
+    db: Session = Depends(get_db)
+):
     """
     Public endpoint to get business branding (logo, name) for client-facing forms.
     No authentication required - accessed via shareable form links.
+    Supports custom domain validation for security.
     """
     logger.info(f"📥 Getting public branding for firebase_uid: {firebase_uid}")
+
+    # Custom domain security validation
+    if hasattr(request.state, 'is_custom_domain') and request.state.is_custom_domain:
+        # If this is a custom domain request, validate that the domain belongs to the requested user
+        if (not hasattr(request.state, 'custom_domain_user_uid') or 
+            request.state.custom_domain_user_uid != firebase_uid):
+            logger.warning(
+                f"🚫 Custom domain security violation in branding: Domain user {getattr(request.state, 'custom_domain_user_uid', 'unknown')} "
+                f"does not match requested user {firebase_uid}"
+            )
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied: Custom domain does not match requested user"
+            )
+        logger.info(f"✅ Custom domain validation passed for branding {firebase_uid}")
 
     # Validate firebase_uid format to prevent injection
     if (
@@ -582,12 +621,32 @@ def get_public_branding(firebase_uid: str, db: Session = Depends(get_db)):
 
 
 @router.get("/public/addons/{firebase_uid}")
-def get_public_addons(firebase_uid: str, db: Session = Depends(get_db)):
+def get_public_addons(
+    firebase_uid: str, 
+    request: Request,
+    db: Session = Depends(get_db)
+):
     """
     Public endpoint to get business addon services for client-facing forms.
     No authentication required - accessed via shareable form links.
+    Supports custom domain validation for security.
     """
     logger.info(f"📥 Getting public addons for firebase_uid: {firebase_uid}")
+
+    # Custom domain security validation
+    if hasattr(request.state, 'is_custom_domain') and request.state.is_custom_domain:
+        # If this is a custom domain request, validate that the domain belongs to the requested user
+        if (not hasattr(request.state, 'custom_domain_user_uid') or 
+            request.state.custom_domain_user_uid != firebase_uid):
+            logger.warning(
+                f"🚫 Custom domain security violation in addons: Domain user {getattr(request.state, 'custom_domain_user_uid', 'unknown')} "
+                f"does not match requested user {firebase_uid}"
+            )
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied: Custom domain does not match requested user"
+            )
+        logger.info(f"✅ Custom domain validation passed for addons {firebase_uid}")
 
     # Validate firebase_uid format to prevent injection
     if (
@@ -629,12 +688,32 @@ def get_public_addons(firebase_uid: str, db: Session = Depends(get_db)):
 
 
 @router.get("/{firebase_uid}/public-info")
-def get_public_business_info(firebase_uid: str, db: Session = Depends(get_db)):
+def get_public_business_info(
+    firebase_uid: str, 
+    request: Request,
+    db: Session = Depends(get_db)
+):
     """
     Get public business information including working hours and schedules (for business-aware calendar)
     No authentication required - accessed via client forms and scheduling components.
+    Supports custom domain validation for security.
     """
     logger.info(f"📥 Getting public business info for firebase_uid: {firebase_uid}")
+
+    # Custom domain security validation
+    if hasattr(request.state, 'is_custom_domain') and request.state.is_custom_domain:
+        # If this is a custom domain request, validate that the domain belongs to the requested user
+        if (not hasattr(request.state, 'custom_domain_user_uid') or 
+            request.state.custom_domain_user_uid != firebase_uid):
+            logger.warning(
+                f"🚫 Custom domain security violation in public info: Domain user {getattr(request.state, 'custom_domain_user_uid', 'unknown')} "
+                f"does not match requested user {firebase_uid}"
+            )
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied: Custom domain does not match requested user"
+            )
+        logger.info(f"✅ Custom domain validation passed for public info {firebase_uid}")
 
     # Validate firebase_uid format to prevent injection
     if (

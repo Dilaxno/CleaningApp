@@ -543,6 +543,7 @@ async def get_quote_preview(
     """
     Public endpoint to calculate and preview quote before form submission.
     No client is created - just returns the calculated quote with explanation.
+    Supports custom domain validation for security.
     """
     from .contracts_pdf import calculate_quote
 
@@ -551,6 +552,22 @@ async def get_quote_preview(
     )
     if client_ip and "," in client_ip:
         client_ip = client_ip.split(",")[0].strip()
+    
+    # Custom domain security validation
+    if hasattr(request.state, 'is_custom_domain') and request.state.is_custom_domain:
+        # If this is a custom domain request, validate that the domain belongs to the requested user
+        if (not hasattr(request.state, 'custom_domain_user_uid') or 
+            request.state.custom_domain_user_uid != data.ownerUid):
+            logger.warning(
+                f"🚫 Custom domain security violation in quote preview: Domain user {getattr(request.state, 'custom_domain_user_uid', 'unknown')} "
+                f"does not match form owner {data.ownerUid} from IP {client_ip}"
+            )
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied: Custom domain does not match form owner"
+            )
+        logger.info(f"✅ Custom domain validation passed for quote preview {data.ownerUid}")
+    
     # Find the user by Firebase UID
     user = db.query(User).filter(User.firebase_uid == data.ownerUid).first()
     if not user:
@@ -665,6 +682,7 @@ async def submit_public_form(
     Rate limited: 5 per minute per IP, 15 per minute globally.
     Contract generation is queued asynchronously to prevent timeouts.
     No authentication required - this is accessed via shareable link.
+    Supports custom domain validation for security.
     """
     from arq import create_pool
     from arq.connections import RedisSettings
@@ -686,6 +704,21 @@ async def submit_public_form(
     logger.info(
         f"📥 Public form submission for owner UID: {data.ownerUid} from IP: {client_ip}"
     )
+
+    # Custom domain security validation
+    if hasattr(request.state, 'is_custom_domain') and request.state.is_custom_domain:
+        # If this is a custom domain request, validate that the domain belongs to the requested user
+        if (not hasattr(request.state, 'custom_domain_user_uid') or 
+            request.state.custom_domain_user_uid != data.ownerUid):
+            logger.warning(
+                f"🚫 Custom domain security violation: Domain user {getattr(request.state, 'custom_domain_user_uid', 'unknown')} "
+                f"does not match form owner {data.ownerUid} from IP {client_ip}"
+            )
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied: Custom domain does not match form owner"
+            )
+        logger.info(f"✅ Custom domain validation passed for {data.ownerUid}")
 
     # Note: Rate limiting handles submission abuse prevention
     # No need for additional Redis tracking here

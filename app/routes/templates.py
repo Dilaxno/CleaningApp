@@ -1,10 +1,10 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from ..database import get_db
-from ..models import FormTemplate, User, UserTemplateCustomization
+from ..models import FormTemplate, User, UserTemplateCustomization, BusinessConfig
 from ..auth import get_current_user
 
 
@@ -381,14 +381,248 @@ async def delete_template(
         return {"message": "Template deleted"}
 
 
+# Custom domain-aware endpoints for secure template access
+@router.get("/domain/templates", response_model=List[FormTemplateSchema])
+async def get_templates_by_domain(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Get all templates for a business via custom domain (secure)"""
+    # Check if this is a custom domain request
+    if not hasattr(request.state, 'is_custom_domain') or not request.state.is_custom_domain:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This endpoint is only available via custom domains"
+        )
+    
+    if not hasattr(request.state, 'custom_domain_user_id'):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Custom domain not configured properly"
+        )
+    
+    user_id = request.state.custom_domain_user_id
+    
+    # Get system templates (pre-built)
+    system_templates = db.query(FormTemplate).filter(
+        FormTemplate.is_system_template == True,
+        FormTemplate.is_active == True
+    ).all()
+    
+    # Get user's custom templates
+    user_templates = db.query(FormTemplate).filter(
+        FormTemplate.user_id == user_id,
+        FormTemplate.is_active == True
+    ).all()
+    
+    # Get user's customizations
+    customizations = db.query(UserTemplateCustomization).filter(
+        UserTemplateCustomization.user_id == user_id,
+        UserTemplateCustomization.is_active == True
+    ).all()
+    
+    # Build response
+    templates = []
+    
+    # Add system templates with user customizations if any
+    for template in system_templates:
+        template_data = template.template_data
+        
+        # Check if user has customizations for this template
+        customization = next(
+            (c for c in customizations if c.template_id == template.id), 
+            None
+        )
+        if customization:
+            template_data = customization.customized_data
+        
+        templates.append(FormTemplateSchema(
+            id=template.template_id,
+            name=template.name,
+            description=template.description or "",
+            image=template.image or "",
+            color=template.color or "#00C4B4",
+            sections=template_data.get("sections", [])
+        ))
+    
+    # Add user's custom templates
+    for template in user_templates:
+        templates.append(FormTemplateSchema(
+            id=template.template_id,
+            name=template.name,
+            description=template.description or "",
+            image=template.image or "",
+            color=template.color or "#00C4B4",
+            sections=template.template_data.get("sections", [])
+        ))
+    
+    return templates
+
+
+@router.get("/domain/templates/{template_id}", response_model=FormTemplateSchema)
+async def get_template_by_domain(
+    template_id: str,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Get a template via custom domain (secure)"""
+    # Check if this is a custom domain request
+    if not hasattr(request.state, 'is_custom_domain') or not request.state.is_custom_domain:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This endpoint is only available via custom domains"
+        )
+    
+    if not hasattr(request.state, 'custom_domain_user_id'):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Custom domain not configured properly"
+        )
+    
+    user_id = request.state.custom_domain_user_id
+    
+    # First check if it's a system template
+    template = db.query(FormTemplate).filter(
+        FormTemplate.template_id == template_id,
+        FormTemplate.is_system_template == True,
+        FormTemplate.is_active == True
+    ).first()
+    
+    if not template:
+        # Check if it's a user's custom template
+        template = db.query(FormTemplate).filter(
+            FormTemplate.template_id == template_id,
+            FormTemplate.user_id == user_id,
+            FormTemplate.is_active == True
+        ).first()
+    
+    if not template:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Template not found"
+        )
+    
+    template_data = template.template_data
+    
+    # Check if user has customizations for this system template
+    if template.is_system_template:
+        customization = db.query(UserTemplateCustomization).filter(
+            UserTemplateCustomization.user_id == user_id,
+            UserTemplateCustomization.template_id == template.id,
+            UserTemplateCustomization.is_active == True
+        ).first()
+        
+        if customization:
+            template_data = customization.customized_data
+    
+    return FormTemplateSchema(
+        id=template.template_id,
+        name=template.name,
+        description=template.description or "",
+        image=template.image or "",
+        color=template.color or "#00C4B4",
+        sections=template_data.get("sections", [])
+    )
+
+
 # Public endpoints for client forms
+@router.get("/public/{owner_uid}", response_model=List[FormTemplateSchema])
+async def get_public_templates(
+    owner_uid: str,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Get all templates for a business (public access for embed/template selection)"""
+    # If this is a custom domain request, validate that the domain belongs to the requested user
+    if hasattr(request.state, 'is_custom_domain') and request.state.is_custom_domain:
+        if (not hasattr(request.state, 'custom_domain_user_uid') or 
+            request.state.custom_domain_user_uid != owner_uid):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Custom domain does not match requested user"
+            )
+    
+    # Find the user by firebase_uid
+    user = db.query(User).filter(User.firebase_uid == owner_uid).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Get system templates (pre-built)
+    system_templates = db.query(FormTemplate).filter(
+        FormTemplate.is_system_template == True,
+        FormTemplate.is_active == True
+    ).all()
+    
+    # Get user's custom templates
+    user_templates = db.query(FormTemplate).filter(
+        FormTemplate.user_id == user.id,
+        FormTemplate.is_active == True
+    ).all()
+    
+    # Get user's customizations
+    customizations = db.query(UserTemplateCustomization).filter(
+        UserTemplateCustomization.user_id == user.id,
+        UserTemplateCustomization.is_active == True
+    ).all()
+    
+    # Build response
+    templates = []
+    
+    # Add system templates with user customizations if any
+    for template in system_templates:
+        template_data = template.template_data
+        
+        # Check if user has customizations for this template
+        customization = next(
+            (c for c in customizations if c.template_id == template.id), 
+            None
+        )
+        if customization:
+            template_data = customization.customized_data
+        
+        templates.append(FormTemplateSchema(
+            id=template.template_id,
+            name=template.name,
+            description=template.description or "",
+            image=template.image or "",
+            color=template.color or "#00C4B4",
+            sections=template_data.get("sections", [])
+        ))
+    
+    # Add user's custom templates
+    for template in user_templates:
+        templates.append(FormTemplateSchema(
+            id=template.template_id,
+            name=template.name,
+            description=template.description or "",
+            image=template.image or "",
+            color=template.color or "#00C4B4",
+            sections=template.template_data.get("sections", [])
+        ))
+    
+    return templates
+
+
 @router.get("/public/{owner_uid}/{template_id}", response_model=FormTemplateSchema)
 async def get_public_template(
     owner_uid: str,
     template_id: str,
+    request: Request,
     db: Session = Depends(get_db)
 ):
     """Get a template for public client form access"""
+    # If this is a custom domain request, validate that the domain belongs to the requested user
+    if hasattr(request.state, 'is_custom_domain') and request.state.is_custom_domain:
+        if (not hasattr(request.state, 'custom_domain_user_uid') or 
+            request.state.custom_domain_user_uid != owner_uid):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Custom domain does not match requested user"
+            )
+    
     # Find the user by firebase_uid
     user = db.query(User).filter(User.firebase_uid == owner_uid).first()
     if not user:
