@@ -92,93 +92,105 @@ async def verify_dodo_webhook(
     raise_on_failure: bool = True
 ) -> Tuple[bool, bytes]:
     """
-    Verify Dodo Payments webhook signature following Standard Webhooks spec.
+    Verify Dodo Payments webhook signature using Standard Webhooks specification.
     
-    According to Dodo docs:
-    - Build signed message: webhook-id.webhook-timestamp.raw_payload
-    - Compute HMAC SHA256 of that string using webhook secret
-    - Compare to webhook-signature header (format: "v1,<base64_signature>")
+    According to Dodo support:
+    - Use webhook-signature header with Standard Webhooks spec
+    - Verify using webhook-id, webhook-timestamp, and raw payload
+    - Use HMAC SHA256 algorithm
+    - Must use raw request body (not parsed JSON)
+    
+    Standard Webhooks format:
+    - Signed payload: {webhook-id}.{webhook-timestamp}.{raw_body}
+    - Signature format: v1,{base64_encoded_signature}
     
     Args:
         request: FastAPI request object
-        secret: Webhook secret from Dodo dashboard
+        secret: Webhook secret from Dodo dashboard (with or without whsec_ prefix)
         raise_on_failure: If True, raises HTTPException on failure
     
     Returns:
         Tuple of (is_valid, raw_body)
     """
+    # Get raw body BEFORE any parsing
     raw_body = await request.body()
-    signature = request.headers.get("webhook-signature", "")
+    
+    # Get required headers
+    signature_header = request.headers.get("webhook-signature", "")
     timestamp = request.headers.get("webhook-timestamp", "")
     webhook_id = request.headers.get("webhook-id", "")
     
-    # Log webhook receipt (without sensitive data)
-    logger.debug(f"📥 Dodo webhook received: id={webhook_id}")
+    # Log webhook receipt
+    logger.info(f"📥 Dodo webhook received: id={webhook_id}")
+    logger.info(f"🔍 Headers: signature={signature_header}, timestamp={timestamp}")
     
-    # Verify required headers are present
-    if not signature:
-        logger.warning("🚫 Dodo webhook missing signature header")
+    # Validate required headers
+    if not signature_header:
+        logger.error("❌ Missing webhook-signature header")
         if raise_on_failure:
             raise HTTPException(status_code=401, detail="Missing webhook signature")
         return False, raw_body
     
     if not timestamp:
-        logger.warning("🚫 Dodo webhook missing timestamp header")
+        logger.error("❌ Missing webhook-timestamp header")
         if raise_on_failure:
             raise HTTPException(status_code=401, detail="Missing webhook timestamp")
         return False, raw_body
     
     if not webhook_id:
-        logger.warning("🚫 Dodo webhook missing webhook-id header")
+        logger.error("❌ Missing webhook-id header")
         if raise_on_failure:
             raise HTTPException(status_code=401, detail="Missing webhook ID")
         return False, raw_body
     
-    # Verify timestamp if provided
+    # Verify timestamp (prevent replay attacks)
     if not verify_timestamp(timestamp):
+        logger.error("❌ Webhook timestamp expired or invalid")
         if raise_on_failure:
             raise HTTPException(status_code=401, detail="Webhook timestamp expired")
         return False, raw_body
     
-    # Process the secret - remove whsec_ prefix if present
-    actual_secret = secret[6:] if secret.startswith("whsec_") else secret
-    
-    # Dodo uses v1,<signature> format
-    if not signature.startswith("v1,"):
-        logger.warning(f"🚫 Dodo webhook signature missing v1 prefix: {signature[:20]}...")
+    # Parse signature header (format: "v1,{signature}")
+    if not signature_header.startswith("v1,"):
+        logger.error(f"❌ Invalid signature format: {signature_header[:20]}...")
         if raise_on_failure:
             raise HTTPException(status_code=401, detail="Invalid signature format")
         return False, raw_body
     
-    signature_value = signature[3:]  # Remove "v1," prefix
+    received_signature = signature_header[3:]  # Remove "v1," prefix
     
-    # Build signed message according to Standard Webhooks spec:
-    # webhook-id.webhook-timestamp.raw_payload
-    raw_payload = raw_body.decode('utf-8', errors='ignore')
-    signed_message = f"{webhook_id}.{timestamp}.{raw_payload}"
+    # Process webhook secret (remove whsec_ prefix if present)
+    actual_secret = secret[6:] if secret.startswith("whsec_") else secret
+    logger.info(f"🔑 Using secret (first 10 chars): {actual_secret[:10]}...")
     
-    # Compute HMAC SHA256 and encode as base64
-    expected_signature = compute_hmac_sha256_base64(actual_secret, signed_message.encode())
+    # Build signed payload according to Standard Webhooks spec
+    # Format: {webhook-id}.{webhook-timestamp}.{raw_body_as_string}
+    raw_body_str = raw_body.decode('utf-8', errors='replace')
+    signed_payload = f"{webhook_id}.{timestamp}.{raw_body_str}"
     
-    logger.info(f"🔍 Standard Webhooks verification for {webhook_id}:")
-    logger.info(f"🔍 Signed message format: {webhook_id}.{timestamp}.<payload>")
+    # Compute expected signature using HMAC SHA256
+    expected_signature = compute_hmac_sha256_base64(actual_secret, signed_payload.encode('utf-8'))
+    
+    # Log verification details
+    logger.info(f"🔍 Webhook verification details:")
+    logger.info(f"🔍 Webhook ID: {webhook_id}")
+    logger.info(f"🔍 Timestamp: {timestamp}")
+    logger.info(f"🔍 Raw body length: {len(raw_body)} bytes")
+    logger.info(f"🔍 Signed payload length: {len(signed_payload)} bytes")
     logger.info(f"🔍 Expected signature: {expected_signature}")
-    logger.info(f"🔍 Received signature: {signature_value}")
+    logger.info(f"🔍 Received signature: {received_signature}")
     
-    if constant_time_compare(expected_signature, signature_value):
-        logger.debug(f"✅ Dodo webhook signature verified: id={webhook_id}")
+    # Verify signature using constant-time comparison
+    if constant_time_compare(expected_signature, received_signature):
+        logger.info(f"✅ Dodo webhook signature verified successfully: {webhook_id}")
         return True, raw_body
     
-    # If we get here, signature verification failed
-    logger.warning(f"🚫 Dodo webhook signature mismatch for id={webhook_id}")
-    logger.info(f"🔍 Signature debug for webhook {webhook_id}:")
-    logger.info(f"🔍 Received signature: '{signature}'")
-    logger.info(f"🔍 Timestamp: '{timestamp}'")
-    logger.info(f"🔍 Webhook ID: '{webhook_id}'")
-    logger.info(f"🔍 Raw body length: {len(raw_body)}")
+    # Signature verification failed
+    logger.error(f"❌ Dodo webhook signature mismatch for {webhook_id}")
+    logger.error(f"❌ This will result in 401 Unauthorized response")
+    logger.info(f"🔍 Debug info:")
     logger.info(f"🔍 Raw body (first 200 chars): {raw_body[:200]}")
-    logger.info(f"🔍 Signed message length: {len(signed_message)}")
-    logger.info(f"🔍 Expected signature (Standard Webhooks): {expected_signature}")
+    logger.info(f"🔍 Signed payload format: {webhook_id}.{timestamp}.<raw_body>")
     
     if raise_on_failure:
         raise HTTPException(status_code=401, detail="Invalid webhook signature")

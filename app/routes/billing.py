@@ -588,6 +588,57 @@ async def bypass_signature_webhook(
         return {"error": str(e)}
 
 
+@webhooks_router.post("/webhooks/dodopayments/debug-exact-signature")
+async def debug_exact_signature():
+    """
+    Debug signature verification using exact data from Dodo dashboard screenshot
+    """
+    import hmac
+    import hashlib
+    import base64
+    
+    # Exact data from the screenshot
+    webhook_id = "msg_397i3YMxD6jR4w6HYVjH2TvwTtP"
+    timestamp = "1770055499"
+    received_signature = "g6b12SXpy7beyEn2JZ+SOC000feTUioflzX0HtEk90w="
+    
+    # Test secret (verify this matches your environment)
+    test_secret = "whsec_iCYnlyl4QjPRL9Bj1Vka0pmX22FcNyEz"
+    actual_secret = test_secret[6:]
+    
+    # Sample body (approximate - we need the exact body for accurate testing)
+    sample_body = '{"business_id":"bus_OumfAar4K7irg6ZTZlqcD","data":{"billing":{"city":"Camden","country":"US","state":"Delaware","street":"2140 S Dupont Hwy, 2140 South Dupont Highway","zipcode":"19934"},"brand_id":"brand_123"}}'
+    
+    # Standard Webhooks format: webhook-id.webhook-timestamp.raw_body
+    signed_payload = f"{webhook_id}.{timestamp}.{sample_body}"
+    
+    # Compute expected signature
+    expected_signature = base64.b64encode(
+        hmac.new(actual_secret.encode('utf-8'), signed_payload.encode('utf-8'), hashlib.sha256).digest()
+    ).decode('utf-8')
+    
+    return {
+        "test_data": {
+            "webhook_id": webhook_id,
+            "timestamp": timestamp,
+            "received_signature": received_signature,
+            "secret_prefix": test_secret[:15] + "..."
+        },
+        "computation": {
+            "signed_payload_format": f"{webhook_id}.{timestamp}.<body>",
+            "signed_payload_length": len(signed_payload),
+            "expected_signature": expected_signature,
+            "signatures_match": expected_signature == received_signature
+        },
+        "next_steps": [
+            "1. Verify DODO_PAYMENTS_WEBHOOK_SECRET environment variable matches Dodo dashboard",
+            "2. Ensure webhook endpoint receives raw body before any JSON parsing",
+            "3. Check if webhook secret includes or excludes 'whsec_' prefix",
+            "4. Test with exact webhook body content from Dodo logs"
+        ]
+    }
+
+
 @webhooks_router.post("/webhooks/dodopayments/debug")
 @webhooks_router.post("/api/payments/dodo/webhook/debug")  # Debug alias
 async def debug_dodo_webhook(request: Request, db: Session = Depends(get_db)):
