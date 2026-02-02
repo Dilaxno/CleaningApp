@@ -145,6 +145,7 @@ class User(Base):
     calendly_integration = relationship(
         "CalendlyIntegration", back_populates="user", uselist=False
     )
+    form_templates = relationship("FormTemplate", back_populates="user")
 
 
 class BusinessConfig(Base):
@@ -554,4 +555,38 @@ class IntegrationRequestVote(Base):
 
     # Unique constraint to prevent duplicate votes
     __table_args__ = ({"sqlite_autoincrement": True},)
+
+
+class FormTemplate(Base):
+    __tablename__ = "form_templates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    template_id = Column(String(100), unique=True, index=True, nullable=False)  # e.g., "office", "retail"
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # null for system templates
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    image = Column(String(500), nullable=True)
+    color = Column(String(7), nullable=True)  # hex color
+    is_system_template = Column(Boolean, default=False, nullable=False)  # true for pre-built templates
+    is_active = Column(Boolean, default=True, nullable=False)
+    template_data = Column(JSON, nullable=False)  # stores the complete template structure
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    user = relationship("User", back_populates="form_templates")
+
+
+class UserTemplateCustomization(Base):
+    __tablename__ = "user_template_customizations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    template_id = Column(Integer, ForeignKey("form_templates.id"), nullable=False)
+    customized_data = Column(JSON, nullable=False)  # stores user's customizations
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    user = relationship("User")
+    template = relationship("FormTemplate")
 
