@@ -588,62 +588,69 @@ async def bypass_signature_webhook(
         return {"error": str(e)}
 
 
-@webhooks_router.post("/webhooks/dodopayments/test-dodo-format")
-async def test_dodo_signature_format():
+@webhooks_router.post("/webhooks/dodopayments/test-byte-perfect")
+async def test_byte_perfect_signature():
     """
-    Test Dodo's exact signature format: {timestamp}.{raw_body}
+    Test the byte-perfect signature implementation
     """
     import hmac
     import hashlib
     import base64
+    import os
     
-    # Use recent webhook data from logs
-    webhook_id = "msg_397oagPWWSmG0LNxASdsw9C3H71"
-    timestamp = "1770056539"
-    received_signature = "1LiONS3CmyIFbfigolCthK0r14fq6lMzQM7YMBikYEk="
+    # Data from recent logs
+    timestamp = "1770057255"
+    received_signature = "OkPW+QrUpFRf6tFENpZeI2ZXYWEWCbZaHZmEq0+S5tY="
     
-    # Test with webhook secret (verify this matches your DODO_PAYMENTS_WEBHOOK_SECRET)
-    test_secret = "whsec_iCYnlyl4QjPRL9Bj1Vka0pmX22FcNyEz"
+    # Get actual webhook secret
+    webhook_secret = os.getenv("DODO_PAYMENTS_WEBHOOK_SECRET", "")
     
-    # Sample body (approximate based on logs)
-    sample_body = '{"business_id":"bus_OumfAar4K7irg6ZTZlqcD","data":{"billing":{"city":"Camden","country":"US","state":"Delaware","street":"2140 S Dupont Hwy, 2140 South Dupont Highway","zipcode":"19934"},"brand_id":"brand_123","metadata":{"firebase_uid":"test_uid","selected_plan":"solo","billing_cycle":"yearly"}}}'
+    # Sample body as bytes (approximate)
+    sample_body = b'{"business_id":"bus_OumfAar4K7irg6ZTZlqcD","data":{"billing":{"city":"Camden","country":"US","state":"Delaware","street":"2140 S Dupont Hwy, 2140 South Dupont Highway","zipcode":"19934"},"brand_id":"brand_123","metadata":{"firebase_uid":"test_uid","selected_plan":"solo","billing_cycle":"yearly"}}}'
+    
+    # Test byte-perfect method
+    signed_payload = timestamp.encode('utf-8') + b"." + sample_body
+    
+    # Test with different secret formats
+    secrets_to_test = [
+        ("env_secret", webhook_secret),
+        ("env_without_whsec", webhook_secret[6:] if webhook_secret.startswith("whsec_") else webhook_secret),
+        ("hardcoded_full", "whsec_iCYnlyl4QjPRL9Bj1Vka0pmX22FcNyEz"),
+        ("hardcoded_no_prefix", "iCYnlyl4QjPRL9Bj1Vka0pmX22FcNyEz"),
+    ]
     
     results = {}
     
-    # Test Dodo's format: {timestamp}.{raw_body}
-    dodo_payload = f"{timestamp}.{sample_body}"
-    
-    # Test with full secret (including whsec_ prefix)
-    dodo_signature_full = base64.b64encode(
-        hmac.new(test_secret.encode('utf-8'), dodo_payload.encode('utf-8'), hashlib.sha256).digest()
-    ).decode('utf-8')
-    
-    # Test with secret without whsec_ prefix
-    secret_no_prefix = test_secret[6:]
-    dodo_signature_no_prefix = base64.b64encode(
-        hmac.new(secret_no_prefix.encode('utf-8'), dodo_payload.encode('utf-8'), hashlib.sha256).digest()
-    ).decode('utf-8')
-    
-    results["dodo_format"] = {
-        "payload_format": f"{timestamp}.<raw_body>",
-        "payload_length": len(dodo_payload),
-        "with_whsec_prefix": {
-            "computed_signature": dodo_signature_full,
-            "matches_received": dodo_signature_full == received_signature
-        },
-        "without_whsec_prefix": {
-            "computed_signature": dodo_signature_no_prefix,
-            "matches_received": dodo_signature_no_prefix == received_signature
-        }
-    }
+    for secret_name, secret in secrets_to_test:
+        if not secret:
+            continue
+            
+        try:
+            expected_signature = base64.b64encode(
+                hmac.new(
+                    secret.encode('utf-8'),
+                    signed_payload,
+                    hashlib.sha256
+                ).digest()
+            ).decode('utf-8')
+            
+            results[secret_name] = {
+                "secret_prefix": secret[:10] + "..." if len(secret) > 10 else secret,
+                "expected_signature": expected_signature,
+                "matches_received": expected_signature == received_signature
+            }
+        except Exception as e:
+            results[secret_name] = {"error": str(e)}
     
     return {
-        "webhook_id": webhook_id,
+        "method": "BYTE-PERFECT: timestamp.encode() + b'.' + raw_body",
         "timestamp": timestamp,
         "received_signature": received_signature,
-        "secret_prefix": test_secret[:15] + "...",
-        "test_results": results,
-        "note": "Testing Dodo's format: {timestamp}.{raw_body} (NOT Standard Webhooks format)"
+        "sample_body_length": len(sample_body),
+        "signed_payload_length": len(signed_payload),
+        "env_secret_set": bool(webhook_secret),
+        "results": results,
+        "note": "Look for 'matches_received': true to confirm correct secret format"
     }
 
 

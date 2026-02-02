@@ -93,14 +93,14 @@ async def verify_dodo_webhook(
     raise_on_failure: bool = True
 ) -> Tuple[bool, bytes]:
     """
-    Verify Dodo Payments webhook signature using their exact specification.
+    Verify Dodo Payments webhook signature using byte-perfect implementation.
     
-    Dodo signs this string: {webhook-timestamp}.{raw_body}
-    NOT the Standard Webhooks format with webhook-id.
+    Critical: Dodo signs the raw bytes, not re-encoded strings.
+    Signed payload: timestamp.encode() + b"." + raw_body (NO decoding/re-encoding)
     
     Args:
         request: FastAPI request object
-        secret: Webhook secret from Dodo dashboard (NOT API key)
+        secret: Webhook secret from Dodo dashboard
         raise_on_failure: If True, raises HTTPException on failure
     
     Returns:
@@ -147,20 +147,19 @@ async def verify_dodo_webhook(
     
     received_signature = signature_header[3:]  # Remove "v1," prefix
     
-    # Use webhook secret as-is (don't remove whsec_ prefix for Dodo)
+    # Use webhook secret as-is
     webhook_secret = secret
     logger.info(f"🔑 Using webhook secret (first 10 chars): {webhook_secret[:10]}...")
     
-    # Build signed payload according to Dodo's specification
-    # Format: {webhook-timestamp}.{raw_body_as_string}
-    raw_body_str = raw_body.decode('utf-8')
-    signed_payload = f"{timestamp}.{raw_body_str}"
+    # Build signed payload using BYTE-PERFECT method
+    # NO decoding/re-encoding - work with raw bytes only
+    signed_payload = timestamp.encode('utf-8') + b"." + raw_body
     
     # Compute expected signature using HMAC SHA256 + Base64
     expected_signature = base64.b64encode(
         hmac.new(
             webhook_secret.encode('utf-8'), 
-            signed_payload.encode('utf-8'), 
+            signed_payload, 
             hashlib.sha256
         ).digest()
     ).decode('utf-8')
@@ -170,7 +169,7 @@ async def verify_dodo_webhook(
     logger.info(f"🔍 Webhook ID: {webhook_id}")
     logger.info(f"🔍 Timestamp: {timestamp}")
     logger.info(f"🔍 Raw body length: {len(raw_body)} bytes")
-    logger.info(f"🔍 Signed payload format: {timestamp}.<raw_body>")
+    logger.info(f"🔍 Signed payload format: timestamp.encode() + b'.' + raw_body")
     logger.info(f"🔍 Signed payload length: {len(signed_payload)} bytes")
     logger.info(f"🔍 Expected signature: {expected_signature}")
     logger.info(f"🔍 Received signature: {received_signature}")
@@ -185,7 +184,7 @@ async def verify_dodo_webhook(
     logger.error(f"❌ This will result in 401 Unauthorized response")
     logger.info(f"🔍 Debug info:")
     logger.info(f"🔍 Raw body (first 200 chars): {raw_body[:200]}")
-    logger.info(f"🔍 Signed payload: {timestamp}.<raw_body>")
+    logger.info(f"🔍 Byte-perfect payload construction used")
     
     if raise_on_failure:
         raise HTTPException(status_code=401, detail="Invalid webhook signature")
