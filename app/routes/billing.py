@@ -493,43 +493,55 @@ async def change_subscription_plan(
 
 # No product-to-plan mapping on backend; plan is derived from metadata set at checkout creation.
 
-@webhooks_router.post("/webhooks/dodopayments/test")
-async def test_dodo_webhook_signature():
+@webhooks_router.post("/webhooks/dodopayments/test-signature")
+async def test_dodo_signature_format():
     """
-    Test endpoint to verify our signature computation matches Dodo's format
+    Test endpoint to verify Dodo signature format with known test data
     """
     import hmac
     import hashlib
     import base64
     
-    # Test data
-    test_body = b'{"test": "data"}'
+    # Use the actual webhook secret from the logs
     test_secret = "whsec_iCYnlyl4QjPRL9Bj1Vka0pmX22FcNyEz"
+    actual_secret = test_secret[6:]  # Remove whsec_ prefix
     
-    # Compute signatures with different methods
+    # Test data from the logs
+    test_timestamp = "1770052363"
+    test_body = b'{"business_id":"bus_OumfAar4K7irg6ZTZlqcD","data":{"addons":[],"billing":{"city":"New York","country":"US","state":"New York","street":"JW Marriott Essex House New York,  160 Central Park South, Manha'
+    
+    # Expected signature from logs: uPjndWiG95cjKPvh0+PZG8sUIV8x5XKSmUl0kXjwsuE=
+    expected_signature = "uPjndWiG95cjKPvh0+PZG8sUIV8x5XKSmUl0kXjwsuE="
+    
     results = {}
     
-    # Method 1: Full secret, hex
-    sig1 = hmac.new(test_secret.encode(), test_body, hashlib.sha256).hexdigest()
-    results["full_secret_hex"] = sig1
+    # Test different payload constructions
+    payloads = [
+        ("raw_body", test_body),
+        ("timestamp_dot_body", f"{test_timestamp}.{test_body.decode('utf-8', errors='ignore')}".encode()),
+        ("timestamp_body", f"{test_timestamp}{test_body.decode('utf-8', errors='ignore')}".encode()),
+    ]
     
-    # Method 2: Secret without prefix, hex  
-    secret_no_prefix = test_secret[6:] if test_secret.startswith("whsec_") else test_secret
-    sig2 = hmac.new(secret_no_prefix.encode(), test_body, hashlib.sha256).hexdigest()
-    results["no_prefix_hex"] = sig2
-    
-    # Method 3: Full secret, base64
-    sig3 = base64.b64encode(hmac.new(test_secret.encode(), test_body, hashlib.sha256).digest()).decode()
-    results["full_secret_base64"] = sig3
-    
-    # Method 4: Secret without prefix, base64
-    sig4 = base64.b64encode(hmac.new(secret_no_prefix.encode(), test_body, hashlib.sha256).digest()).decode()
-    results["no_prefix_base64"] = sig4
+    for payload_name, payload in payloads:
+        # Base64 signature
+        computed_base64 = base64.b64encode(
+            hmac.new(actual_secret.encode("utf-8"), payload, hashlib.sha256).digest()
+        ).decode('utf-8')
+        
+        # Hex signature
+        computed_hex = hmac.new(actual_secret.encode("utf-8"), payload, hashlib.sha256).hexdigest()
+        
+        results[payload_name] = {
+            "base64": computed_base64,
+            "hex": computed_hex,
+            "matches_expected": computed_base64 == expected_signature
+        }
     
     return {
-        "test_body": test_body.decode(),
         "test_secret_prefix": test_secret[:15] + "...",
-        "signatures": results
+        "test_timestamp": test_timestamp,
+        "expected_signature": expected_signature,
+        "results": results
     }
 
 
@@ -612,6 +624,78 @@ async def debug_dodo_webhook(request: Request, db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"🔍 DEBUG: Error processing webhook: {e}")
         return {"status": "debug_error", "error": str(e)}
+
+
+@webhooks_router.post("/webhooks/dodopayments/manual-fix-from-logs")
+async def manual_fix_from_webhook_logs(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Extract user info from webhook logs and manually fix their plan.
+    Use this when webhook signature verification fails but we can see the webhook data in logs.
+    """
+    try:
+        # Get the webhook data (this endpoint doesn't verify signature)
+        raw_body = await request.body()
+        event = json.loads(raw_body.decode("utf-8"))
+        
+        data = event.get("data") or {}
+        meta = data.get("metadata") or {}
+        
+        firebase_uid = meta.get("firebase_uid")
+        selected_plan = meta.get("selected_plan")
+        billing_cycle = meta.get("billing_cycle")
+        
+        if not firebase_uid:
+            return {"error": "No firebase_uid found in webhook metadata"}
+        
+        if not selected_plan or selected_plan == "unknown":
+            return {"error": "No valid selected_plan found in webhook metadata"}
+        
+        user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
+        if not user:
+            return {"error": f"User not found for firebase_uid: {firebase_uid}"}
+        
+        # Update user plan and subscription status
+        from datetime import datetime, timedelta
+        
+        old_plan = user.plan
+        user.plan = selected_plan
+        user.subscription_status = "active"
+        user.last_payment_date = datetime.utcnow()
+        
+        if not user.subscription_start_date:
+            user.subscription_start_date = datetime.utcnow()
+            user.clients_this_month = 0
+            user.month_reset_date = datetime.utcnow() + timedelta(days=30)
+        
+        # Set billing cycle and next billing date
+        if billing_cycle and billing_cycle != "unknown":
+            user.billing_cycle = billing_cycle
+            if billing_cycle == "yearly":
+                user.next_billing_date = datetime.utcnow() + timedelta(days=365)
+            else:
+                user.next_billing_date = datetime.utcnow() + timedelta(days=30)
+        else:
+            user.next_billing_date = datetime.utcnow() + timedelta(days=30)
+        
+        db.commit()
+        
+        logger.info(f"🔧 MANUAL FIX FROM LOGS: Updated user {user.id} plan from {old_plan} to {selected_plan}")
+        
+        return {
+            "success": True,
+            "message": f"User plan updated from {old_plan} to {selected_plan}",
+            "user_id": user.id,
+            "email": user.email,
+            "firebase_uid": firebase_uid,
+            "billing_cycle": billing_cycle
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Manual fix from logs error: {e}")
+        return {"error": str(e)}
 
 
 @webhooks_router.post("/webhooks/dodopayments/manual-fix")
