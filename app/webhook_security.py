@@ -95,9 +95,10 @@ async def verify_dodo_webhook(
     Verify Dodo Payments webhook signature.
     
     Dodo uses:
-    - Header: 'webhook-signature' (HMAC-SHA256 hex digest)
-    - Optional: 'webhook-timestamp' for replay protection
-    - Optional: 'webhook-id' for idempotency
+    - Header: 'webhook-signature' (format: "v1,<base64_signature>")
+    - Header: 'webhook-timestamp' for replay protection
+    - Header: 'webhook-id' for idempotency
+    - Payload format: timestamp.body (like Stripe)
     
     Args:
         request: FastAPI request object
@@ -106,6 +107,77 @@ async def verify_dodo_webhook(
     
     Returns:
         Tuple of (is_valid, raw_body)
+    """
+    raw_body = await request.body()
+    signature = request.headers.get("webhook-signature", "")
+    timestamp = request.headers.get("webhook-timestamp")
+    webhook_id = request.headers.get("webhook-id", "unknown")
+    
+    # Log webhook receipt (without sensitive data)
+    logger.debug(f"📥 Dodo webhook received: id={webhook_id}")
+    
+    # Verify timestamp if provided
+    if timestamp and not verify_timestamp(timestamp):
+        if raise_on_failure:
+            raise HTTPException(status_code=401, detail="Webhook timestamp expired")
+        return False, raw_body
+    
+    # Process the secret - remove whsec_ prefix if present
+    actual_secret = secret[6:] if secret.startswith("whsec_") else secret
+    
+    # Dodo uses v1,<signature> format
+    if not signature.startswith("v1,"):
+        logger.warning(f"🚫 Dodo webhook signature missing v1 prefix: {signature[:20]}...")
+        if raise_on_failure:
+            raise HTTPException(status_code=401, detail="Invalid signature format")
+        return False, raw_body
+    
+    signature_value = signature[3:]  # Remove "v1," prefix
+    
+    # Dodo uses timestamp.body format (like Stripe) with base64 encoding
+    if timestamp:
+        signed_payload = f"{timestamp}.{raw_body.decode('utf-8', errors='ignore')}"
+        expected_signature = compute_hmac_sha256_base64(actual_secret, signed_payload.encode())
+        
+        if constant_time_compare(expected_signature, signature_value):
+            logger.debug(f"✅ Dodo webhook signature verified: id={webhook_id}")
+            return True, raw_body
+    
+    # Fallback: try raw body only
+    expected_signature_raw = compute_hmac_sha256_base64(actual_secret, raw_body)
+    if constant_time_compare(expected_signature_raw, signature_value):
+        logger.debug(f"✅ Dodo webhook signature verified (raw body): id={webhook_id}")
+        return True, raw_body
+    
+    # If we get here, signature verification failed
+    logger.warning(f"🚫 Dodo webhook signature mismatch for id={webhook_id}")
+    logger.info(f"🔍 Signature debug for webhook {webhook_id}:")
+    logger.info(f"🔍 Received signature: '{signature}'")
+    logger.info(f"🔍 Timestamp: '{timestamp}'")
+    logger.info(f"🔍 Raw body length: {len(raw_body)}")
+    logger.info(f"🔍 Raw body (first 200 chars): {raw_body[:200]}")
+    
+    if timestamp:
+        signed_payload = f"{timestamp}.{raw_body.decode('utf-8', errors='ignore')}"
+        expected_signature = compute_hmac_sha256_base64(actual_secret, signed_payload.encode())
+        logger.info(f"🔍 Expected signature (timestamp.body): {expected_signature}")
+    
+    expected_signature_raw = compute_hmac_sha256_base64(actual_secret, raw_body)
+    logger.info(f"🔍 Expected signature (raw body): {expected_signature_raw}")
+    
+    if raise_on_failure:
+        raise HTTPException(status_code=401, detail="Invalid webhook signature")
+    return False, raw_body
+
+
+async def verify_dodo_webhook_legacy(
+    request: Request,
+    secret: str,
+    raise_on_failure: bool = True
+) -> Tuple[bool, bytes]:
+    """
+    Legacy Dodo Payments webhook signature verification with multiple format attempts.
+    This is kept as a fallback in case the main verification fails.
     """
     raw_body = await request.body()
     signature = request.headers.get("webhook-signature", "")
@@ -168,27 +240,22 @@ async def verify_dodo_webhook(
             signature_without_prefix = signature[3:]  # Remove "v1," prefix
             logger.info(f"🔍 Detected v1 signature format, signature without prefix: {signature_without_prefix}")
             
-            # Try different payload constructions for v1 format
+            # For Dodo, try the most common payload constructions
             v1_payloads = [
                 ("raw_body", raw_body),
             ]
             
             if timestamp:
-                v1_payloads.extend([
-                    ("timestamp_dot_body", f"{timestamp}.{raw_body.decode('utf-8', errors='ignore')}".encode()),
-                    ("timestamp_body", f"{timestamp}{raw_body.decode('utf-8', errors='ignore')}".encode()),
-                ])
+                # Dodo might use timestamp.body format (like Stripe)
+                timestamp_dot_body = f"{timestamp}.{raw_body.decode('utf-8', errors='ignore')}"
+                v1_payloads.append(("timestamp_dot_body", timestamp_dot_body.encode()))
             
             for payload_name, payload in v1_payloads:
-                expected_v1_hex = compute_hmac_sha256(secret_variant, payload)
                 expected_v1_base64 = compute_hmac_sha256_base64(secret_variant, payload)
                 
-                logger.info(f"🔍 Trying v1 {payload_name} - hex: {expected_v1_hex[:20]}..., base64: {expected_v1_base64[:20]}...")
+                logger.info(f"🔍 Trying v1 {payload_name} - base64: {expected_v1_base64[:20]}...")
                 
-                if constant_time_compare(expected_v1_hex, signature_without_prefix):
-                    logger.info(f"✅ v1 signature matched using {payload_name} hex with secret variant {secret_variant[:10]}...")
-                    return True, raw_body
-                elif constant_time_compare(expected_v1_base64, signature_without_prefix):
+                if constant_time_compare(expected_v1_base64, signature_without_prefix):
                     logger.info(f"✅ v1 signature matched using {payload_name} base64 with secret variant {secret_variant[:10]}...")
                     return True, raw_body
         
