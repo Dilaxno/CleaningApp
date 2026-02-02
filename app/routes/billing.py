@@ -542,6 +542,7 @@ async def debug_dodo_webhook(request: Request, db: Session = Depends(get_db)):
     """
     import hmac
     import hashlib
+    import base64
     
     try:
         raw_body = await request.body()
@@ -558,26 +559,116 @@ async def debug_dodo_webhook(request: Request, db: Session = Depends(get_db)):
         logger.info(f"🔍 Webhook secret configured: {'Yes' if webhook_secret else 'No'}")
         
         if webhook_secret:
-            # Try to compute the expected signature
-            expected_signature = hmac.new(
-                webhook_secret.encode("utf-8"),
-                raw_body,
-                hashlib.sha256
-            ).hexdigest()
+            signature = headers.get("webhook-signature", "")
+            timestamp = headers.get("webhook-timestamp", "")
             
-            received_signature = headers.get("webhook-signature", "")
-            logger.info(f"🔍 Expected signature: {expected_signature}")
-            logger.info(f"🔍 Received signature: {received_signature}")
-            logger.info(f"🔍 Signatures match: {expected_signature == received_signature}")
+            logger.info(f"🔍 Received signature: {signature}")
+            logger.info(f"🔍 Timestamp: {timestamp}")
+            
+            # Test different secret variants
+            secrets_to_try = [webhook_secret]
+            if webhook_secret.startswith("whsec_"):
+                secrets_to_try.append(webhook_secret[6:])
+            
+            for secret_variant in secrets_to_try:
+                logger.info(f"🔍 Testing secret variant: {secret_variant[:10]}...")
+                
+                # Test different payload constructions
+                payloads_to_test = [
+                    ("raw_body", raw_body),
+                ]
+                
+                if timestamp:
+                    payloads_to_test.extend([
+                        ("timestamp.body", f"{timestamp}.{raw_body.decode('utf-8', errors='ignore')}".encode()),
+                        ("timestamp+body", f"{timestamp}{raw_body.decode('utf-8', errors='ignore')}".encode()),
+                    ])
+                
+                for payload_name, payload in payloads_to_test:
+                    expected_hex = hmac.new(secret_variant.encode("utf-8"), payload, hashlib.sha256).hexdigest()
+                    expected_base64 = base64.b64encode(hmac.new(secret_variant.encode("utf-8"), payload, hashlib.sha256).digest()).decode('utf-8')
+                    
+                    logger.info(f"🔍 {payload_name} - Expected hex: {expected_hex}")
+                    logger.info(f"🔍 {payload_name} - Expected base64: {expected_base64}")
+                    
+                    # Check if signature matches any format
+                    if signature.startswith("v1,"):
+                        signature_without_prefix = signature[3:]
+                        logger.info(f"🔍 {payload_name} - Signature without v1 prefix: {signature_without_prefix}")
+                        
+                        if expected_hex == signature_without_prefix:
+                            logger.info(f"🎯 MATCH FOUND: {payload_name} hex matches v1 signature!")
+                        elif expected_base64 == signature_without_prefix:
+                            logger.info(f"🎯 MATCH FOUND: {payload_name} base64 matches v1 signature!")
+                    
+                    # Also check direct matches
+                    if expected_hex == signature:
+                        logger.info(f"🎯 DIRECT MATCH: {payload_name} hex matches signature!")
+                    elif expected_base64 == signature:
+                        logger.info(f"🎯 DIRECT MATCH: {payload_name} base64 matches signature!")
         
-        return {"status": "debug_complete", "message": "Check logs for details"}
+        return {"status": "debug_complete", "message": "Check logs for signature analysis"}
         
     except Exception as e:
         logger.error(f"🔍 DEBUG: Error processing webhook: {e}")
         return {"status": "debug_error", "error": str(e)}
 
 
+@webhooks_router.post("/webhooks/dodopayments/manual-fix")
+async def manual_fix_user_plan(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Temporary endpoint to manually fix user plan when webhook fails.
+    This should only be used for debugging/emergency fixes.
+    """
+    try:
+        data = await request.json()
+        firebase_uid = data.get("firebase_uid")
+        plan = data.get("plan")
+        
+        if not firebase_uid or not plan:
+            return {"error": "firebase_uid and plan are required"}
+        
+        user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
+        if not user:
+            return {"error": "User not found"}
+        
+        # Update user plan and subscription status
+        from datetime import datetime, timedelta
+        
+        old_plan = user.plan
+        user.plan = plan
+        user.subscription_status = "active"
+        user.last_payment_date = datetime.utcnow()
+        
+        if not user.subscription_start_date:
+            user.subscription_start_date = datetime.utcnow()
+            user.clients_this_month = 0
+            user.month_reset_date = datetime.utcnow() + timedelta(days=30)
+        
+        # Set next billing date (default to monthly)
+        user.next_billing_date = datetime.utcnow() + timedelta(days=30)
+        
+        db.commit()
+        
+        logger.info(f"🔧 MANUAL FIX: Updated user {user.id} plan from {old_plan} to {plan}")
+        
+        return {
+            "success": True,
+            "message": f"User plan updated from {old_plan} to {plan}",
+            "user_id": user.id,
+            "email": user.email
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Manual fix error: {e}")
+        return {"error": str(e)}
+
+
 @webhooks_router.post("/webhooks/dodopayments")
+@webhooks_router.post("/api/payments/dodo/webhook")  # Alias for Dodo's configured webhook URL
 @webhooks_router.post("/api/payments/dodo/webhook")  # Alias for Dodo's configured webhook URL
 async def handle_dodopayments_webhook(
     request: Request,

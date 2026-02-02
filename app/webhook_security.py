@@ -163,6 +163,35 @@ async def verify_dodo_webhook(
             expected_with_timestamp_hex = compute_hmac_sha256(secret_variant, timestamp_payload.encode())
             expected_with_timestamp_base64 = compute_hmac_sha256_base64(secret_variant, timestamp_payload.encode())
         
+        # Special handling for v1,<signature> format (Stripe-style)
+        if signature.startswith("v1,"):
+            signature_without_prefix = signature[3:]  # Remove "v1," prefix
+            logger.info(f"🔍 Detected v1 signature format, signature without prefix: {signature_without_prefix}")
+            
+            # Try different payload constructions for v1 format
+            v1_payloads = [
+                ("raw_body", raw_body),
+            ]
+            
+            if timestamp:
+                v1_payloads.extend([
+                    ("timestamp_dot_body", f"{timestamp}.{raw_body.decode('utf-8', errors='ignore')}".encode()),
+                    ("timestamp_body", f"{timestamp}{raw_body.decode('utf-8', errors='ignore')}".encode()),
+                ])
+            
+            for payload_name, payload in v1_payloads:
+                expected_v1_hex = compute_hmac_sha256(secret_variant, payload)
+                expected_v1_base64 = compute_hmac_sha256_base64(secret_variant, payload)
+                
+                logger.info(f"🔍 Trying v1 {payload_name} - hex: {expected_v1_hex[:20]}..., base64: {expected_v1_base64[:20]}...")
+                
+                if constant_time_compare(expected_v1_hex, signature_without_prefix):
+                    logger.info(f"✅ v1 signature matched using {payload_name} hex with secret variant {secret_variant[:10]}...")
+                    return True, raw_body
+                elif constant_time_compare(expected_v1_base64, signature_without_prefix):
+                    logger.info(f"✅ v1 signature matched using {payload_name} base64 with secret variant {secret_variant[:10]}...")
+                    return True, raw_body
+        
         # Try different signature formats that Dodo might use
         signature_candidates = [
             ("hex", expected_signature_hex),
@@ -171,6 +200,25 @@ async def verify_dodo_webhook(
             ("sha256=base64", f"sha256={expected_signature_base64}"),
         ]
         
+        # Handle Stripe-style v1,<signature> format
+        if signature.startswith("v1,"):
+            signature_without_prefix = signature[3:]  # Remove "v1," prefix
+            signature_candidates.extend([
+                ("v1_hex", expected_signature_hex),
+                ("v1_base64", expected_signature_base64),
+                ("v1_sha256=hex", f"sha256={expected_signature_hex}"),
+                ("v1_sha256=base64", f"sha256={expected_signature_base64}"),
+            ])
+            # Also try comparing against the signature without prefix
+            for method, expected in [
+                ("v1_stripped_hex", expected_signature_hex),
+                ("v1_stripped_base64", expected_signature_base64),
+            ]:
+                if constant_time_compare(expected, signature_without_prefix):
+                    logger.info(f"✅ Signature matched using {method} with secret variant {secret_variant[:10]}...")
+                    logger.debug(f"✅ Dodo webhook signature verified: id={webhook_id}")
+                    return True, raw_body
+        
         if expected_with_timestamp_hex:
             signature_candidates.extend([
                 ("timestamp+body_hex", expected_with_timestamp_hex),
@@ -178,6 +226,23 @@ async def verify_dodo_webhook(
                 ("sha256=timestamp+body_hex", f"sha256={expected_with_timestamp_hex}"),
                 ("sha256=timestamp+body_base64", f"sha256={expected_with_timestamp_base64}"),
             ])
+            
+            # Handle v1 format with timestamp
+            if signature.startswith("v1,"):
+                signature_without_prefix = signature[3:]
+                signature_candidates.extend([
+                    ("v1_timestamp+body_hex", expected_with_timestamp_hex),
+                    ("v1_timestamp+body_base64", expected_with_timestamp_base64),
+                ])
+                # Try comparing timestamp variants against signature without prefix
+                for method, expected in [
+                    ("v1_stripped_timestamp+body_hex", expected_with_timestamp_hex),
+                    ("v1_stripped_timestamp+body_base64", expected_with_timestamp_base64),
+                ]:
+                    if constant_time_compare(expected, signature_without_prefix):
+                        logger.info(f"✅ Signature matched using {method} with secret variant {secret_variant[:10]}...")
+                        logger.debug(f"✅ Dodo webhook signature verified: id={webhook_id}")
+                        return True, raw_body
         
         # Compare all possible signature formats
         for method, expected in signature_candidates:
