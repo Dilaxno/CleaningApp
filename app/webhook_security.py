@@ -45,6 +45,17 @@ def compute_hmac_sha256(secret: str, payload: bytes) -> str:
     ).hexdigest()
 
 
+def compute_hmac_sha256_base64(secret: str, payload: bytes) -> str:
+    """Compute HMAC-SHA256 signature of payload and return base64 encoded"""
+    import base64
+    signature = hmac.new(
+        secret.encode("utf-8"),
+        payload,
+        hashlib.sha256
+    ).digest()
+    return base64.b64encode(signature).decode('utf-8')
+
+
 def verify_timestamp(timestamp: Optional[str], max_age: int = MAX_WEBHOOK_AGE_SECONDS) -> bool:
     """
     Verify webhook timestamp is within acceptable range.
@@ -101,6 +112,27 @@ async def verify_dodo_webhook(
     timestamp = request.headers.get("webhook-timestamp")
     webhook_id = request.headers.get("webhook-id", "unknown")
     
+    # Log all headers for debugging
+    logger.info(f"🔍 All webhook headers for {webhook_id}: {dict(request.headers)}")
+    
+    # Check for alternative signature headers that Dodo might use
+    alt_signatures = {
+        "webhook-signature": request.headers.get("webhook-signature", ""),
+        "x-webhook-signature": request.headers.get("x-webhook-signature", ""),
+        "dodo-signature": request.headers.get("dodo-signature", ""),
+        "x-dodo-signature": request.headers.get("x-dodo-signature", ""),
+        "signature": request.headers.get("signature", ""),
+    }
+    
+    logger.info(f"🔍 Signature headers found: {alt_signatures}")
+    
+    # Use the first non-empty signature we find
+    for header_name, header_value in alt_signatures.items():
+        if header_value:
+            signature = header_value
+            logger.info(f"🔍 Using signature from header: {header_name}")
+            break
+    
     # Log webhook receipt (without sensitive data)
     logger.debug(f"📥 Dodo webhook received: id={webhook_id}")
     
@@ -110,18 +142,61 @@ async def verify_dodo_webhook(
             raise HTTPException(status_code=401, detail="Webhook timestamp expired")
         return False, raw_body
     
-    # Compute expected signature
-    expected_signature = compute_hmac_sha256(secret, raw_body)
+    # Process the secret - some providers expect it without the prefix
+    secrets_to_try = [secret]
+    if secret.startswith("whsec_"):
+        secrets_to_try.append(secret[6:])  # Remove "whsec_" prefix
     
-    # Compare signatures
-    if not constant_time_compare(expected_signature, signature):
-        logger.warning(f"🚫 Dodo webhook signature mismatch for id={webhook_id}")
-        if raise_on_failure:
-            raise HTTPException(status_code=401, detail="Invalid webhook signature")
-        return False, raw_body
+    # Try each secret variant
+    for secret_variant in secrets_to_try:
+        logger.info(f"🔍 Trying secret variant starting with: {secret_variant[:10]}...")
+        
+        # Compute expected signature with different methods and formats
+        expected_signature_hex = compute_hmac_sha256(secret_variant, raw_body)
+        expected_signature_base64 = compute_hmac_sha256_base64(secret_variant, raw_body)
+        
+        # Try timestamp + body (some providers do this)
+        expected_with_timestamp_hex = ""
+        expected_with_timestamp_base64 = ""
+        if timestamp:
+            timestamp_payload = f"{timestamp}.{raw_body.decode('utf-8', errors='ignore')}"
+            expected_with_timestamp_hex = compute_hmac_sha256(secret_variant, timestamp_payload.encode())
+            expected_with_timestamp_base64 = compute_hmac_sha256_base64(secret_variant, timestamp_payload.encode())
+        
+        # Try different signature formats that Dodo might use
+        signature_candidates = [
+            ("hex", expected_signature_hex),
+            ("base64", expected_signature_base64),
+            ("sha256=hex", f"sha256={expected_signature_hex}"),
+            ("sha256=base64", f"sha256={expected_signature_base64}"),
+        ]
+        
+        if expected_with_timestamp_hex:
+            signature_candidates.extend([
+                ("timestamp+body_hex", expected_with_timestamp_hex),
+                ("timestamp+body_base64", expected_with_timestamp_base64),
+                ("sha256=timestamp+body_hex", f"sha256={expected_with_timestamp_hex}"),
+                ("sha256=timestamp+body_base64", f"sha256={expected_with_timestamp_base64}"),
+            ])
+        
+        # Compare all possible signature formats
+        for method, expected in signature_candidates:
+            if constant_time_compare(expected, signature):
+                logger.info(f"✅ Signature matched using {method} with secret variant {secret_variant[:10]}...")
+                logger.debug(f"✅ Dodo webhook signature verified: id={webhook_id}")
+                return True, raw_body
     
-    logger.debug(f"✅ Dodo webhook signature verified: id={webhook_id}")
-    return True, raw_body
+    # If we get here, no signature matched
+    logger.warning(f"🚫 Dodo webhook signature mismatch for id={webhook_id}")
+    logger.info(f"🔍 Signature debug for webhook {webhook_id}:")
+    logger.info(f"🔍 Received signature: '{signature}'")
+    logger.info(f"🔍 Timestamp: '{timestamp}'")
+    logger.info(f"🔍 Raw body length: {len(raw_body)}")
+    logger.info(f"🔍 Raw body (first 200 chars): {raw_body[:200]}")
+    
+    if raise_on_failure:
+        raise HTTPException(status_code=401, detail="Invalid webhook signature")
+    return False, raw_body
 
 
 async def verify_calendly_webhook(

@@ -493,6 +493,46 @@ async def change_subscription_plan(
 
 # No product-to-plan mapping on backend; plan is derived from metadata set at checkout creation.
 
+@webhooks_router.post("/webhooks/dodopayments/test")
+async def test_dodo_webhook_signature():
+    """
+    Test endpoint to verify our signature computation matches Dodo's format
+    """
+    import hmac
+    import hashlib
+    import base64
+    
+    # Test data
+    test_body = b'{"test": "data"}'
+    test_secret = "whsec_iCYnlyl4QjPRL9Bj1Vka0pmX22FcNyEz"
+    
+    # Compute signatures with different methods
+    results = {}
+    
+    # Method 1: Full secret, hex
+    sig1 = hmac.new(test_secret.encode(), test_body, hashlib.sha256).hexdigest()
+    results["full_secret_hex"] = sig1
+    
+    # Method 2: Secret without prefix, hex  
+    secret_no_prefix = test_secret[6:] if test_secret.startswith("whsec_") else test_secret
+    sig2 = hmac.new(secret_no_prefix.encode(), test_body, hashlib.sha256).hexdigest()
+    results["no_prefix_hex"] = sig2
+    
+    # Method 3: Full secret, base64
+    sig3 = base64.b64encode(hmac.new(test_secret.encode(), test_body, hashlib.sha256).digest()).decode()
+    results["full_secret_base64"] = sig3
+    
+    # Method 4: Secret without prefix, base64
+    sig4 = base64.b64encode(hmac.new(secret_no_prefix.encode(), test_body, hashlib.sha256).digest()).decode()
+    results["no_prefix_base64"] = sig4
+    
+    return {
+        "test_body": test_body.decode(),
+        "test_secret_prefix": test_secret[:15] + "...",
+        "signatures": results
+    }
+
+
 @webhooks_router.post("/webhooks/dodopayments/debug")
 @webhooks_router.post("/api/payments/dodo/webhook/debug")  # Debug alias
 async def debug_dodo_webhook(request: Request, db: Session = Depends(get_db)):
@@ -562,16 +602,9 @@ async def handle_dodopayments_webhook(
         raise HTTPException(status_code=500, detail="Webhook not configured")
 
     # Verify webhook signature using centralized security module
-    try:
-        is_valid, raw_body = await verify_dodo_webhook(
-            request, DODO_PAYMENTS_WEBHOOK_SECRET, raise_on_failure=True
-        )
-    except HTTPException as e:
-        # Log the signature failure but continue processing for now
-        # This is a temporary measure to ensure payments work while we debug
-        logger.warning(f"⚠️ Webhook signature verification failed: {e.detail}")
-        logger.warning("⚠️ Processing webhook anyway (temporary bypass)")
-        raw_body = await request.body()
+    is_valid, raw_body = await verify_dodo_webhook(
+        request, DODO_PAYMENTS_WEBHOOK_SECRET, raise_on_failure=True
+    )
 
     webhook_id = request.headers.get("webhook-id", "unknown")
     webhook_timestamp = request.headers.get("webhook-timestamp", "")
