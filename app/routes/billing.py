@@ -214,6 +214,48 @@ async def update_user_plan(
     logger.info(f"User {user.id} plan manually updated to {body.plan}")
     return {"message": f"Plan updated to {body.plan}", "plan": body.plan}
 
+@router.get("/debug/find-user")
+async def debug_find_user(
+    firebase_uid: str = None,
+    email: str = None,
+    db: Session = Depends(get_db)
+):
+    """Debug endpoint to find users by firebase_uid or email"""
+    results = {}
+    
+    if firebase_uid:
+        user_by_uid = db.query(User).filter(User.firebase_uid == firebase_uid).first()
+        results["by_firebase_uid"] = {
+            "found": user_by_uid is not None,
+            "user_id": user_by_uid.id if user_by_uid else None,
+            "email": user_by_uid.email if user_by_uid else None,
+            "plan": user_by_uid.plan if user_by_uid else None
+        }
+    
+    if email:
+        user_by_email = db.query(User).filter(User.email == email).first()
+        results["by_email"] = {
+            "found": user_by_email is not None,
+            "user_id": user_by_email.id if user_by_email else None,
+            "firebase_uid": user_by_email.firebase_uid if user_by_email else None,
+            "plan": user_by_email.plan if user_by_email else None
+        }
+    
+    # Also show recent users for debugging
+    recent_users = db.query(User).order_by(User.id.desc()).limit(5).all()
+    results["recent_users"] = [
+        {
+            "id": u.id,
+            "email": u.email,
+            "firebase_uid": u.firebase_uid,
+            "plan": u.plan
+        }
+        for u in recent_users
+    ]
+    
+    return results
+
+
 @router.get("/debug/user-status")
 async def debug_user_status(
     user: User = Depends(get_current_user),
