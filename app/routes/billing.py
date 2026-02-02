@@ -884,6 +884,9 @@ async def handle_dodopayments_webhook(
     if not DODO_PAYMENTS_WEBHOOK_SECRET:
         logger.error("❌ DODO_PAYMENTS_WEBHOOK_SECRET not configured")
         raise HTTPException(status_code=500, detail="Webhook not configured")
+    
+    # Log webhook secret length for debugging
+    logger.info(f"🔑 Webhook secret configured, length = {len(DODO_PAYMENTS_WEBHOOK_SECRET)}")
 
     # Verify webhook signature using centralized security module
     is_valid, raw_body = await verify_dodo_webhook(

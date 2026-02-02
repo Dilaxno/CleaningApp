@@ -149,6 +149,7 @@ async def verify_dodo_webhook(
     
     # Use webhook secret as-is
     webhook_secret = secret
+    logger.info(f"🔑 Webhook secret length = {len(webhook_secret or '')}")
     logger.info(f"🔑 Using webhook secret (first 10 chars): {webhook_secret[:10]}...")
     
     # Build signed payload using BYTE-PERFECT method
