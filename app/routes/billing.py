@@ -496,7 +496,7 @@ async def change_subscription_plan(
 @webhooks_router.post("/webhooks/dodopayments/test-signature")
 async def test_dodo_signature_format():
     """
-    Test endpoint to verify Dodo signature format with known test data
+    Test endpoint to verify Dodo signature format using Standard Webhooks spec
     """
     import hmac
     import hashlib
@@ -506,39 +506,50 @@ async def test_dodo_signature_format():
     test_secret = "whsec_iCYnlyl4QjPRL9Bj1Vka0pmX22FcNyEz"
     actual_secret = test_secret[6:]  # Remove whsec_ prefix
     
-    # Test data from the logs
-    test_timestamp = "1770052363"
-    test_body = b'{"business_id":"bus_OumfAar4K7irg6ZTZlqcD","data":{"addons":[],"billing":{"city":"New York","country":"US","state":"New York","street":"JW Marriott Essex House New York,  160 Central Park South, Manha'
+    # Test data from the latest logs
+    test_webhook_id = "msg_397hYp94SyvYlp6YhHeQ1OCdWZz"
+    test_timestamp = "1770053322"
+    test_body = '{"business_id":"bus_OumfAar4K7irg6ZTZlqcD","data":{"addons":[],"billing":{"city":"Camden","country":"US","state":"Delaware","street":"2140 S Dupont Hwy, 2140 South Dupont Highway","zipcode":"19934"},"'
     
-    # Expected signature from logs: uPjndWiG95cjKPvh0+PZG8sUIV8x5XKSmUl0kXjwsuE=
-    expected_signature = "uPjndWiG95cjKPvh0+PZG8sUIV8x5XKSmUl0kXjwsuE="
+    # Expected signature from logs: LxTIbmN7J/bxVtmc9+yyOWNrcFOrUNPciqO9TBsYaI8=
+    expected_signature = "LxTIbmN7J/bxVtmc9+yyOWNrcFOrUNPciqO9TBsYaI8="
     
     results = {}
     
-    # Test different payload constructions
-    payloads = [
+    # Test Standard Webhooks format: webhook-id.webhook-timestamp.payload
+    signed_message = f"{test_webhook_id}.{test_timestamp}.{test_body}"
+    computed_signature = base64.b64encode(
+        hmac.new(actual_secret.encode("utf-8"), signed_message.encode(), hashlib.sha256).digest()
+    ).decode('utf-8')
+    
+    results["standard_webhooks"] = {
+        "signed_message_format": f"{test_webhook_id}.{test_timestamp}.<payload>",
+        "signed_message_length": len(signed_message),
+        "computed_signature": computed_signature,
+        "expected_signature": expected_signature,
+        "matches": computed_signature == expected_signature
+    }
+    
+    # Also test other formats for comparison
+    other_formats = [
+        ("timestamp.body", f"{test_timestamp}.{test_body}"),
         ("raw_body", test_body),
-        ("timestamp_dot_body", f"{test_timestamp}.{test_body.decode('utf-8', errors='ignore')}".encode()),
-        ("timestamp_body", f"{test_timestamp}{test_body.decode('utf-8', errors='ignore')}".encode()),
+        ("id.body", f"{test_webhook_id}.{test_body}"),
     ]
     
-    for payload_name, payload in payloads:
-        # Base64 signature
-        computed_base64 = base64.b64encode(
-            hmac.new(actual_secret.encode("utf-8"), payload, hashlib.sha256).digest()
+    for format_name, payload in other_formats:
+        computed = base64.b64encode(
+            hmac.new(actual_secret.encode("utf-8"), payload.encode(), hashlib.sha256).digest()
         ).decode('utf-8')
         
-        # Hex signature
-        computed_hex = hmac.new(actual_secret.encode("utf-8"), payload, hashlib.sha256).hexdigest()
-        
-        results[payload_name] = {
-            "base64": computed_base64,
-            "hex": computed_hex,
-            "matches_expected": computed_base64 == expected_signature
+        results[format_name] = {
+            "computed_signature": computed,
+            "matches": computed == expected_signature
         }
     
     return {
         "test_secret_prefix": test_secret[:15] + "...",
+        "test_webhook_id": test_webhook_id,
         "test_timestamp": test_timestamp,
         "expected_signature": expected_signature,
         "results": results
