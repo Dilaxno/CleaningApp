@@ -588,54 +588,62 @@ async def bypass_signature_webhook(
         return {"error": str(e)}
 
 
-@webhooks_router.post("/webhooks/dodopayments/debug-exact-signature")
-async def debug_exact_signature():
+@webhooks_router.post("/webhooks/dodopayments/test-dodo-format")
+async def test_dodo_signature_format():
     """
-    Debug signature verification using exact data from Dodo dashboard screenshot
+    Test Dodo's exact signature format: {timestamp}.{raw_body}
     """
     import hmac
     import hashlib
     import base64
     
-    # Exact data from the screenshot
-    webhook_id = "msg_397i3YMxD6jR4w6HYVjH2TvwTtP"
-    timestamp = "1770055499"
-    received_signature = "g6b12SXpy7beyEn2JZ+SOC000feTUioflzX0HtEk90w="
+    # Use recent webhook data from logs
+    webhook_id = "msg_397oagPWWSmG0LNxASdsw9C3H71"
+    timestamp = "1770056539"
+    received_signature = "1LiONS3CmyIFbfigolCthK0r14fq6lMzQM7YMBikYEk="
     
-    # Test secret (verify this matches your environment)
+    # Test with webhook secret (verify this matches your DODO_PAYMENTS_WEBHOOK_SECRET)
     test_secret = "whsec_iCYnlyl4QjPRL9Bj1Vka0pmX22FcNyEz"
-    actual_secret = test_secret[6:]
     
-    # Sample body (approximate - we need the exact body for accurate testing)
-    sample_body = '{"business_id":"bus_OumfAar4K7irg6ZTZlqcD","data":{"billing":{"city":"Camden","country":"US","state":"Delaware","street":"2140 S Dupont Hwy, 2140 South Dupont Highway","zipcode":"19934"},"brand_id":"brand_123"}}'
+    # Sample body (approximate based on logs)
+    sample_body = '{"business_id":"bus_OumfAar4K7irg6ZTZlqcD","data":{"billing":{"city":"Camden","country":"US","state":"Delaware","street":"2140 S Dupont Hwy, 2140 South Dupont Highway","zipcode":"19934"},"brand_id":"brand_123","metadata":{"firebase_uid":"test_uid","selected_plan":"solo","billing_cycle":"yearly"}}}'
     
-    # Standard Webhooks format: webhook-id.webhook-timestamp.raw_body
-    signed_payload = f"{webhook_id}.{timestamp}.{sample_body}"
+    results = {}
     
-    # Compute expected signature
-    expected_signature = base64.b64encode(
-        hmac.new(actual_secret.encode('utf-8'), signed_payload.encode('utf-8'), hashlib.sha256).digest()
+    # Test Dodo's format: {timestamp}.{raw_body}
+    dodo_payload = f"{timestamp}.{sample_body}"
+    
+    # Test with full secret (including whsec_ prefix)
+    dodo_signature_full = base64.b64encode(
+        hmac.new(test_secret.encode('utf-8'), dodo_payload.encode('utf-8'), hashlib.sha256).digest()
     ).decode('utf-8')
     
+    # Test with secret without whsec_ prefix
+    secret_no_prefix = test_secret[6:]
+    dodo_signature_no_prefix = base64.b64encode(
+        hmac.new(secret_no_prefix.encode('utf-8'), dodo_payload.encode('utf-8'), hashlib.sha256).digest()
+    ).decode('utf-8')
+    
+    results["dodo_format"] = {
+        "payload_format": f"{timestamp}.<raw_body>",
+        "payload_length": len(dodo_payload),
+        "with_whsec_prefix": {
+            "computed_signature": dodo_signature_full,
+            "matches_received": dodo_signature_full == received_signature
+        },
+        "without_whsec_prefix": {
+            "computed_signature": dodo_signature_no_prefix,
+            "matches_received": dodo_signature_no_prefix == received_signature
+        }
+    }
+    
     return {
-        "test_data": {
-            "webhook_id": webhook_id,
-            "timestamp": timestamp,
-            "received_signature": received_signature,
-            "secret_prefix": test_secret[:15] + "..."
-        },
-        "computation": {
-            "signed_payload_format": f"{webhook_id}.{timestamp}.<body>",
-            "signed_payload_length": len(signed_payload),
-            "expected_signature": expected_signature,
-            "signatures_match": expected_signature == received_signature
-        },
-        "next_steps": [
-            "1. Verify DODO_PAYMENTS_WEBHOOK_SECRET environment variable matches Dodo dashboard",
-            "2. Ensure webhook endpoint receives raw body before any JSON parsing",
-            "3. Check if webhook secret includes or excludes 'whsec_' prefix",
-            "4. Test with exact webhook body content from Dodo logs"
-        ]
+        "webhook_id": webhook_id,
+        "timestamp": timestamp,
+        "received_signature": received_signature,
+        "secret_prefix": test_secret[:15] + "...",
+        "test_results": results,
+        "note": "Testing Dodo's format: {timestamp}.{raw_body} (NOT Standard Webhooks format)"
     }
 
 
