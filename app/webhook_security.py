@@ -56,6 +56,23 @@ def compute_hmac_sha256_base64(secret: str, payload: bytes) -> str:
     ).digest()
     return base64.b64encode(signature).decode('utf-8')
 
+def extract_svix_signing_key(secret: str) -> bytes:
+    """
+    Extract Svix/Standard Webhooks signing key bytes from a Dodo/whsec_ style secret.
+
+    - Incoming secret typically looks like: "whsec_BASE64KEY"
+    - The HMAC key must be the BASE64-decoded bytes of the part after "whsec_"
+    - If not prefixed, attempt base64 decode; if that fails, fall back to UTF-8 bytes
+    """
+    try:
+        if secret.startswith("whsec_"):
+            b64_part = secret[6:]
+            return base64.b64decode(b64_part)
+        # Try decoding entire secret as base64 if no prefix
+        return base64.b64decode(secret)
+    except Exception:
+        # Fallback to raw utf-8 bytes if not valid base64
+        return secret.encode("utf-8")
 
 def verify_timestamp(timestamp: Optional[str], max_age: int = MAX_WEBHOOK_AGE_SECONDS) -> bool:
     """
@@ -147,35 +164,22 @@ async def verify_dodo_webhook(
     
     received_signature = signature_header[3:]  # Remove "v1," prefix
     
-    # Use webhook secret - for Svix (which Dodo uses), we need the base64 part after whsec_
-    webhook_secret = secret
-    if secret.startswith("whsec_"):
-        # Svix uses the base64-decoded portion after whsec_ prefix
-        webhook_secret = secret[6:]
-    
-    logger.info(f"🔑 Webhook secret length = {len(webhook_secret or '')}")
-    logger.info(f"🔑 Using webhook secret (first 10 chars): {webhook_secret[:10]}...")
-    
-    # Build signed message according to Svix/Standard Webhooks spec:
-    # webhook-id.webhook-timestamp.payload (separated by periods)
-    signed_message = f"{webhook_id}.{timestamp}.{raw_body.decode('utf-8')}"
-    
-    # Compute expected signature using HMAC SHA256 + Base64
+    # Prepare Svix key bytes and byte-perfect signed message: id.timestamp.payload
+    signing_key = extract_svix_signing_key(secret)
+    logger.info(f"🔑 Webhook signing key bytes length: {len(signing_key)}")
+    signed_message_bytes = webhook_id.encode("utf-8") + b"." + timestamp.encode("utf-8") + b"." + raw_body
+
     expected_signature = base64.b64encode(
-        hmac.new(
-            webhook_secret.encode('utf-8'), 
-            signed_message.encode('utf-8'), 
-            hashlib.sha256
-        ).digest()
-    ).decode('utf-8')
-    
+        hmac.new(signing_key, signed_message_bytes, hashlib.sha256).digest()
+    ).decode("utf-8")
+
     # Log verification details
-    logger.info(f"🔍 Dodo webhook verification details:")
+    logger.info("🔍 Dodo webhook verification details:")
     logger.info(f"🔍 Webhook ID: {webhook_id}")
     logger.info(f"🔍 Timestamp: {timestamp}")
     logger.info(f"🔍 Raw body length: {len(raw_body)} bytes")
-    logger.info(f"🔍 Signed message format: webhook-id.webhook-timestamp.payload")
-    logger.info(f"🔍 Signed message length: {len(signed_message)} bytes")
+    logger.info("🔍 Signed message format: webhook-id.webhook-timestamp.payload")
+    logger.info(f"🔍 Signed message length: {len(signed_message_bytes)} bytes")
     logger.info(f"🔍 Expected signature: {expected_signature}")
     logger.info(f"🔍 Received signature: {received_signature}")
     

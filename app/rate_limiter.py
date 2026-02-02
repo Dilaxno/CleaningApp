@@ -217,8 +217,9 @@ def check_rate_limit(
         
     except Exception as e:
         logger.error(f"❌ Rate limit check failed: {str(e)}")
-        # Fail open - allow request if rate limiting fails
-        return True, 0, 0
+        # Fail closed for security - deny request if rate limiting fails
+        logger.warning(f"🔒 Denying request due to rate limiting error (fail-closed mode)")
+        return False, limit, 0
 
 
 async def rate_limit_dependency(
@@ -283,9 +284,12 @@ async def rate_limit_dependency(
         raise
     except Exception as e:
         logger.error(f"❌ Rate limiting error: {str(e)}")
-        logger.warning(f"⚠️ Allowing request due to rate limiting error (fail-open mode)")
-        # Fail open - allow request if rate limiting fails
-        pass
+        logger.warning(f"🔒 Denying request due to rate limiting error (fail-closed mode)")
+        # Fail closed for security - deny request if rate limiting fails
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Rate limiting service temporarily unavailable"
+        )
 
 
 def create_rate_limiter(limit: int, window_seconds: int, key_prefix: str = "rate_limit", use_ip: bool = True):

@@ -54,9 +54,9 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 # Security settings from environment
-# CSRF is DISABLED by default until frontend integration is complete
-# Set CSRF_ENABLED=true to enable once frontend sends X-CSRF-Token headers
-CSRF_ENABLED = os.getenv("CSRF_ENABLED", "false").lower() == "true"
+# CSRF is ENABLED by default for security
+# Set CSRF_ENABLED=false only for development/testing
+CSRF_ENABLED = os.getenv("CSRF_ENABLED", "true").lower() == "true"
 SECURITY_HEADERS_ENABLED = os.getenv("SECURITY_HEADERS_ENABLED", "true").lower() == "true"
 
 
@@ -158,11 +158,13 @@ else:
     logger.info("CSRF protection disabled")
 
 
-# CORS - must expose csrf_token cookie and allow X-CSRF-Token header
-# Allow all origins for custom domain support, but validate in middleware
+# CORS - Secure configuration with specific origins
+# Get allowed origins from environment variable
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173,https://cleanenroll.com,https://www.cleanenroll.com").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for custom domain support
+    allow_origins=ALLOWED_ORIGINS,  # Restrict to specific origins only
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*", "X-CSRF-Token"],

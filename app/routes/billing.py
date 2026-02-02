@@ -10,7 +10,7 @@ from ..auth import get_current_user
 from ..database import get_db
 from ..models import User
 from ..rate_limiter import create_rate_limiter
-from ..webhook_security import verify_dodo_webhook
+from ..webhook_security import verify_dodo_webhook, extract_svix_signing_key
 from ..config import (
     DODO_PAYMENTS_API_KEY,
     DODO_PAYMENTS_ENVIRONMENT,
@@ -372,6 +372,7 @@ async def create_checkout_session(
         raise HTTPException(status_code=400, detail="product_id is required")
  
     return_url = f"{FRONTEND_URL.rstrip('/')}{body.return_path or '/checkout/success'}"
+    cancel_url = f"{FRONTEND_URL.rstrip('/')}/checkout/failed"
 
     # Build metadata to link back to your user
     metadata = {
@@ -397,6 +398,7 @@ async def create_checkout_session(
             # subscription_data={"trial_period_days": 3},
             metadata=metadata,
             return_url=return_url,
+            cancel_url=cancel_url,
         )
         # According to docs, response contains `checkout_url` and `session_id`
         checkout_url = getattr(session, "checkout_url", None) or getattr(session, "url", None) or session.get("checkout_url")
@@ -591,14 +593,18 @@ async def bypass_signature_webhook(
 @webhooks_router.post("/webhooks/dodopayments/test-byte-perfect")
 async def test_byte_perfect_signature():
     """
-    Test the byte-perfect signature implementation
+    Test the byte-perfect signature implementation using Standard Webhooks (Svix) format:
+    signed_message = webhook-id.webhook-timestamp.payload
+    signature = base64(HMAC_SHA256(signing_key_bytes, signed_message_bytes))
     """
     import hmac
     import hashlib
     import base64
     import os
+    from ..webhook_security import extract_svix_signing_key
     
-    # Data from recent logs
+    # Data from recent logs (example placeholders)
+    webhook_id = "msg_example123"
     timestamp = "1770057255"
     received_signature = "OkPW+QrUpFRf6tFENpZeI2ZXYWEWCbZaHZmEq0+S5tY="
     
@@ -608,10 +614,10 @@ async def test_byte_perfect_signature():
     # Sample body as bytes (approximate)
     sample_body = b'{"business_id":"bus_OumfAar4K7irg6ZTZlqcD","data":{"billing":{"city":"Camden","country":"US","state":"Delaware","street":"2140 S Dupont Hwy, 2140 South Dupont Highway","zipcode":"19934"},"brand_id":"brand_123","metadata":{"firebase_uid":"test_uid","selected_plan":"solo","billing_cycle":"yearly"}}}'
     
-    # Test byte-perfect method
-    signed_payload = timestamp.encode('utf-8') + b"." + sample_body
+    # Svix canonical: id.timestamp.body (all bytes, no JSON reserialization)
+    signed_payload = webhook_id.encode("utf-8") + b"." + timestamp.encode("utf-8") + b"." + sample_body
     
-    # Test with different secret formats
+    # Test with different secret formats (only correct: base64 decode after whsec_)
     secrets_to_test = [
         ("env_secret", webhook_secret),
         ("env_without_whsec", webhook_secret[6:] if webhook_secret.startswith("whsec_") else webhook_secret),
@@ -626,16 +632,17 @@ async def test_byte_perfect_signature():
             continue
             
         try:
+            key_bytes = extract_svix_signing_key(secret)
             expected_signature = base64.b64encode(
                 hmac.new(
-                    secret.encode('utf-8'),
+                    key_bytes,
                     signed_payload,
                     hashlib.sha256
                 ).digest()
             ).decode('utf-8')
             
             results[secret_name] = {
-                "secret_prefix": secret[:10] + "..." if len(secret) > 10 else secret,
+                "secret_prefix": (secret[:10] + "...") if isinstance(secret, str) and len(secret) > 10 else (secret if isinstance(secret, str) else "bytes"),
                 "expected_signature": expected_signature,
                 "matches_received": expected_signature == received_signature
             }
@@ -643,14 +650,15 @@ async def test_byte_perfect_signature():
             results[secret_name] = {"error": str(e)}
     
     return {
-        "method": "BYTE-PERFECT: timestamp.encode() + b'.' + raw_body",
+        "method": "BYTE-PERFECT: id.encode()+b'.'+timestamp.encode()+b'.'+raw_body",
+        "webhook_id": webhook_id,
         "timestamp": timestamp,
         "received_signature": received_signature,
         "sample_body_length": len(sample_body),
         "signed_payload_length": len(signed_payload),
         "env_secret_set": bool(webhook_secret),
         "results": results,
-        "note": "Look for 'matches_received': true to confirm correct secret format"
+        "note": "Look for 'matches_received': true to confirm correct secret handling (base64 decode after whsec_)"
     }
 
 
@@ -693,35 +701,44 @@ async def debug_dodo_webhook(request: Request, db: Session = Depends(get_db)):
             
             for secret_variant in secrets_to_try:
                 logger.info(f"🔍 Testing secret variant: {secret_variant[:10]}...")
-                
-                # Test different payload constructions
+
+                # First: Svix/Standard Webhooks canonical check using id.timestamp.payload and base64(HMAC-SHA256)
+                signing_key = extract_svix_signing_key(secret_variant)
+                signed_message_bytes = headers.get("webhook-id", "").encode("utf-8") + b"." + timestamp.encode("utf-8") + b"." + raw_body
+                expected_svix = base64.b64encode(hmac.new(signing_key, signed_message_bytes, hashlib.sha256).digest()).decode('utf-8')
+                signature_without_prefix = signature[3:] if signature.startswith("v1,") else signature
+                logger.info(f"🔍 svix id.ts.body expected base64: {expected_svix}")
+                if expected_svix == signature_without_prefix:
+                    logger.info("🎯 MATCH FOUND: svix id.timestamp.body base64 matches v1 signature!")
+
+                # Legacy/debug payload constructions
                 payloads_to_test = [
                     ("raw_body", raw_body),
                 ]
-                
+
                 if timestamp:
                     payloads_to_test.extend([
                         ("timestamp.body", f"{timestamp}.{raw_body.decode('utf-8', errors='ignore')}".encode()),
                         ("timestamp+body", f"{timestamp}{raw_body.decode('utf-8', errors='ignore')}".encode()),
                     ])
-                
+
                 for payload_name, payload in payloads_to_test:
                     expected_hex = hmac.new(secret_variant.encode("utf-8"), payload, hashlib.sha256).hexdigest()
                     expected_base64 = base64.b64encode(hmac.new(secret_variant.encode("utf-8"), payload, hashlib.sha256).digest()).decode('utf-8')
-                    
+
                     logger.info(f"🔍 {payload_name} - Expected hex: {expected_hex}")
                     logger.info(f"🔍 {payload_name} - Expected base64: {expected_base64}")
-                    
+
                     # Check if signature matches any format
                     if signature.startswith("v1,"):
                         signature_without_prefix = signature[3:]
                         logger.info(f"🔍 {payload_name} - Signature without v1 prefix: {signature_without_prefix}")
-                        
+
                         if expected_hex == signature_without_prefix:
                             logger.info(f"🎯 MATCH FOUND: {payload_name} hex matches v1 signature!")
                         elif expected_base64 == signature_without_prefix:
                             logger.info(f"🎯 MATCH FOUND: {payload_name} base64 matches v1 signature!")
-                    
+
                     # Also check direct matches
                     if expected_hex == signature:
                         logger.info(f"🎯 DIRECT MATCH: {payload_name} hex matches signature!")
@@ -877,9 +894,9 @@ async def handle_dodopayments_webhook(
       - Rate limiting to prevent abuse
     
     Headers:
-      - 'webhook-signature': HMAC-SHA256 hex digest
+      - 'webhook-signature': 'v1,{base64(hmac_sha256(webhook-id.webhook-timestamp.payload))}'
       - 'webhook-id': Unique webhook ID for idempotency
-      - 'webhook-timestamp': Unix timestamp for replay protection
+      - 'webhook-timestamp': Unix timestamp (seconds)
     """
     if not DODO_PAYMENTS_WEBHOOK_SECRET:
         logger.error("❌ DODO_PAYMENTS_WEBHOOK_SECRET not configured")

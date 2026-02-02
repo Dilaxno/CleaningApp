@@ -13,10 +13,23 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/users", tags=["Users"])
 
 def validate_firebase_uid(firebase_uid: str) -> bool:
-    """Validate firebase_uid format to prevent injection"""
-    if not firebase_uid or len(firebase_uid) > 128:
+    """Validate firebase_uid format using strict Firebase UID pattern"""
+    if not firebase_uid:
         return False
-    return firebase_uid.replace("-", "").replace("_", "").isalnum()
+    
+    # Firebase UIDs are exactly 28 characters, alphanumeric with possible hyphens and underscores
+    # They follow a specific pattern: base64url-encoded 128-bit identifier
+    import re
+    firebase_uid_pattern = r'^[a-zA-Z0-9_-]{28}$'
+    
+    if not re.match(firebase_uid_pattern, firebase_uid):
+        return False
+    
+    # Additional length check for safety
+    if len(firebase_uid) != 28:
+        return False
+        
+    return True
 
 def verify_user_access(firebase_uid: str, current_user: User) -> None:
     """Verify the authenticated user has access to the requested resource"""
@@ -275,11 +288,11 @@ class PayoutInfoResponse(BaseModel):
     bankAddress: Optional[str] = None
     isConfigured: bool = False
 
-def mask_sensitive(value: Optional[str], visible_chars: int = 4) -> Optional[str]:
-    """Mask sensitive data, showing only last few characters"""
-    if not value or len(value) <= visible_chars:
-        return value
-    return "*" * (len(value) - visible_chars) + value[-visible_chars:]
+def mask_sensitive(value: Optional[str], visible_chars: int = 2) -> Optional[str]:
+    """Mask sensitive data, showing only first 2 and last 2 characters for security"""
+    if not value or len(value) <= 4:
+        return "****" if value else None  # Always mask short values
+    return value[:2] + "*" * (len(value) - 4) + value[-2:]
 
 @router.get("/{firebase_uid}/payout-info", response_model=PayoutInfoResponse)
 def get_payout_info(
