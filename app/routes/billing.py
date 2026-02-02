@@ -452,7 +452,7 @@ async def handle_dodopayments_webhook(
 
     try:
         # Python 3.9 compatible if/elif instead of match
-        if event_type in ("subscription.active", "subscription.renewed", "subscription.plan_changed"):
+        if event_type in ("subscription.active", "subscription.renewed", "subscription.plan_changed", "checkout.session.completed"):
             # Identify the user
             meta = (data.get("metadata") or {})
             logger.info(f"🔍 Processing {event_type} - metadata: {meta}")
@@ -493,9 +493,11 @@ async def handle_dodopayments_webhook(
                         db.rollback()
                         logger.error(f"❌ Failed to persist subscription_id for user {user.id}: {e}")
 
-                # Handle new subscriptions
-                if event_type in ("subscription.active", "checkout.session.completed"):
-                    logger.info(f"🆕 Processing new subscription for user {user.id}")
+                # Handle all subscription activation events the same way
+                if event_type in ("subscription.active", "checkout.session.completed", "subscription.renewed", "subscription.plan_changed"):
+                    logger.info(f"🆕 Processing subscription activation for user {user.id}")
+                    
+                    # Set subscription start date if not already set
                     if not user.subscription_start_date:
                         user.subscription_start_date = datetime.utcnow()
                         user.clients_this_month = 0
@@ -507,7 +509,7 @@ async def handle_dodopayments_webhook(
                         user.billing_cycle = billing_cycle
                         logger.info(f"🔄 Set billing_cycle to {billing_cycle} for user {user.id}")
                     
-                    # Set initial payment date and calculate next billing
+                    # Set payment date and subscription status
                     user.last_payment_date = datetime.utcnow()
                     user.subscription_status = "active"
                     logger.info(f"✅ Set subscription_status to active for user {user.id}")
@@ -518,32 +520,22 @@ async def handle_dodopayments_webhook(
                     else:  # monthly or default
                         user.next_billing_date = datetime.utcnow() + timedelta(days=30)
                     
-                    db.commit()
-                    logger.info(f"💾 Committed subscription changes for user {user.id}")
+                    # Update plan if provided - this is crucial for immediate access
+                    if selected_plan and selected_plan != "unknown":
+                        logger.info(f"📋 Updating plan from {user.plan} to {selected_plan} for user {user.id}")
+                        user.plan = selected_plan
+                        logger.info(f"✅ User {user.id} plan updated to {selected_plan} via webhook")
+                    else:
+                        logger.warning("⚠️ No selected_plan in metadata; plan unchanged")
                     
-                # Handle subscription renewals (recurring charges)
-                elif event_type == "subscription.renewed":
-                    logger.info(f"🔄 Processing subscription renewal for user {user.id}")
-                    user.last_payment_date = datetime.utcnow()
-                    user.subscription_status = "active"
-                    
-                    # Calculate next billing date based on cycle
-                    if user.billing_cycle == "yearly":
-                        user.next_billing_date = datetime.utcnow() + timedelta(days=365)
-                    else:  # monthly or default
-                        user.next_billing_date = datetime.utcnow() + timedelta(days=30)
-                    
-                    db.commit()
-                    logger.info(f"💾 Committed renewal changes for user {user.id}")
-                    
-                # Update plan if provided
-                if selected_plan and selected_plan != "unknown":
-                    logger.info(f"📋 Updating plan from {user.plan} to {selected_plan} for user {user.id}")
-                    user.plan = selected_plan
-                    db.commit()
-                    logger.info(f"✅ User {user.id} plan updated to {selected_plan} via webhook")
-                else:
-                    logger.info("ℹ️ No selected_plan in metadata; plan unchanged")
+                    # Commit all changes at once
+                    try:
+                        db.commit()
+                        logger.info(f"💾 Successfully committed all subscription changes for user {user.id}")
+                    except Exception as e:
+                        db.rollback()
+                        logger.error(f"❌ Failed to commit subscription changes for user {user.id}: {e}")
+                        raise
 
         elif event_type in ("subscription.cancelled", "subscription.canceled"):
             # Cancelled subscription - revoke access

@@ -52,7 +52,7 @@ def get_csp_policy() -> str:
     ]
     
     policy = "; ".join(directives)
-    logger.info(f"🔒 Generated CSP policy: {policy}")
+    logger.debug(f"🔒 Generated CSP policy: {policy}")
     return policy
 
 

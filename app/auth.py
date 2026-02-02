@@ -150,7 +150,7 @@ async def verify_firebase_token(token: str) -> dict:
         if 'auth_time' not in decoded_payload:
             raise HTTPException(status_code=401, detail="Invalid token claims")
         
-        logger.info(f"✅ Token cryptographically verified for user: {decoded_payload.get('email')}")
+        logger.debug(f"✅ Token cryptographically verified for user: {decoded_payload.get('email')}")
         return decoded_payload
         
     except HTTPException:
