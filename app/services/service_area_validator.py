@@ -3,15 +3,29 @@ Service Area Validation Service
 
 Validates ZIP codes against business-configured service areas.
 Supports state, county, and neighborhood-level restrictions.
+Uses uszipcode library for comprehensive US ZIP code data.
 """
 
 import logging
 import re
 from typing import Dict, List, Optional, Tuple
 from sqlalchemy.orm import Session
+from uszipcode import SearchEngine
 from ..models import BusinessConfig, User
 
 logger = logging.getLogger(__name__)
+
+# Initialize ZIP code search engine (cached globally for performance)
+_zip_search_engine = None
+
+def get_zip_search_engine():
+    """Get or create the ZIP code search engine (singleton pattern)."""
+    global _zip_search_engine
+    if _zip_search_engine is None:
+        logger.info("🗺️ Initializing ZIP code search engine...")
+        _zip_search_engine = SearchEngine()
+        logger.info("✅ ZIP code search engine initialized")
+    return _zip_search_engine
 
 # US state abbreviations to full names mapping
 US_STATES = {
@@ -100,90 +114,46 @@ class ServiceAreaValidator:
     
     def _get_zipcode_location(self, zipcode: str) -> Optional[Dict[str, str]]:
         """
-        Get location data for a ZIP code.
-        In a production system, this would use a ZIP code database or API.
-        For now, we'll use a simplified approach with Smarty API if available.
+        Get location data for a ZIP code using the uszipcode library.
+        Returns standardized location information including state, county, and city.
         """
-        # TODO: Integrate with ZIP code database or Smarty API
-        # For now, return a mock structure that would come from a real service
-        
-        # This is a placeholder - in production you'd query:
-        # 1. A ZIP code database (like USPS ZIP code files)
-        # 2. Smarty Streets API with ZIP code lookup
-        # 3. Census Bureau API
-        # 4. Commercial ZIP code service
-        
-        # Mock data structure for development - covers major US cities
-        mock_locations = {
-            # California
-            '90210': {'state': 'CA', 'county': 'Los Angeles County', 'city': 'Beverly Hills'},
-            '90211': {'state': 'CA', 'county': 'Los Angeles County', 'city': 'Beverly Hills'},
-            '90401': {'state': 'CA', 'county': 'Los Angeles County', 'city': 'Santa Monica'},
-            '90402': {'state': 'CA', 'county': 'Los Angeles County', 'city': 'Santa Monica'},
-            '94102': {'state': 'CA', 'county': 'San Francisco County', 'city': 'San Francisco'},
-            '94103': {'state': 'CA', 'county': 'San Francisco County', 'city': 'San Francisco'},
-            '95014': {'state': 'CA', 'county': 'Santa Clara County', 'city': 'Cupertino'},
+        try:
+            search_engine = get_zip_search_engine()
             
-            # New York
-            '10001': {'state': 'NY', 'county': 'New York County', 'city': 'New York'},
-            '10002': {'state': 'NY', 'county': 'New York County', 'city': 'New York'},
-            '10003': {'state': 'NY', 'county': 'New York County', 'city': 'New York'},
-            '10004': {'state': 'NY', 'county': 'New York County', 'city': 'New York'},
-            '10005': {'state': 'NY', 'county': 'New York County', 'city': 'New York'},
-            '11201': {'state': 'NY', 'county': 'Kings County', 'city': 'Brooklyn'},
-            '11202': {'state': 'NY', 'county': 'Kings County', 'city': 'Brooklyn'},
+            # Search for the ZIP code
+            zip_info = search_engine.by_zipcode(zipcode)
             
-            # Illinois
-            '60601': {'state': 'IL', 'county': 'Cook County', 'city': 'Chicago'},
-            '60602': {'state': 'IL', 'county': 'Cook County', 'city': 'Chicago'},
-            '60603': {'state': 'IL', 'county': 'Cook County', 'city': 'Chicago'},
-            '60604': {'state': 'IL', 'county': 'Cook County', 'city': 'Chicago'},
+            if not zip_info or not zip_info.zipcode:
+                logger.debug(f"ZIP code {zipcode} not found in database")
+                return None
             
-            # Texas
-            '77001': {'state': 'TX', 'county': 'Harris County', 'city': 'Houston'},
-            '77002': {'state': 'TX', 'county': 'Harris County', 'city': 'Houston'},
-            '77003': {'state': 'TX', 'county': 'Harris County', 'city': 'Houston'},
-            '75201': {'state': 'TX', 'county': 'Dallas County', 'city': 'Dallas'},
-            '75202': {'state': 'TX', 'county': 'Dallas County', 'city': 'Dallas'},
-            '78701': {'state': 'TX', 'county': 'Travis County', 'city': 'Austin'},
-            '78702': {'state': 'TX', 'county': 'Travis County', 'city': 'Austin'},
+            # Extract location information
+            state = zip_info.state
+            county = zip_info.county
+            city = zip_info.major_city or zip_info.post_office_city
             
-            # Florida
-            '33101': {'state': 'FL', 'county': 'Miami-Dade County', 'city': 'Miami'},
-            '33102': {'state': 'FL', 'county': 'Miami-Dade County', 'city': 'Miami'},
-            '33103': {'state': 'FL', 'county': 'Miami-Dade County', 'city': 'Miami'},
-            '33109': {'state': 'FL', 'county': 'Miami-Dade County', 'city': 'Miami Beach'},
-            '32801': {'state': 'FL', 'county': 'Orange County', 'city': 'Orlando'},
-            '32802': {'state': 'FL', 'county': 'Orange County', 'city': 'Orlando'},
+            # Validate required fields
+            if not state or not county or not city:
+                logger.debug(f"ZIP code {zipcode} missing required location data: state={state}, county={county}, city={city}")
+                return None
             
-            # Washington
-            '98101': {'state': 'WA', 'county': 'King County', 'city': 'Seattle'},
-            '98102': {'state': 'WA', 'county': 'King County', 'city': 'Seattle'},
-            '98103': {'state': 'WA', 'county': 'King County', 'city': 'Seattle'},
-            '98104': {'state': 'WA', 'county': 'King County', 'city': 'Seattle'},
+            # Normalize county name (ensure it ends with "County" if not already)
+            if county and not county.lower().endswith('county'):
+                county = f"{county} County"
             
-            # Massachusetts
-            '02101': {'state': 'MA', 'county': 'Suffolk County', 'city': 'Boston'},
-            '02102': {'state': 'MA', 'county': 'Suffolk County', 'city': 'Boston'},
-            '02103': {'state': 'MA', 'county': 'Suffolk County', 'city': 'Boston'},
+            location_data = {
+                'state': state.upper(),
+                'county': county,
+                'city': city,
+                'zipcode': zipcode
+            }
             
-            # Georgia
-            '30301': {'state': 'GA', 'county': 'Fulton County', 'city': 'Atlanta'},
-            '30302': {'state': 'GA', 'county': 'Fulton County', 'city': 'Atlanta'},
-            '30303': {'state': 'GA', 'county': 'Fulton County', 'city': 'Atlanta'},
+            logger.debug(f"ZIP code {zipcode} location: {location_data}")
+            return location_data
             
-            # Colorado
-            '80201': {'state': 'CO', 'county': 'Denver County', 'city': 'Denver'},
-            '80202': {'state': 'CO', 'county': 'Denver County', 'city': 'Denver'},
-            '80203': {'state': 'CO', 'county': 'Denver County', 'city': 'Denver'},
-            
-            # Arizona
-            '85001': {'state': 'AZ', 'county': 'Maricopa County', 'city': 'Phoenix'},
-            '85002': {'state': 'AZ', 'county': 'Maricopa County', 'city': 'Phoenix'},
-            '85003': {'state': 'AZ', 'county': 'Maricopa County', 'city': 'Phoenix'},
-        }
-        
-        return mock_locations.get(zipcode)
+        except Exception as e:
+            logger.error(f"Error looking up ZIP code {zipcode}: {e}")
+            return None
     
     def _check_service_areas(self, zip_location: Dict[str, str], service_areas: List[Dict]) -> bool:
         """
