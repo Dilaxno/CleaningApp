@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from .database import engine, Base, get_db
 from .csrf import CSRFMiddleware, get_csrf_token_endpoint, CSRF_COOKIE_NAME, generate_csrf_token
 from .security_headers import SecurityHeadersMiddleware
+from .sentry_config import init_sentry
 from .routes import auth_router
 from .routes.business import router as business_router
 from .routes.users import router as users_router
@@ -80,6 +81,9 @@ async def lifespan(app: FastAPI):
     yield
     logger.info("Application shutting down...")
 
+
+# Initialize Sentry for error monitoring
+init_sentry()
 
 app = FastAPI(title="CleanEnroll API", version="1.0.0", lifespan=lifespan)
 
