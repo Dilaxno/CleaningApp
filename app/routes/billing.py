@@ -510,6 +510,14 @@ class PaymentItem(BaseModel):
     status: str
     invoice_available: bool = False
 
+class BillingAddressResponse(BaseModel):
+    street: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    zipcode: Optional[str] = None
+    country: Optional[str] = None
+    updated_at: Optional[str] = None
+
 class PaymentsResponse(BaseModel):
     payments: list[PaymentItem]
 
@@ -624,6 +632,19 @@ async def get_user_payment_method(
     except Exception as e:
         logger.error(f"Failed to retrieve payment methods for user {user.id}: {e}")
         return PaymentMethodResponse(dodo_customer_id=customer_id, payment_method=None)
+
+@router.get("/billing-address", response_model=BillingAddressResponse)
+async def get_billing_address(
+    user: User = Depends(get_current_user),
+):
+    return BillingAddressResponse(
+        street=getattr(user, "billing_street", None),
+        city=getattr(user, "billing_city", None),
+        state=getattr(user, "billing_state", None),
+        zipcode=getattr(user, "billing_zipcode", None),
+        country=getattr(user, "billing_country", None),
+        updated_at=(getattr(user, "billing_updated_at", None).isoformat() if getattr(user, "billing_updated_at", None) else None),
+    )
 
 @router.get("/payments", response_model=PaymentsResponse)
 async def get_user_payments(
@@ -1311,6 +1332,25 @@ async def handle_dodopayments_webhook(
                                 if exp_year:
                                     user.dodo_payment_method_exp_year = exp_year
                                 logger.info(f"💾 Stored masked payment method for user {user.id}: brand={brand}, last4={last4}")
+
+                        # Persist billing address if present (non-sensitive PII)
+                        billing = (data.get("billing") or customer_obj.get("billing") or {})
+                        if isinstance(billing, dict):
+                            street = billing.get("street")
+                            city = billing.get("city")
+                            state = billing.get("state")
+                            zipcode_val = billing.get("zipcode")
+                            zipcode = str(zipcode_val) if zipcode_val is not None else None
+                            country = billing.get("country")
+                            if street or city or state or zipcode or country:
+                                from datetime import datetime
+                                user.billing_street = street or user.billing_street
+                                user.billing_city = city or user.billing_city
+                                user.billing_state = state or user.billing_state
+                                user.billing_zipcode = zipcode or user.billing_zipcode
+                                user.billing_country = country or user.billing_country
+                                user.billing_updated_at = datetime.utcnow()
+                                logger.info(f"💾 Stored billing address for user {user.id}")
                     except Exception as e:
                         logger.warning(f"⚠️ Failed extracting customer/payment method from webhook for user {user.id}: {e}")
 

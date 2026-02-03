@@ -143,6 +143,13 @@ class User(Base):
     dodo_payment_method_exp_year = Column(Integer, nullable=True)
     dodo_payment_method_type = Column(String(50), nullable=True)
 
+    # Billing address from checkout (non-sensitive PII)
+    billing_street = Column(String(500), nullable=True)
+    billing_city = Column(String(255), nullable=True)
+    billing_state = Column(String(255), nullable=True)
+    billing_zipcode = Column(String(20), nullable=True)
+    billing_country = Column(String(2), nullable=True)  # ISO country code
+    billing_updated_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
