@@ -36,7 +36,7 @@ def init_sentry() -> None:
         dsn=dsn,
         environment=environment,
         integrations=[
-            FastApiIntegration(auto_enabling_integrations=False),
+            FastApiIntegration(),
             SqlalchemyIntegration(),
             RedisIntegration(),
             HttpxIntegration(),
@@ -51,9 +51,6 @@ def init_sentry() -> None:
         
         # Filter out noise
         before_send=filter_events,
-        
-        # Set default tags
-        default_integrations=False,
     )
     
     # Set global tags
