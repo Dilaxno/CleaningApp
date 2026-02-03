@@ -170,7 +170,7 @@ def encrypt_backup_codes(codes: List[str]) -> List[str]:
 
 # Rate limiters
 rate_limit_password_reset = create_rate_limiter(
-    limit=5,
+    limit=10,  # Increased from 5 to 10 for better UX
     window_seconds=3600,  # 1 hour
     key_prefix="password_reset",
     use_ip=True
@@ -184,11 +184,16 @@ async def request_password_reset_otp(
     _: None = Depends(rate_limit_password_reset)
 ):
     """Request OTP for password reset - Rate limited to 5 requests per hour per IP with Turnstile CAPTCHA"""
+    logger.info(f"Password reset OTP request for email: {data.email}")
+    logger.info(f"Request origin: {request.headers.get('origin')}")
+    logger.info(f"Request host: {request.headers.get('host')}")
+    
     # Verify Turnstile token
     if data.turnstileToken:
         client_ip = request.client.host if request.client else None
         is_valid = await verify_turnstile(data.turnstileToken, client_ip)
         if not is_valid:
+            logger.warning(f"Turnstile verification failed for {data.email}")
             raise HTTPException(status_code=400, detail="CAPTCHA verification failed")
     else:
         logger.warning("⚠️ No Turnstile token provided for password reset request")
@@ -322,11 +327,16 @@ async def get_recovery_methods(
     _: None = Depends(rate_limit_password_reset)
 ):
     """Get available 2FA recovery methods for an account"""
+    logger.info(f"Recovery methods request for email: {data.email}")
+    logger.info(f"Request origin: {request.headers.get('origin')}")
+    logger.info(f"Request host: {request.headers.get('host')}")
+    
     # Verify Turnstile token
     if data.turnstileToken:
         client_ip = request.client.host if request.client else None
         is_valid = await verify_turnstile(data.turnstileToken, client_ip)
         if not is_valid:
+            logger.warning(f"Turnstile verification failed for {data.email}")
             raise HTTPException(status_code=400, detail="CAPTCHA verification failed")
     
     # Check if user exists

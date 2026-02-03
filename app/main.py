@@ -161,7 +161,10 @@ else:
 
 # CORS - Secure configuration with specific origins
 # Get allowed origins from environment variable
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173,https://cleanenroll.com,https://www.cleanenroll.com").split(",")
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173,https://cleanenroll.com,https://www.cleanenroll.com,https://api.cleanenroll.com").split(",")
+
+# Log CORS configuration for debugging
+logger.info(f"CORS allowed origins: {ALLOWED_ORIGINS}")
 
 app.add_middleware(
     CORSMiddleware,
@@ -213,6 +216,18 @@ def root():
 @app.get("/health")
 def health():
     return {"status": "healthy"}
+
+
+@app.get("/debug/cors")
+def debug_cors(request: Request):
+    """Debug endpoint to check CORS configuration"""
+    return {
+        "origin": request.headers.get("origin"),
+        "host": request.headers.get("host"),
+        "user_agent": request.headers.get("user-agent"),
+        "allowed_origins": ALLOWED_ORIGINS,
+        "timestamp": time.time()
+    }
 
 
 @app.get("/health/redis")
