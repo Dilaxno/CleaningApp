@@ -37,6 +37,7 @@ from .routes.integration_requests import router as integration_requests_router
 from .routes.geocoding import router as geocoding_router
 from .routes.smarty_geocoding import router as smarty_geocoding_router
 from .routes.templates import router as templates_router
+from .routes.service_areas import router as service_areas_router
 
 # Import all models to ensure they're registered with SQLAlchemy Base
 # This is needed for relationships between models in different files
@@ -206,6 +207,7 @@ app.include_router(integration_requests_router)
 app.include_router(geocoding_router)
 app.include_router(smarty_geocoding_router)
 app.include_router(templates_router)
+app.include_router(service_areas_router)
 
 
 @app.get("/")

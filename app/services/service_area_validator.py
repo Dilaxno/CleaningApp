@@ -1,321 +1,298 @@
 """
 Service Area Validation Service
 
-Validates client ZIP codes against business owner's configured service areas.
-Supports multiple validation types: radius-based, ZIP code lists, state/county restrictions.
+Validates ZIP codes against business-configured service areas.
+Supports state, county, and neighborhood-level restrictions.
 """
 
 import logging
-import math
 import re
 from typing import Dict, List, Optional, Tuple
-
-import httpx
 from sqlalchemy.orm import Session
-
-from ..models import BusinessConfig
+from ..models import BusinessConfig, User
 
 logger = logging.getLogger(__name__)
 
+# US state abbreviations to full names mapping
+US_STATES = {
+    'AL': 'Alabama', 'AK': 'Alaska', 'AZ': 'Arizona', 'AR': 'Arkansas', 'CA': 'California',
+    'CO': 'Colorado', 'CT': 'Connecticut', 'DE': 'Delaware', 'FL': 'Florida', 'GA': 'Georgia',
+    'HI': 'Hawaii', 'ID': 'Idaho', 'IL': 'Illinois', 'IN': 'Indiana', 'IA': 'Iowa',
+    'KS': 'Kansas', 'KY': 'Kentucky', 'LA': 'Louisiana', 'ME': 'Maine', 'MD': 'Maryland',
+    'MA': 'Massachusetts', 'MI': 'Michigan', 'MN': 'Minnesota', 'MS': 'Mississippi', 'MO': 'Missouri',
+    'MT': 'Montana', 'NE': 'Nebraska', 'NV': 'Nevada', 'NH': 'New Hampshire', 'NJ': 'New Jersey',
+    'NM': 'New Mexico', 'NY': 'New York', 'NC': 'North Carolina', 'ND': 'North Dakota', 'OH': 'Ohio',
+    'OK': 'Oklahoma', 'OR': 'Oregon', 'PA': 'Pennsylvania', 'RI': 'Rhode Island', 'SC': 'South Carolina',
+    'SD': 'South Dakota', 'TN': 'Tennessee', 'TX': 'Texas', 'UT': 'Utah', 'VT': 'Vermont',
+    'VA': 'Virginia', 'WA': 'Washington', 'WV': 'West Virginia', 'WI': 'Wisconsin', 'WY': 'Wyoming',
+    'DC': 'District of Columbia'
+}
+
+# Reverse mapping for lookups
+STATE_NAMES_TO_ABBREV = {v.lower(): k for k, v in US_STATES.items()}
+
 
 class ServiceAreaValidator:
-    """Validates client locations against business service areas."""
-
+    """Validates ZIP codes against configured service areas."""
+    
     def __init__(self, db: Session):
         self.db = db
-
-    async def validate_zipcode(
-        self, business_config: BusinessConfig, zipcode: str
-    ) -> Dict[str, any]:
+    
+    def validate_zipcode_for_business(self, zipcode: str, business_uid: str) -> Tuple[bool, Optional[str]]:
         """
-        Validate a ZIP code against the business's service area configuration.
+        Validate if a ZIP code is within a business's service areas.
         
         Args:
-            business_config: BusinessConfig object with service area settings
-            zipcode: Client's ZIP code to validate
+            zipcode: The ZIP code to validate (5 digits)
+            business_uid: The business owner's Firebase UID
             
         Returns:
-            Dict with validation result:
-            {
-                "allowed": bool,
-                "reason": str,
-                "zipcode_info": dict (if available)
-            }
+            Tuple of (is_valid, error_message)
         """
-        # Clean and validate ZIP code format
-        clean_zipcode = self._clean_zipcode(zipcode)
-        if not clean_zipcode:
-            return {
-                "allowed": False,
-                "reason": "Invalid ZIP code format",
-                "zipcode_info": None
-            }
-
-        # If service area is not enabled, allow all
-        if not business_config.service_area_enabled:
-            return {
-                "allowed": True,
-                "reason": "Service area restrictions not enabled",
-                "zipcode_info": None
-            }
-
-        # Get ZIP code geographic information
-        zipcode_info = await self._get_zipcode_info(clean_zipcode)
-        if not zipcode_info:
-            return {
-                "allowed": False,
-                "reason": "Unable to verify ZIP code location",
-                "zipcode_info": None
-            }
-
-        # Validate based on service area type
-        service_area_type = business_config.service_area_type
-
-        if service_area_type == "zipcode":
-            return self._validate_zipcode_list(business_config, clean_zipcode, zipcode_info)
-        elif service_area_type == "radius":
-            return self._validate_radius(business_config, zipcode_info)
-        elif service_area_type == "custom":
-            return self._validate_custom_areas(business_config, clean_zipcode, zipcode_info)
-        else:
-            return {
-                "allowed": False,
-                "reason": "Service area type not configured",
-                "zipcode_info": zipcode_info
-            }
-
-    def _clean_zipcode(self, zipcode: str) -> Optional[str]:
-        """Clean and validate ZIP code format."""
+        try:
+            # Normalize ZIP code
+            zipcode = self._normalize_zipcode(zipcode)
+            if not zipcode:
+                return False, "Invalid ZIP code format"
+            
+            # Get business config
+            user = self.db.query(User).filter(User.firebase_uid == business_uid).first()
+            if not user or not user.business_config:
+                return False, "Business not found"
+            
+            service_areas = user.business_config.service_areas or []
+            if not service_areas:
+                # No service areas configured - allow all (backward compatibility)
+                return True, None
+            
+            # Get ZIP code location data
+            zip_location = self._get_zipcode_location(zipcode)
+            if not zip_location:
+                return False, "Unable to verify ZIP code location"
+            
+            # Check against service areas
+            is_served = self._check_service_areas(zip_location, service_areas)
+            
+            if is_served:
+                return True, None
+            else:
+                return False, "Sorry, but we don't serve your area yet, maybe in the future."
+                
+        except Exception as e:
+            logger.error(f"Error validating ZIP code {zipcode} for business {business_uid}: {e}")
+            return False, "Unable to verify service area"
+    
+    def _normalize_zipcode(self, zipcode: str) -> Optional[str]:
+        """Normalize ZIP code to 5-digit format."""
         if not zipcode:
             return None
         
-        # Remove all non-digit characters
-        clean = re.sub(r'\D', '', zipcode.strip())
+        # Remove all non-digits
+        digits = re.sub(r'\D', '', zipcode)
         
-        # US ZIP codes are 5 or 9 digits
-        if len(clean) == 5 or len(clean) == 9:
-            return clean[:5]  # Return 5-digit ZIP
+        # Must be 5 or 9 digits (ZIP or ZIP+4)
+        if len(digits) == 5:
+            return digits
+        elif len(digits) == 9:
+            return digits[:5]  # Take first 5 digits
+        else:
+            return None
+    
+    def _get_zipcode_location(self, zipcode: str) -> Optional[Dict[str, str]]:
+        """
+        Get location data for a ZIP code.
+        In a production system, this would use a ZIP code database or API.
+        For now, we'll use a simplified approach with Smarty API if available.
+        """
+        # TODO: Integrate with ZIP code database or Smarty API
+        # For now, return a mock structure that would come from a real service
         
-        return None
-
-    async def _get_zipcode_info(self, zipcode: str) -> Optional[Dict]:
+        # This is a placeholder - in production you'd query:
+        # 1. A ZIP code database (like USPS ZIP code files)
+        # 2. Smarty Streets API with ZIP code lookup
+        # 3. Census Bureau API
+        # 4. Commercial ZIP code service
+        
+        # Mock data structure for development - covers major US cities
+        mock_locations = {
+            # California
+            '90210': {'state': 'CA', 'county': 'Los Angeles County', 'city': 'Beverly Hills'},
+            '90211': {'state': 'CA', 'county': 'Los Angeles County', 'city': 'Beverly Hills'},
+            '90401': {'state': 'CA', 'county': 'Los Angeles County', 'city': 'Santa Monica'},
+            '90402': {'state': 'CA', 'county': 'Los Angeles County', 'city': 'Santa Monica'},
+            '94102': {'state': 'CA', 'county': 'San Francisco County', 'city': 'San Francisco'},
+            '94103': {'state': 'CA', 'county': 'San Francisco County', 'city': 'San Francisco'},
+            '95014': {'state': 'CA', 'county': 'Santa Clara County', 'city': 'Cupertino'},
+            
+            # New York
+            '10001': {'state': 'NY', 'county': 'New York County', 'city': 'New York'},
+            '10002': {'state': 'NY', 'county': 'New York County', 'city': 'New York'},
+            '10003': {'state': 'NY', 'county': 'New York County', 'city': 'New York'},
+            '10004': {'state': 'NY', 'county': 'New York County', 'city': 'New York'},
+            '10005': {'state': 'NY', 'county': 'New York County', 'city': 'New York'},
+            '11201': {'state': 'NY', 'county': 'Kings County', 'city': 'Brooklyn'},
+            '11202': {'state': 'NY', 'county': 'Kings County', 'city': 'Brooklyn'},
+            
+            # Illinois
+            '60601': {'state': 'IL', 'county': 'Cook County', 'city': 'Chicago'},
+            '60602': {'state': 'IL', 'county': 'Cook County', 'city': 'Chicago'},
+            '60603': {'state': 'IL', 'county': 'Cook County', 'city': 'Chicago'},
+            '60604': {'state': 'IL', 'county': 'Cook County', 'city': 'Chicago'},
+            
+            # Texas
+            '77001': {'state': 'TX', 'county': 'Harris County', 'city': 'Houston'},
+            '77002': {'state': 'TX', 'county': 'Harris County', 'city': 'Houston'},
+            '77003': {'state': 'TX', 'county': 'Harris County', 'city': 'Houston'},
+            '75201': {'state': 'TX', 'county': 'Dallas County', 'city': 'Dallas'},
+            '75202': {'state': 'TX', 'county': 'Dallas County', 'city': 'Dallas'},
+            '78701': {'state': 'TX', 'county': 'Travis County', 'city': 'Austin'},
+            '78702': {'state': 'TX', 'county': 'Travis County', 'city': 'Austin'},
+            
+            # Florida
+            '33101': {'state': 'FL', 'county': 'Miami-Dade County', 'city': 'Miami'},
+            '33102': {'state': 'FL', 'county': 'Miami-Dade County', 'city': 'Miami'},
+            '33103': {'state': 'FL', 'county': 'Miami-Dade County', 'city': 'Miami'},
+            '33109': {'state': 'FL', 'county': 'Miami-Dade County', 'city': 'Miami Beach'},
+            '32801': {'state': 'FL', 'county': 'Orange County', 'city': 'Orlando'},
+            '32802': {'state': 'FL', 'county': 'Orange County', 'city': 'Orlando'},
+            
+            # Washington
+            '98101': {'state': 'WA', 'county': 'King County', 'city': 'Seattle'},
+            '98102': {'state': 'WA', 'county': 'King County', 'city': 'Seattle'},
+            '98103': {'state': 'WA', 'county': 'King County', 'city': 'Seattle'},
+            '98104': {'state': 'WA', 'county': 'King County', 'city': 'Seattle'},
+            
+            # Massachusetts
+            '02101': {'state': 'MA', 'county': 'Suffolk County', 'city': 'Boston'},
+            '02102': {'state': 'MA', 'county': 'Suffolk County', 'city': 'Boston'},
+            '02103': {'state': 'MA', 'county': 'Suffolk County', 'city': 'Boston'},
+            
+            # Georgia
+            '30301': {'state': 'GA', 'county': 'Fulton County', 'city': 'Atlanta'},
+            '30302': {'state': 'GA', 'county': 'Fulton County', 'city': 'Atlanta'},
+            '30303': {'state': 'GA', 'county': 'Fulton County', 'city': 'Atlanta'},
+            
+            # Colorado
+            '80201': {'state': 'CO', 'county': 'Denver County', 'city': 'Denver'},
+            '80202': {'state': 'CO', 'county': 'Denver County', 'city': 'Denver'},
+            '80203': {'state': 'CO', 'county': 'Denver County', 'city': 'Denver'},
+            
+            # Arizona
+            '85001': {'state': 'AZ', 'county': 'Maricopa County', 'city': 'Phoenix'},
+            '85002': {'state': 'AZ', 'county': 'Maricopa County', 'city': 'Phoenix'},
+            '85003': {'state': 'AZ', 'county': 'Maricopa County', 'city': 'Phoenix'},
+        }
+        
+        return mock_locations.get(zipcode)
+    
+    def _check_service_areas(self, zip_location: Dict[str, str], service_areas: List[Dict]) -> bool:
         """
-        Get geographic information for a ZIP code using a geocoding service.
-        Returns lat/lon, city, state, county information.
+        Check if ZIP code location matches any configured service area.
+        
+        Service area types:
+        - state: Serves entire state
+        - county: Serves specific county within state  
+        - neighborhood: Serves specific neighborhood/city within county
         """
-        try:
-            # Use a free ZIP code API (you can replace with your preferred service)
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                # Using zippopotam.us - free ZIP code API
-                response = await client.get(f"http://api.zippopotam.us/us/{zipcode}")
-                
-                if response.status_code == 200:
-                    data = response.json()
+        zip_state = zip_location.get('state', '').upper()
+        zip_county = zip_location.get('county', '').lower()
+        zip_city = zip_location.get('city', '').lower()
+        
+        for area in service_areas:
+            area_type = area.get('type', '').lower()
+            area_value = area.get('value', '').lower()
+            area_state = area.get('state', '').upper()
+            
+            if area_type == 'state':
+                # Check if ZIP is in this state
+                if zip_state == area_state:
+                    return True
                     
-                    if data.get("places"):
-                        place = data["places"][0]
-                        return {
-                            "zipcode": zipcode,
-                            "city": place.get("place name"),
-                            "state": place.get("state abbreviation"),
-                            "state_full": place.get("state"),
-                            "county": place.get("county", "").replace(" County", ""),
-                            "latitude": float(place.get("latitude", 0)),
-                            "longitude": float(place.get("longitude", 0))
-                        }
+            elif area_type == 'county':
+                # Check if ZIP is in this county and state
+                if zip_state == area_state and zip_county == area_value:
+                    return True
+                    
+            elif area_type == 'neighborhood' or area_type == 'city':
+                # Check if ZIP is in this city/neighborhood, county, and state
+                area_county = area.get('county', '').lower()
+                if (zip_state == area_state and 
+                    zip_county == area_county and 
+                    zip_city == area_value):
+                    return True
+        
+        return False
+    
+    def get_service_areas_for_business(self, business_uid: str) -> List[Dict]:
+        """Get configured service areas for a business."""
+        try:
+            user = self.db.query(User).filter(User.firebase_uid == business_uid).first()
+            if not user or not user.business_config:
+                return []
+            
+            return user.business_config.service_areas or []
+            
         except Exception as e:
-            logger.warning(f"Failed to get ZIP code info for {zipcode}: {e}")
-        
-        return None
-
-    def _validate_zipcode_list(
-        self, business_config: BusinessConfig, zipcode: str, zipcode_info: Dict
-    ) -> Dict[str, any]:
-        """Validate against explicit ZIP code list."""
-        allowed_zipcodes = business_config.service_area_zipcodes or []
-        
-        if zipcode in allowed_zipcodes:
-            return {
-                "allowed": True,
-                "reason": "ZIP code in allowed list",
-                "zipcode_info": zipcode_info
-            }
-        
-        # Also check state/county restrictions if configured
-        state_county_result = self._check_state_county_restrictions(
-            business_config, zipcode_info
-        )
-        
-        if state_county_result["allowed"]:
-            return state_county_result
-        
-        return {
-            "allowed": False,
-            "reason": "ZIP code not in service area",
-            "zipcode_info": zipcode_info
-        }
-
-    def _validate_radius(
-        self, business_config: BusinessConfig, zipcode_info: Dict
-    ) -> Dict[str, any]:
-        """Validate against radius-based service area."""
-        center_lat = business_config.service_area_center_lat
-        center_lon = business_config.service_area_center_lon
-        radius_miles = business_config.service_area_radius_miles
-        
-        if not all([center_lat, center_lon, radius_miles]):
-            return {
-                "allowed": False,
-                "reason": "Radius service area not properly configured",
-                "zipcode_info": zipcode_info
-            }
-        
-        zip_lat = zipcode_info.get("latitude")
-        zip_lon = zipcode_info.get("longitude")
-        
-        if not zip_lat or not zip_lon:
-            return {
-                "allowed": False,
-                "reason": "Unable to determine ZIP code coordinates",
-                "zipcode_info": zipcode_info
-            }
-        
-        distance = self._calculate_distance(center_lat, center_lon, zip_lat, zip_lon)
-        
-        if distance <= radius_miles:
-            return {
-                "allowed": True,
-                "reason": f"Within {radius_miles} mile service radius ({distance:.1f} miles)",
-                "zipcode_info": zipcode_info
-            }
-        
-        return {
-            "allowed": False,
-            "reason": f"Outside {radius_miles} mile service radius ({distance:.1f} miles)",
-            "zipcode_info": zipcode_info
-        }
-
-    def _validate_custom_areas(
-        self, business_config: BusinessConfig, zipcode: str, zipcode_info: Dict
-    ) -> Dict[str, any]:
-        """Validate against custom area definitions (states, counties, neighborhoods)."""
-        # Check explicit ZIP codes first
-        allowed_zipcodes = business_config.service_area_zipcodes or []
-        if zipcode in allowed_zipcodes:
-            return {
-                "allowed": True,
-                "reason": "ZIP code in allowed list",
-                "zipcode_info": zipcode_info
-            }
-        
-        # Check state/county restrictions
-        return self._check_state_county_restrictions(business_config, zipcode_info)
-
-    def _check_state_county_restrictions(
-        self, business_config: BusinessConfig, zipcode_info: Dict
-    ) -> Dict[str, any]:
-        """Check state and county restrictions."""
-        state = zipcode_info.get("state")
-        county = zipcode_info.get("county")
-        
-        # Check state restrictions
-        allowed_states = business_config.service_area_states or []
-        if allowed_states and state not in allowed_states:
-            return {
-                "allowed": False,
-                "reason": f"State {state} not in service area",
-                "zipcode_info": zipcode_info
-            }
-        
-        # Check county restrictions
-        allowed_counties = business_config.service_area_counties or []
-        if allowed_counties and county:
-            # Counties are stored in "STATE:COUNTY" format
-            county_key = f"{state}:{county}"
-            if county_key not in allowed_counties:
-                return {
-                    "allowed": False,
-                    "reason": f"County {county}, {state} not in service area",
-                    "zipcode_info": zipcode_info
-                }
-        
-        # Check neighborhood restrictions (if implemented)
-        # This would require more detailed geocoding data
-        
-        return {
-            "allowed": True,
-            "reason": "Location within configured service area",
-            "zipcode_info": zipcode_info
-        }
-
-    def _calculate_distance(
-        self, lat1: float, lon1: float, lat2: float, lon2: float
-    ) -> float:
-        """
-        Calculate the great circle distance between two points on Earth.
-        Returns distance in miles.
-        """
-        # Convert latitude and longitude from degrees to radians
-        lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
-        
-        # Haversine formula
-        dlat = lat2 - lat1
-        dlon = lon2 - lon1
-        a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
-        c = 2 * math.asin(math.sqrt(a))
-        
-        # Radius of Earth in miles
-        r = 3956
-        
-        return c * r
-
-    async def get_service_area_summary(self, business_config: BusinessConfig) -> Dict:
-        """Get a human-readable summary of the service area configuration."""
-        if not business_config.service_area_enabled:
-            return {"enabled": False, "description": "Service area restrictions disabled"}
-        
-        service_type = business_config.service_area_type
-        
-        if service_type == "radius":
-            radius = business_config.service_area_radius_miles
-            return {
-                "enabled": True,
-                "type": "radius",
-                "description": f"Within {radius} miles of business location"
-            }
-        
-        elif service_type == "zipcode":
-            zipcodes = business_config.service_area_zipcodes or []
-            count = len(zipcodes)
-            return {
-                "enabled": True,
-                "type": "zipcode",
-                "description": f"Specific ZIP codes ({count} configured)"
-            }
-        
-        elif service_type == "custom":
-            states = business_config.service_area_states or []
-            counties = business_config.service_area_counties or []
-            zipcodes = business_config.service_area_zipcodes or []
+            logger.error(f"Error getting service areas for business {business_uid}: {e}")
+            return []
+    
+    def update_service_areas_for_business(self, business_uid: str, service_areas: List[Dict]) -> bool:
+        """Update service areas for a business."""
+        try:
+            user = self.db.query(User).filter(User.firebase_uid == business_uid).first()
+            if not user or not user.business_config:
+                return False
             
-            parts = []
-            if states:
-                parts.append(f"{len(states)} states")
-            if counties:
-                parts.append(f"{len(counties)} counties")
-            if zipcodes:
-                parts.append(f"{len(zipcodes)} ZIP codes")
+            # Validate service area format
+            for area in service_areas:
+                if not self._validate_service_area_format(area):
+                    return False
             
-            description = "Custom areas: " + ", ".join(parts) if parts else "Custom areas configured"
+            user.business_config.service_areas = service_areas
+            self.db.commit()
+            return True
             
-            return {
-                "enabled": True,
-                "type": "custom",
-                "description": description
-            }
+        except Exception as e:
+            logger.error(f"Error updating service areas for business {business_uid}: {e}")
+            self.db.rollback()
+            return False
+    
+    def _validate_service_area_format(self, area: Dict) -> bool:
+        """Validate service area object format."""
+        required_fields = ['type', 'value', 'name']
         
-        return {
-            "enabled": True,
-            "type": "unknown",
-            "description": "Service area configured but type unknown"
-        }
+        # Check required fields
+        for field in required_fields:
+            if field not in area or not area[field]:
+                return False
+        
+        area_type = area['type'].lower()
+        
+        # Valid area types
+        valid_types = ['state', 'county', 'neighborhood', 'city']
+        if area_type not in valid_types:
+            return False
+        
+        # Type-specific validation
+        if area_type == 'state':
+            # State must have valid state code
+            state_code = area.get('state', '').upper()
+            return state_code in US_STATES
+            
+        elif area_type in ['county', 'neighborhood', 'city']:
+            # County/neighborhood must have state
+            state_code = area.get('state', '').upper()
+            if state_code not in US_STATES:
+                return False
+            
+            # County/neighborhood must have county if type is neighborhood
+            if area_type in ['neighborhood', 'city'] and not area.get('county'):
+                return False
+        
+        return True
+
+
+def validate_zipcode_for_business(db: Session, zipcode: str, business_uid: str) -> Tuple[bool, Optional[str]]:
+    """Convenience function for ZIP code validation."""
+    validator = ServiceAreaValidator(db)
+    return validator.validate_zipcode_for_business(zipcode, business_uid)
