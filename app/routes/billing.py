@@ -495,6 +495,271 @@ async def change_subscription_plan(
 
 # No product-to-plan mapping on backend; plan is derived from metadata set at checkout creation.
 
+# ======== Payment Method & Payment History (per-user, secure) ========
+
+class PaymentMethodResponse(BaseModel):
+    dodo_customer_id: Optional[str] = None
+    payment_method: Optional[Dict] = None  # {"id","type","brand","last4","exp_month","exp_year","is_default"}
+
+class PaymentItem(BaseModel):
+    id: str
+    created_at: Optional[str] = None
+    description: Optional[str] = None
+    amount: float
+    currency: str
+    status: str
+    invoice_available: bool = False
+
+class PaymentsResponse(BaseModel):
+    payments: list[PaymentItem]
+
+def _major_amount(amount_lowest: Optional[int], currency: Optional[str]) -> float:
+    if amount_lowest is None:
+        return 0.0
+    # Convert from lowest denomination to major units
+    c = (currency or "USD").upper()
+    # Common currencies with 100 minor units
+    if c in {"USD","EUR","GBP","CAD","AUD","NZD","SGD","MXN"}:
+        return round(amount_lowest / 100.0, 2)
+    # JPY is zero-decimal
+    if c in {"JPY","KRW"}:
+        return float(amount_lowest)
+    # Default to 100 minor units
+    return round(amount_lowest / 100.0, 2)
+
+@router.get("/payment-method", response_model=PaymentMethodResponse)
+async def get_user_payment_method(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Return the user's default payment method metadata (brand, last4, exp) masked.
+    Stores only non-PCI data. Falls back to Dodo API lookup by dodo_customer_id.
+    """
+    if not DODO_PAYMENTS_API_KEY or dodo_client is None:
+        # Return any locally stored metadata if billing not configured
+        return PaymentMethodResponse(
+            dodo_customer_id=getattr(user, "dodo_customer_id", None),
+            payment_method=(
+                {
+                    "id": getattr(user, "dodo_default_payment_method_id", None),
+                    "type": getattr(user, "dodo_payment_method_type", None) or "card",
+                    "brand": getattr(user, "dodo_payment_method_brand", None),
+                    "last4": getattr(user, "dodo_payment_method_last4", None),
+                    "exp_month": getattr(user, "dodo_payment_method_exp_month", None),
+                    "exp_year": getattr(user, "dodo_payment_method_exp_year", None),
+                    "is_default": True,
+                }
+                if getattr(user, "dodo_payment_method_last4", None)
+                else None
+            ),
+        )
+
+    # If we already have local masked metadata, return it first
+    if getattr(user, "dodo_payment_method_last4", None):
+        return PaymentMethodResponse(
+            dodo_customer_id=getattr(user, "dodo_customer_id", None),
+            payment_method={
+                "id": getattr(user, "dodo_default_payment_method_id", None),
+                "type": getattr(user, "dodo_payment_method_type", None) or "card",
+                "brand": getattr(user, "dodo_payment_method_brand", None),
+                "last4": getattr(user, "dodo_payment_method_last4", None),
+                "exp_month": getattr(user, "dodo_payment_method_exp_month", None),
+                "exp_year": getattr(user, "dodo_payment_method_exp_year", None),
+                "is_default": True,
+            },
+        )
+
+    # Otherwise attempt to pull from Dodo customer vault
+    customer_id = getattr(user, "dodo_customer_id", None)
+    if not customer_id:
+        # No Dodo customer on file yet
+        return PaymentMethodResponse(dodo_customer_id=None, payment_method=None)
+
+    try:
+        pm_list = await dodo_client.customers.retrieve_payment_methods(customer_id)
+        items = getattr(pm_list, "items", []) or getattr(pm_list, "data", []) or []
+        if not items:
+            return PaymentMethodResponse(dodo_customer_id=customer_id, payment_method=None)
+
+        # Prefer the first or a flagged default
+        method = None
+        for it in items:
+            if getattr(it, "is_default", False) or (getattr(it, "default", False)):
+                method = it
+                break
+        if method is None:
+            method = items[0]
+
+        # Extract card details safely
+        card = getattr(method, "card", None) or {}
+        brand = getattr(card, "brand", None) or getattr(method, "brand", None)
+        last4 = getattr(card, "last4", None) or getattr(method, "last4", None)
+        exp_month = getattr(card, "exp_month", None) or getattr(method, "exp_month", None)
+        exp_year = getattr(card, "exp_year", None) or getattr(method, "exp_year", None)
+        pm_type = getattr(method, "type", None) or "card"
+        pm_id = getattr(method, "payment_method_id", None) or getattr(method, "id", None)
+
+        # Persist non-PCI metadata
+        user.dodo_default_payment_method_id = pm_id
+        user.dodo_payment_method_type = pm_type
+        user.dodo_payment_method_brand = brand
+        user.dodo_payment_method_last4 = last4
+        user.dodo_payment_method_exp_month = exp_month
+        user.dodo_payment_method_exp_year = exp_year
+        db.commit()
+
+        return PaymentMethodResponse(
+            dodo_customer_id=customer_id,
+            payment_method={
+                "id": pm_id,
+                "type": pm_type,
+                "brand": brand,
+                "last4": last4,
+                "exp_month": exp_month,
+                "exp_year": exp_year,
+                "is_default": True,
+            },
+        )
+    except Exception as e:
+        logger.error(f"Failed to retrieve payment methods for user {user.id}: {e}")
+        return PaymentMethodResponse(dodo_customer_id=customer_id, payment_method=None)
+
+@router.get("/payments", response_model=PaymentsResponse)
+async def get_user_payments(
+    user: User = Depends(get_current_user),
+):
+    """
+    List payments for the authenticated user.
+    Filters by Dodo customer id and/or metadata.internal_user_id to ensure per-user isolation.
+    """
+    if not DODO_PAYMENTS_API_KEY or dodo_client is None:
+        return PaymentsResponse(payments=[])
+
+    cust_id = getattr(user, "dodo_customer_id", None)
+    results: list[PaymentItem] = []
+    try:
+        # Auto-paginating async iterator
+        async for pay in dodo_client.payments.list():
+            # Narrow scope to this user securely
+            pay_meta = getattr(pay, "metadata", {}) or {}
+            internal_user_id = str(pay_meta.get("internal_user_id") or "")
+            pay_customer = getattr(pay, "customer", None)
+            pay_customer_id = None
+            if pay_customer:
+                pay_customer_id = getattr(pay_customer, "id", None) or getattr(pay_customer, "customer_id", None)
+
+            if cust_id and pay_customer_id and pay_customer_id != cust_id:
+                continue
+            if internal_user_id and internal_user_id != str(user.id):
+                continue
+            if not cust_id and not internal_user_id:
+                # If neither marker exists, skip for safety
+                continue
+
+            amount_lowest = getattr(pay, "amount", None) or getattr(pay, "amount_lowest_unit", None)
+            currency = getattr(pay, "currency", None) or "USD"
+            status = getattr(pay, "status", None) or "paid"
+            description = getattr(pay, "description", None) or getattr(pay, "statement_descriptor", None)
+            created_at = getattr(pay, "created_at", None)
+            pay_id = getattr(pay, "id", None) or getattr(pay, "payment_id", None)
+
+            # Check if invoice is available
+            has_invoice = True if pay_id else False
+
+            results.append(
+                PaymentItem(
+                    id=str(pay_id),
+                    created_at=str(created_at) if created_at else None,
+                    description=description,
+                    amount=_major_amount(amount_lowest, currency),
+                    currency=currency,
+                    status=status,
+                    invoice_available=has_invoice,
+                )
+            )
+    except Exception as e:
+        logger.error(f"Failed to list payments for user {user.id}: {e}")
+        return PaymentsResponse(payments=[])
+
+    # Sort newest first if dates exist
+    results.sort(key=lambda x: x.created_at or "", reverse=True)
+    return PaymentsResponse(payments=results)
+
+@router.get("/invoices/{payment_id}/download")
+async def download_payment_invoice_pdf(
+    payment_id: str,
+    user: User = Depends(get_current_user),
+):
+    """
+    Securely stream the PDF invoice for a given payment_id if it belongs to the current user.
+    Validates ownership by scanning the user's own payments in-memory before requesting the PDF.
+    """
+    if not DODO_PAYMENTS_API_KEY or dodo_client is None:
+        raise HTTPException(status_code=500, detail="Billing not configured")
+
+    # Ownership check
+    is_owned = False
+    try:
+        cust_id = getattr(user, "dodo_customer_id", None)
+        async for pay in dodo_client.payments.list():
+            pid = getattr(pay, "id", None) or getattr(pay, "payment_id", None)
+            if not pid or str(pid) != payment_id:
+                continue
+            pay_meta = getattr(pay, "metadata", {}) or {}
+            internal_user_id = str(pay_meta.get("internal_user_id") or "")
+            pay_customer = getattr(pay, "customer", None)
+            pay_customer_id = None
+            if pay_customer:
+                pay_customer_id = getattr(pay_customer, "id", None) or getattr(pay_customer, "customer_id", None)
+
+            if cust_id and pay_customer_id and pay_customer_id != cust_id:
+                continue
+            if internal_user_id and internal_user_id != str(user.id):
+                continue
+            is_owned = True
+            break
+    except Exception as e:
+        logger.error(f"Failed during ownership verification for payment {payment_id}: {e}")
+        raise HTTPException(status_code=400, detail="Unable to verify payment ownership")
+
+    if not is_owned:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    try:
+        # Retrieve PDF content via Dodo SDK
+        invoice_file = await dodo_client.invoices.payments.retrieve(payment_id)
+        content = None
+
+        if hasattr(invoice_file, "read"):
+            content = invoice_file.read()
+        elif hasattr(invoice_file, "content"):
+            content = getattr(invoice_file, "content")
+        elif hasattr(invoice_file, "to_bytes"):
+            content = invoice_file.to_bytes()
+
+        if content is None:
+            # As a last resort, try attribute commonly used for async responses
+            content = getattr(invoice_file, "body", None)
+
+        if not content:
+            logger.error(f"Invoice content empty for payment {payment_id}")
+            raise HTTPException(status_code=502, detail="Failed to fetch invoice")
+
+        from fastapi import Response as FastAPIResponse
+        return FastAPIResponse(
+            content=content,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="invoice_{payment_id}.pdf"'
+            },
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to download invoice for payment {payment_id}: {e}")
+        raise HTTPException(status_code=400, detail="Failed to download invoice")
+
 @webhooks_router.post("/webhooks/dodopayments/bypass")
 async def bypass_signature_webhook(
     request: Request,
@@ -1013,7 +1278,44 @@ async def handle_dodopayments_webhook(
                     
                     # Commit all changes at once
                     try:
-                        db.commit()
+                        # Also persist Dodo customer and default payment method metadata when available
+                    try:
+                        customer_obj = (data.get("customer") or {}) if isinstance(data.get("customer"), dict) else {}
+                        dodo_cust_id = customer_obj.get("id") or data.get("customer_id") or data.get("customerId")
+                        if dodo_cust_id and getattr(user, "dodo_customer_id", None) != dodo_cust_id:
+                            setattr(user, "dodo_customer_id", dodo_cust_id)
+                            logger.info(f"💾 Stored dodo_customer_id for user {user.id}: {dodo_cust_id}")
+
+                        pm = (
+                            data.get("default_payment_method")
+                            or customer_obj.get("default_payment_method")
+                            or data.get("payment_method")
+                            or {}
+                        )
+                        if isinstance(pm, dict):
+                            card = pm.get("card") or {}
+                            pm_id = pm.get("payment_method_id") or pm.get("id")
+                            pm_type = pm.get("type") or "card"
+                            brand = card.get("brand") or pm.get("brand")
+                            last4 = card.get("last4") or pm.get("last4")
+                            exp_month = card.get("exp_month") or pm.get("exp_month")
+                            exp_year = card.get("exp_year") or pm.get("exp_year")
+
+                            # Only store non-PCI metadata
+                            if pm_id or last4 or brand:
+                                user.dodo_default_payment_method_id = pm_id or user.dodo_default_payment_method_id
+                                user.dodo_payment_method_type = pm_type or user.dodo_payment_method_type
+                                user.dodo_payment_method_brand = brand or user.dodo_payment_method_brand
+                                user.dodo_payment_method_last4 = last4 or user.dodo_payment_method_last4
+                                if exp_month:
+                                    user.dodo_payment_method_exp_month = exp_month
+                                if exp_year:
+                                    user.dodo_payment_method_exp_year = exp_year
+                                logger.info(f"💾 Stored masked payment method for user {user.id}: brand={brand}, last4={last4}")
+                    except Exception as e:
+                        logger.warning(f"⚠️ Failed extracting customer/payment method from webhook for user {user.id}: {e}")
+
+                    db.commit()
                         logger.info(f"💾 Successfully committed all subscription changes for user {user.id}")
                     except Exception as e:
                         db.rollback()

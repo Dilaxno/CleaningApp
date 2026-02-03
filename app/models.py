@@ -133,6 +133,16 @@ class User(Base):
     payout_bank_address = Column(
         String(500), nullable=True
     )  # Bank address (for international transfers)
+
+    # Dodo Payments linkage (non-PCI metadata only)
+    dodo_customer_id = Column(String(255), nullable=True)
+    dodo_default_payment_method_id = Column(String(255), nullable=True)
+    dodo_payment_method_brand = Column(String(50), nullable=True)
+    dodo_payment_method_last4 = Column(String(4), nullable=True)
+    dodo_payment_method_exp_month = Column(Integer, nullable=True)
+    dodo_payment_method_exp_year = Column(Integer, nullable=True)
+    dodo_payment_method_type = Column(String(50), nullable=True)
+
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 

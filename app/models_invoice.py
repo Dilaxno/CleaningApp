@@ -102,3 +102,32 @@ class Payout(Base):
     
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class SubscriptionPayment(Base):
+    """Track subscription payments charged to the platform user (provider) via Dodo"""
+    __tablename__ = "subscription_payments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    # Dodo references
+    dodo_payment_id = Column(String(255), unique=True, nullable=False, index=True)
+    dodo_subscription_id = Column(String(255), nullable=True)
+    dodo_customer_id = Column(String(255), nullable=True)
+
+    # Amounts (store in major units for display; raw_lowest_unit stored for audit)
+    amount = Column(Float, nullable=True)  # Converted to major unit (e.g., USD -> dollars)
+    amount_lowest_unit = Column(Integer, nullable=True)  # Raw amount from Dodo (e.g., cents)
+    currency = Column(String(10), default="USD")
+
+    # Status and description
+    status = Column(String(50), default="paid")  # paid, failed, pending
+    description = Column(Text, nullable=True)  # e.g., plan name or invoice title
+    invoice_number = Column(String(100), nullable=True)
+
+    # Timestamps from provider
+    paid_at = Column(DateTime, nullable=True)
+
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
