@@ -3,29 +3,17 @@ Service Area Validation Service
 
 Validates ZIP codes against business-configured service areas.
 Supports state, county, and neighborhood-level restrictions.
-Uses uszipcode library for comprehensive US ZIP code data.
+Uses zipcodes library for comprehensive US ZIP code data.
 """
 
 import logging
 import re
 from typing import Dict, List, Optional, Tuple
 from sqlalchemy.orm import Session
-from uszipcode import SearchEngine
+import zipcodes
 from ..models import BusinessConfig, User
 
 logger = logging.getLogger(__name__)
-
-# Initialize ZIP code search engine (cached globally for performance)
-_zip_search_engine = None
-
-def get_zip_search_engine():
-    """Get or create the ZIP code search engine (singleton pattern)."""
-    global _zip_search_engine
-    if _zip_search_engine is None:
-        logger.info("🗺️ Initializing ZIP code search engine...")
-        _zip_search_engine = SearchEngine()
-        logger.info("✅ ZIP code search engine initialized")
-    return _zip_search_engine
 
 # US state abbreviations to full names mapping
 US_STATES = {
@@ -114,23 +102,28 @@ class ServiceAreaValidator:
     
     def _get_zipcode_location(self, zipcode: str) -> Optional[Dict[str, str]]:
         """
-        Get location data for a ZIP code using the uszipcode library.
+        Get location data for a ZIP code using the zipcodes library.
         Returns standardized location information including state, county, and city.
         """
         try:
-            search_engine = get_zip_search_engine()
+            # Use zipcodes library to lookup ZIP code
+            zip_info = zipcodes.matching(zipcode)
             
-            # Search for the ZIP code
-            zip_info = search_engine.by_zipcode(zipcode)
-            
-            if not zip_info or not zip_info.zipcode:
+            if not zip_info:
                 logger.debug(f"ZIP code {zipcode} not found in database")
                 return None
             
+            # zipcodes.matching returns a list, get the first match
+            zip_data = zip_info[0] if zip_info else None
+            
+            if not zip_data:
+                logger.debug(f"No data found for ZIP code {zipcode}")
+                return None
+            
             # Extract location information
-            state = zip_info.state
-            county = zip_info.county
-            city = zip_info.major_city or zip_info.post_office_city
+            state = zip_data.get('state')
+            county = zip_data.get('county')
+            city = zip_data.get('city')
             
             # Validate required fields
             if not state or not county or not city:
