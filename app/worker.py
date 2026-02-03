@@ -85,27 +85,44 @@ async def generate_contract_pdf_task(ctx, client_id: int, owner_uid: str, form_d
             raise Exception("Business config not found")
         
         # Calculate quote
-        quote = calculate_quote(config, form_data)
-        pass
+        try:
+            quote = calculate_quote(config, form_data)
+            logger.info(f"📊 Quote calculated: ${quote.get('total', 0)}")
+        except Exception as e:
+            logger.error(f"❌ Quote calculation failed: {str(e)}")
+            raise Exception(f"Failed to calculate quote: {str(e)}")
         
         # Generate HTML
-        html = await generate_contract_html(config, client, form_data, quote, signature)
-        pass
+        try:
+            html = await generate_contract_html(config, client, form_data, quote, signature)
+            logger.info(f"📄 Contract HTML generated ({len(html)} chars)")
+        except Exception as e:
+            logger.error(f"❌ HTML generation failed: {str(e)}")
+            raise Exception(f"Failed to generate contract HTML: {str(e)}")
         
         # Generate PDF
-        pdf_bytes = await html_to_pdf(html)
-        pass
+        try:
+            pdf_bytes = await html_to_pdf(html)
+            logger.info(f"📄 PDF generated ({len(pdf_bytes)} bytes)")
+        except Exception as e:
+            logger.error(f"❌ PDF generation failed: {str(e)}")
+            raise Exception(f"Failed to generate PDF: {str(e)}")
         
         # Upload to R2
         pdf_key = f"contracts/{user.firebase_uid}/{client.id}-{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
         
-        r2_client = get_r2_client()
-        r2_client.put_object(
-            Bucket=R2_BUCKET_NAME,
-            Key=pdf_key,
-            Body=pdf_bytes,
-            ContentType="application/pdf"
-        )
+        try:
+            r2_client = get_r2_client()
+            r2_client.put_object(
+                Bucket=R2_BUCKET_NAME,
+                Key=pdf_key,
+                Body=pdf_bytes,
+                ContentType="application/pdf"
+            )
+            logger.info(f"📤 PDF uploaded to R2: {pdf_key}")
+        except Exception as e:
+            logger.error(f"❌ R2 upload failed: {str(e)}")
+            raise Exception(f"Failed to upload PDF to storage: {str(e)}")
         
         # Generate presigned URL (7 days)
         # Generate backend URL instead of presigned R2 URL to avoid CORS issues
@@ -183,34 +200,45 @@ async def send_form_notification_emails_task(ctx, client_id: int, user_id: int, 
         business_name = config.business_name if config else "Your Business"
         
         # Send notification to business owner
+        emails_sent = 0
         if user.email:
-            # Extract property shots from form data
-            form_data = client.form_data or {}
-            property_shots_keys = form_data.get("propertyShots", [])
-            if isinstance(property_shots_keys, str):
-                property_shots_keys = [property_shots_keys]
-            
-            await send_new_client_notification(
-                to=user.email,
-                business_name=business_name,
-                client_name=client.contact_name or client.business_name,
-                client_email=client.email or "Not provided",
-                property_type=client.property_type or "Not specified",
-                property_shots_keys=property_shots_keys,
-            )
-            pass
+            try:
+                # Extract property shots from form data
+                form_data = client.form_data or {}
+                property_shots_keys = form_data.get("propertyShots", [])
+                if isinstance(property_shots_keys, str):
+                    property_shots_keys = [property_shots_keys]
+                
+                await send_new_client_notification(
+                    to=user.email,
+                    business_name=business_name,
+                    client_name=client.contact_name or client.business_name,
+                    client_email=client.email or "Not provided",
+                    property_type=client.property_type or "Not specified",
+                    property_shots_keys=property_shots_keys,
+                )
+                logger.info(f"✅ New client notification sent to business owner: {user.email}")
+                emails_sent += 1
+            except Exception as e:
+                logger.error(f"❌ Failed to send notification to business owner {user.email}: {str(e)}")
+                # Don't raise - continue with client email
         
         # Send confirmation to client
         if client.email:
-            await send_form_submission_confirmation(
-                to=client.email,
-                client_name=client.contact_name or client.business_name,
-                business_name=business_name,
-                property_type=client.property_type or "Property",
-            )
-            pass
+            try:
+                await send_form_submission_confirmation(
+                    to=client.email,
+                    client_name=client.contact_name or client.business_name,
+                    business_name=business_name,
+                    property_type=client.property_type or "Property",
+                )
+                logger.info(f"✅ Form confirmation sent to client: {client.email}")
+                emails_sent += 1
+            except Exception as e:
+                logger.error(f"❌ Failed to send confirmation to client {client.email}: {str(e)}")
+                # Don't raise - at least one email might have succeeded
         
-        return {"status": "completed", "emails_sent": 2 if user.email and client.email else 1 if user.email or client.email else 0}
+        return {"status": "completed", "emails_sent": emails_sent}
         
     except Exception as e:
         logger.error(f"❌ Email notification failed: {str(e)}")

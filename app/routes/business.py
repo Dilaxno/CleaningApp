@@ -9,6 +9,7 @@ from ..auth import get_current_user
 from ..database import get_db
 from ..models import BusinessConfig, User
 from .upload import generate_presigned_url
+from ..services.service_area_validator import ServiceAreaValidator
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,16 @@ class BusinessConfigCreate(BaseModel):
     formEmbeddingEnabled: Optional[bool] = None
     # White-label public form links
     customFormsDomain: Optional[str] = None  # e.g., forms.cleaningco.com
+    # Service Area Configuration
+    serviceAreaEnabled: Optional[bool] = None
+    serviceAreaType: Optional[str] = None  # "radius", "zipcode", "custom"
+    serviceAreaCenterLat: Optional[float] = None
+    serviceAreaCenterLon: Optional[float] = None
+    serviceAreaRadiusMiles: Optional[float] = None
+    serviceAreaZipcodes: Optional[List[str]] = None
+    serviceAreaStates: Optional[List[str]] = None
+    serviceAreaCounties: Optional[List[str]] = None
+    serviceAreaNeighborhoods: Optional[List[str]] = None
     # Pricing
     pricingModel: Optional[str] = None
     meetingsRequired: Optional[bool] = None
@@ -302,6 +313,16 @@ def get_current_user_business_config(
         "addonCarpetSmall": config.addon_carpet_small,
         "addonCarpetMedium": config.addon_carpet_medium,
         "addonCarpetLarge": config.addon_carpet_large,
+        # Service Area Configuration
+        "serviceAreaEnabled": config.service_area_enabled,
+        "serviceAreaType": config.service_area_type,
+        "serviceAreaCenterLat": config.service_area_center_lat,
+        "serviceAreaCenterLon": config.service_area_center_lon,
+        "serviceAreaRadiusMiles": config.service_area_radius_miles,
+        "serviceAreaZipcodes": config.service_area_zipcodes,
+        "serviceAreaStates": config.service_area_states,
+        "serviceAreaCounties": config.service_area_counties,
+        "serviceAreaNeighborhoods": config.service_area_neighborhoods,
     }
 
 
@@ -451,6 +472,26 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
             if is_provided(data.preferredUnits):
                 existing.preferred_units = data.preferredUnits
 
+            # Service Area Configuration
+            if data.serviceAreaEnabled is not None:
+                existing.service_area_enabled = data.serviceAreaEnabled
+            if is_provided(data.serviceAreaType):
+                existing.service_area_type = data.serviceAreaType
+            if data.serviceAreaCenterLat is not None:
+                existing.service_area_center_lat = data.serviceAreaCenterLat
+            if data.serviceAreaCenterLon is not None:
+                existing.service_area_center_lon = data.serviceAreaCenterLon
+            if data.serviceAreaRadiusMiles is not None:
+                existing.service_area_radius_miles = data.serviceAreaRadiusMiles
+            if data.serviceAreaZipcodes is not None:
+                existing.service_area_zipcodes = data.serviceAreaZipcodes
+            if data.serviceAreaStates is not None:
+                existing.service_area_states = data.serviceAreaStates
+            if data.serviceAreaCounties is not None:
+                existing.service_area_counties = data.serviceAreaCounties
+            if data.serviceAreaNeighborhoods is not None:
+                existing.service_area_neighborhoods = data.serviceAreaNeighborhoods
+
             db.commit()
             config = existing
         else:
@@ -510,6 +551,16 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 custom_inclusions=data.customInclusions,
                 custom_exclusions=data.customExclusions,
                 preferred_units=data.preferredUnits,
+                # Service Area Configuration
+                service_area_enabled=data.serviceAreaEnabled or False,
+                service_area_type=data.serviceAreaType,
+                service_area_center_lat=data.serviceAreaCenterLat,
+                service_area_center_lon=data.serviceAreaCenterLon,
+                service_area_radius_miles=data.serviceAreaRadiusMiles,
+                service_area_zipcodes=data.serviceAreaZipcodes,
+                service_area_states=data.serviceAreaStates,
+                service_area_counties=data.serviceAreaCounties,
+                service_area_neighborhoods=data.serviceAreaNeighborhoods,
             )
             db.add(config)
             db.commit()
@@ -870,3 +921,80 @@ def get_public_business_info(
         "day_schedules": day_schedules,
         "off_work_periods": off_work_periods,
     }
+
+
+# Service Area Validation Endpoints
+
+class ZipcodeValidationRequest(BaseModel):
+    zipcode: str
+
+
+class ZipcodeValidationResponse(BaseModel):
+    allowed: bool
+    reason: str
+    zipcode_info: Optional[Dict] = None
+
+
+@router.post("/public/validate-zipcode/{firebase_uid}", response_model=ZipcodeValidationResponse)
+async def validate_zipcode_public(
+    firebase_uid: str,
+    request_data: ZipcodeValidationRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Public endpoint to validate a ZIP code against a business's service area.
+    Used by client forms before allowing form submission.
+    """
+    logger.info(f"📍 Validating ZIP code {request_data.zipcode} for business {firebase_uid}")
+
+    # Custom domain security validation
+    if hasattr(request.state, 'is_custom_domain') and request.state.is_custom_domain:
+        if (not hasattr(request.state, 'custom_domain_user_uid') or 
+            request.state.custom_domain_user_uid != firebase_uid):
+            logger.warning(
+                f"🚫 Custom domain security violation in ZIP validation: Domain user {getattr(request.state, 'custom_domain_user_uid', 'unknown')} "
+                f"does not match requested user {firebase_uid}"
+            )
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied: Custom domain does not match requested user"
+            )
+
+    # Find user by firebase_uid
+    user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
+    if not user:
+        logger.error(f"❌ User not found for firebase_uid: {firebase_uid}")
+        raise HTTPException(status_code=404, detail="Business not found")
+
+    # Get business config
+    config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
+    if not config:
+        logger.warning(f"⚠️ Business config not found for user_id: {user.id}")
+        raise HTTPException(status_code=404, detail="Business configuration not found")
+
+    # Validate ZIP code
+    validator = ServiceAreaValidator(db)
+    result = await validator.validate_zipcode(config, request_data.zipcode)
+    
+    logger.info(f"📍 ZIP validation result for {request_data.zipcode}: {result['allowed']} - {result['reason']}")
+    
+    return ZipcodeValidationResponse(**result)
+
+
+@router.get("/service-area-summary")
+async def get_service_area_summary(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get a summary of the current user's service area configuration.
+    """
+    config = db.query(BusinessConfig).filter(BusinessConfig.user_id == current_user.id).first()
+    if not config:
+        raise HTTPException(status_code=404, detail="Business configuration not found")
+
+    validator = ServiceAreaValidator(db)
+    summary = await validator.get_service_area_summary(config)
+    
+    return summary

@@ -280,6 +280,17 @@ class BusinessConfig(Base):
     subdomain_last_check_at = Column(DateTime, nullable=True)
     subdomain_verification_token = Column(String(255), nullable=True)  # Unique token for TXT record
 
+    # Service Area Configuration
+    service_area_enabled = Column(Boolean, default=False, nullable=False)
+    service_area_type = Column(String(20), nullable=True)  # "radius", "zipcode", "custom"
+    service_area_center_lat = Column(Float, nullable=True)  # Center point latitude for radius
+    service_area_center_lon = Column(Float, nullable=True)  # Center point longitude for radius
+    service_area_radius_miles = Column(Float, nullable=True)  # Radius in miles
+    service_area_zipcodes = Column(JSON, nullable=True)  # List of allowed ZIP codes
+    service_area_states = Column(JSON, nullable=True)  # List of allowed states
+    service_area_counties = Column(JSON, nullable=True)  # List of allowed counties (state:county format)
+    service_area_neighborhoods = Column(JSON, nullable=True)  # List of allowed neighborhoods
+
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 

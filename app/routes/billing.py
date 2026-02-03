@@ -1199,6 +1199,18 @@ async def handle_dodopayments_webhook(
     webhook_id = request.headers.get("webhook-id", "unknown")
     webhook_timestamp = request.headers.get("webhook-timestamp", "")
 
+    # CRITICAL: Check for duplicate webhook processing (idempotency)
+    # This prevents double-charging users if the same webhook is received multiple times
+    from ..cache import cache
+    idempotency_key = f"webhook_processed:{webhook_id}"
+    
+    if cache.get(idempotency_key):
+        logger.info(f"🔄 Webhook {webhook_id} already processed, skipping (idempotency)")
+        return {"status": "already_processed", "webhook_id": webhook_id}
+    
+    # Mark webhook as being processed (24 hour TTL)
+    cache.set(idempotency_key, True, ttl=86400)
+
     try:
         event = json.loads(raw_body.decode("utf-8"))
     except Exception as e:

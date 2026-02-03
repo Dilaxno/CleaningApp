@@ -15,8 +15,10 @@ from sqlalchemy.orm import sessionmaker
 # Add the app directory to the path so we can import models
 sys.path.append(os.path.join(os.path.dirname(__file__), 'app'))
 
+# Import all models to avoid circular dependency issues
 from app.models import User, BusinessConfig
-from app.database import get_database_url
+from app.models_invoice import Invoice  # Import Invoice model to resolve dependencies
+from app.config import DATABASE_URL
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -25,8 +27,7 @@ def sync_onboarding_status():
     """Synchronize onboarding status between User and BusinessConfig tables"""
     
     # Create database connection
-    database_url = get_database_url()
-    engine = create_engine(database_url)
+    engine = create_engine(DATABASE_URL)
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     
     db = SessionLocal()

@@ -16,6 +16,7 @@ from ..database import get_db
 from ..models import BusinessConfig, Client, User, Contract
 from ..rate_limiter import create_rate_limiter, get_redis_client, rate_limit_dependency
 from ..utils.sanitization import sanitize_string
+from ..services.service_area_validator import ServiceAreaValidator
 
 logger = logging.getLogger(__name__)
 
@@ -593,6 +594,26 @@ async def get_quote_preview(
             quotePending=True,
         )
 
+    # Validate ZIP code against service area if enabled
+    client_zipcode = data.formData.get("zipCode") or data.formData.get("zipcode")
+    if client_zipcode and config.service_area_enabled:
+        validator = ServiceAreaValidator(db)
+        validation_result = await validator.validate_zipcode(config, client_zipcode)
+        
+        if not validation_result["allowed"]:
+            logger.info(f"🚫 ZIP code {client_zipcode} rejected for {data.ownerUid}: {validation_result['reason']}")
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "type": "service_area_restriction",
+                    "message": "Sorry, but we don't serve your area yet, maybe in the future.",
+                    "zipcode": client_zipcode,
+                    "reason": validation_result["reason"]
+                }
+            )
+        
+        logger.info(f"✅ ZIP code {client_zipcode} validated for {data.ownerUid}: {validation_result['reason']}")
+
     # Check if this IP has any signed contracts with this business (first cleaning detection)
     existing_signed_contract = db.query(Contract).filter(
         Contract.user_id == user.id,
@@ -780,6 +801,32 @@ async def submit_public_form(
     if not user:
         logger.error(f"❌ User not found for Firebase UID: {data.ownerUid}")
         raise HTTPException(status_code=404, detail="Business not found")
+
+    # Get business config for service area validation
+    config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
+    
+    # Validate ZIP code against service area if enabled
+    client_zipcode = None
+    if data.formData:
+        client_zipcode = data.formData.get("zipCode") or data.formData.get("zipcode")
+    
+    if client_zipcode and config and config.service_area_enabled:
+        validator = ServiceAreaValidator(db)
+        validation_result = await validator.validate_zipcode(config, client_zipcode)
+        
+        if not validation_result["allowed"]:
+            logger.info(f"🚫 ZIP code {client_zipcode} rejected for {data.ownerUid}: {validation_result['reason']}")
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "type": "service_area_restriction",
+                    "message": "Sorry, but we don't serve your area yet, maybe in the future.",
+                    "zipcode": client_zipcode,
+                    "reason": validation_result["reason"]
+                }
+            )
+        
+        logger.info(f"✅ ZIP code {client_zipcode} validated for {data.ownerUid}: {validation_result['reason']}")
 
     # Check if this IP has any signed contracts with this business (first cleaning detection)
     existing_signed_contract = db.query(Contract).filter(

@@ -549,9 +549,19 @@ async def delete_contract(
     if not contract:
         raise HTTPException(status_code=404, detail="Contract not found")
     
-    # Delete related invoices first to avoid foreign key constraint violation
-    db.query(Invoice).filter(Invoice.contract_id == contract_id).delete()
-    
-    db.delete(contract)
-    db.commit()
-    return {"message": "Contract deleted"}
+    try:
+        # Delete related invoices first to avoid foreign key constraint violation
+        deleted_invoices = db.query(Invoice).filter(Invoice.contract_id == contract_id).delete()
+        logger.info(f"🗑️ Deleted {deleted_invoices} invoices for contract {contract_id}")
+        
+        # Delete the contract
+        db.delete(contract)
+        db.commit()
+        
+        logger.info(f"✅ Contract {contract_id} and related data deleted successfully")
+        return {"message": "Contract deleted"}
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to delete contract {contract_id}: {str(e)}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to delete contract")
