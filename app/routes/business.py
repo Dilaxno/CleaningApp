@@ -165,9 +165,64 @@ def get_current_user_business_config(
         .filter(BusinessConfig.user_id == current_user.id)
         .first()
     )
+    
+    # CRITICAL FIX: If BusinessConfig doesn't exist, check User.onboarding_completed
+    # This prevents users from losing onboarding progress when switching devices
     if not config:
-        logger.warning(f"⚠️ Business config not found for user_id: {current_user.id}")
-        raise HTTPException(status_code=404, detail="Business config not found")
+        logger.info(f"📋 BusinessConfig not found for user {current_user.id}, checking User.onboarding_completed")
+        
+        # If user has completed onboarding (stored in User table), return minimal config
+        if current_user.onboarding_completed:
+            logger.info(f"✅ User {current_user.id} has completed onboarding (from User table)")
+            return {
+                "businessName": None,
+                "logoKey": None,
+                "logoUrl": None,
+                "signatureKey": None,
+                "signatureUrl": None,
+                "onboardingComplete": True,  # Use User.onboarding_completed as fallback
+                "formEmbeddingEnabled": False,
+                "customFormsDomain": None,
+                "pricingModel": None,
+                "meetingsRequired": None,
+                "paymentHandling": None,
+                "cancellationWindow": None,
+                "workingDays": [],
+                "workingHours": {},
+                "breakTimes": [],
+                "daySchedules": {},
+                "offWorkPeriods": [],
+                "customAddons": [],
+                "suppliesProvided": None,
+                "availableSupplies": [],
+                "ratePerSqft": None,
+                "ratePerRoom": None,
+                "hourlyRate": None,
+                "flatRate": None,
+                "flatRateSmall": None,
+                "flatRateMedium": None,
+                "flatRateLarge": None,
+                "minimumCharge": None,
+                "brandColor": "#00C4B4",  # Default brand color
+                "firstCleaningDiscount": None,
+                "firstCleaningDiscountType": None,
+                "firstCleaningDiscountValue": None,
+                "carpetCleaningRate": None,
+                "carpetCleaningRateType": None,
+                "carpetCleaningMinimum": None,
+                "carpetCleaningMaxRooms": None,
+                "carpetCleaningFlatRateSmall": None,
+                "carpetCleaningFlatRateMedium": None,
+                "carpetCleaningFlatRateLarge": None,
+                "threeTimeEstimation": False,
+                "quickTimeEstimate": None,
+                "standardTimeEstimate": None,
+                "deepTimeEstimate": None,
+            }
+        else:
+            # User hasn't completed onboarding, return 404 as before
+            logger.warning(f"⚠️ Business config not found and onboarding not completed for user_id: {current_user.id}")
+            raise HTTPException(status_code=404, detail="Business config not found")
 
     # Generate presigned URLs for logo and signature if they exist
     logo_presigned_url = None
@@ -185,13 +240,20 @@ def get_current_user_business_config(
         except Exception as e:
             logger.warning(f"⚠️ Failed to generate presigned URL for signature: {e}")
 
+    # CRITICAL FIX: Always check both BusinessConfig.onboarding_complete AND User.onboarding_completed
+    # Return true if EITHER is true (prevents losing onboarding status)
+    onboarding_complete = config.onboarding_complete or current_user.onboarding_completed
+    
+    if onboarding_complete != config.onboarding_complete:
+        logger.info(f"🔄 Syncing onboarding status: BusinessConfig={config.onboarding_complete}, User={current_user.onboarding_completed}, returning={onboarding_complete}")
+
     return {
         "businessName": config.business_name,
         "logoKey": config.logo_url,
         "logoUrl": logo_presigned_url,
         "signatureKey": config.signature_url,
         "signatureUrl": signature_presigned_url,
-        "onboardingComplete": config.onboarding_complete,
+        "onboardingComplete": onboarding_complete,  # Use OR logic for reliability
         "formEmbeddingEnabled": config.form_embedding_enabled,
         "customFormsDomain": config.custom_forms_domain,
         "pricingModel": config.pricing_model,
@@ -279,6 +341,9 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 existing.signature_url = data.signatureUrl
             if data.onboardingComplete is not None:
                 existing.onboarding_complete = data.onboardingComplete
+                # CRITICAL FIX: Also update User.onboarding_completed to keep them synchronized
+                user.onboarding_completed = data.onboardingComplete
+                logger.info(f"🔄 Synchronized onboarding status to {data.onboardingComplete} for user {user.id} (existing config)")
             if data.formEmbeddingEnabled is not None:
                 existing.form_embedding_enabled = data.formEmbeddingEnabled
             if is_provided(data.customFormsDomain):
@@ -449,11 +514,15 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
             db.add(config)
             db.commit()
 
-        user.onboarding_completed = (
-            data.onboardingComplete
-            if data.onboardingComplete is not None
-            else user.onboarding_completed
-        )
+        # CRITICAL FIX: Ensure both User.onboarding_completed and BusinessConfig.onboarding_complete are synchronized
+        # This prevents users from losing onboarding progress when switching devices
+        if data.onboardingComplete is not None:
+            user.onboarding_completed = data.onboardingComplete
+            # Also ensure BusinessConfig is updated if it exists
+            if config:
+                config.onboarding_complete = data.onboardingComplete
+            logger.info(f"🔄 Synchronized onboarding status to {data.onboardingComplete} for user {user.id}")
+        
         db.commit()
 
         return {"message": "Business configuration saved", "id": config.id}
