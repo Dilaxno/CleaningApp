@@ -1279,7 +1279,6 @@ async def handle_dodopayments_webhook(
                     # Commit all changes at once
                     try:
                         # Also persist Dodo customer and default payment method metadata when available
-                    try:
                         customer_obj = (data.get("customer") or {}) if isinstance(data.get("customer"), dict) else {}
                         dodo_cust_id = customer_obj.get("id") or data.get("customer_id") or data.get("customerId")
                         if dodo_cust_id and getattr(user, "dodo_customer_id", None) != dodo_cust_id:
@@ -1315,7 +1314,8 @@ async def handle_dodopayments_webhook(
                     except Exception as e:
                         logger.warning(f"⚠️ Failed extracting customer/payment method from webhook for user {user.id}: {e}")
 
-                    db.commit()
+                    try:
+                        db.commit()
                         logger.info(f"💾 Successfully committed all subscription changes for user {user.id}")
                     except Exception as e:
                         db.rollback()
