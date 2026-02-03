@@ -14,11 +14,15 @@ from ..database import get_db
 from ..auth import get_current_user
 from ..models import User
 from ..services.service_area_validator import ServiceAreaValidator
-from ..rate_limiter import rate_limit_api
+from ..rate_limiter import create_rate_limiter
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/service-areas", tags=["service-areas"])
+
+# Rate limiters for service area endpoints
+rate_limit_api = create_rate_limiter(limit=100, window_seconds=60, key_prefix="service_areas_api")
+rate_limit_validation = create_rate_limiter(limit=20, window_seconds=60, key_prefix="zipcode_validation")
 
 
 class ServiceArea(BaseModel):
@@ -118,7 +122,7 @@ async def update_service_areas(
 async def validate_zipcode(
     request: ZipCodeValidationRequest,
     db: Session = Depends(get_db),
-    _: None = Depends(rate_limit_api),
+    _: None = Depends(rate_limit_validation),
 ):
     """
     Validate if a ZIP code is within a business's service areas.
