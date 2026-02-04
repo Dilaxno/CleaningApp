@@ -288,6 +288,9 @@ class BusinessConfig(Base):
     # Service areas configuration
     service_areas = Column(JSON, default=list)  # List of service areas with states, counties, neighborhoods
 
+    # Active templates - list of template IDs that the business owner has selected to work with
+    active_templates = Column(JSON, default=list)  # List of template IDs: ["office", "retail", "medical", ...]
+
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 

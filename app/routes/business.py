@@ -84,6 +84,9 @@ class BusinessConfigCreate(BaseModel):
     
     # Custom packages for "packages" pricing model
     customPackages: Optional[List[Dict]] = None
+    
+    # Active templates - list of template IDs that the business owner has selected to work with
+    activeTemplates: Optional[List[str]] = None
 
 
 def to_float(val: Optional[str]) -> Optional[float]:
@@ -459,6 +462,8 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 existing.preferred_units = data.preferredUnits
             if data.customPackages is not None:
                 existing.custom_packages = data.customPackages
+            if data.activeTemplates is not None:
+                existing.active_templates = data.activeTemplates
 
             db.commit()
             config = existing
@@ -521,6 +526,7 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 custom_exclusions=data.customExclusions,
                 preferred_units=data.preferredUnits,
                 custom_packages=data.customPackages,
+                active_templates=data.activeTemplates,
             )
             db.add(config)
             db.commit()
