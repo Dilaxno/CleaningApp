@@ -16,9 +16,9 @@ TEMPLATE_IMAGES = [
     ("Residential / Home", "https://res.cloudinary.com/dxqum9ywx/image/upload/v1768087528/residential_aoijhw.jpg"),
     ("Airbnb / Short-Term Rental", "https://res.cloudinary.com/dxqum9ywx/image/upload/v1768087528/Airbnb_qopjpn.jpg"),
     ("School / Daycare", "https://res.cloudinary.com/dxqum9ywx/image/upload/v1768087528/school_opn4hw.jpg"),
-    ("Warehouse / Industrial", "https://images.unsplash.com/photo-1586864387967-d02ef85d93e8?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80"),
+    ("Warehouse / Industrial", "https://res.cloudinary.com/dxqum9ywx/image/upload/v1768087528/warehouse_korsp2.jpg"),
     ("Post-Construction", "https://images.unsplash.com/photo-1504307651254-35680f356dfd?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80"),
-    ("Move In / Move Out", "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80"),
+    ("Move In / Move Out", "https://res.cloudinary.com/dxqum9ywx/image/upload/v1768087527/Move_in_Move_out_srjbid.webp"),
     ("Deep Clean", "https://images.unsplash.com/photo-1581578731548-c64695cc6952?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80"),
 ]
 

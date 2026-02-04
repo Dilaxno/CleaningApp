@@ -79,7 +79,7 @@ AVAILABLE_TEMPLATES = [
         "id": "warehouse",
         "name": "Warehouse / Industrial",
         "description": "Heavy-duty cleaning for industrial spaces.",
-        "image": "https://images.unsplash.com/photo-1586864387967-d02ef85d93e8?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80",
+        "image": "https://res.cloudinary.com/dxqum9ywx/image/upload/v1768087528/warehouse_korsp2.jpg",
         "color": "#1a1a1a",
         "category": "Industrial"
     },
@@ -95,7 +95,7 @@ AVAILABLE_TEMPLATES = [
         "id": "move-in-out",
         "name": "Move In / Move Out",
         "description": "Deep cleaning for property transitions.",
-        "image": "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80",
+        "image": "https://res.cloudinary.com/dxqum9ywx/image/upload/v1768087527/Move_in_Move_out_srjbid.webp",
         "color": "#1a1a1a",
         "category": "Specialized"
     },
