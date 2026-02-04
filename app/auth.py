@@ -1,5 +1,6 @@
 import logging
 import httpx
+import json
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
@@ -199,8 +200,14 @@ async def get_current_user(
     token = credentials.credentials
     
     # Basic token format validation before processing
-    if not token or len(token.split('.')) != 3:
-        logger.warning(f"⚠️ Malformed token received: {len(token.split('.')) if token else 0} parts")
+    if not token:
+        logger.warning("⚠️ Empty token received")
+        raise HTTPException(status_code=401, detail="No token provided")
+    
+    token_parts = token.split('.')
+    if len(token_parts) != 3:
+        # Log more details about malformed tokens for debugging
+        logger.warning(f"⚠️ Malformed token received: {len(token_parts)} parts, token length: {len(token)}, first 20 chars: '{token[:20]}...'")
         raise HTTPException(status_code=401, detail="Invalid token format")
     
     try:
@@ -214,6 +221,7 @@ async def get_current_user(
         
         if not firebase_uid:
             logger.error(f"❌ Token missing user ID claim. Available claims: {list(decoded_token.keys())}")
+            logger.error(f"❌ Token payload sample: {json.dumps({k: v for k, v in decoded_token.items() if k in ['sub', 'uid', 'user_id', 'email', 'iss', 'aud']}, indent=2)}")
             raise HTTPException(status_code=401, detail="Invalid token claims")
         
         # Find or create user in our database
