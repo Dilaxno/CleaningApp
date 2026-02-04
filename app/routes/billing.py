@@ -372,7 +372,6 @@ async def create_checkout_session(
         raise HTTPException(status_code=400, detail="product_id is required")
  
     return_url = f"{FRONTEND_URL.rstrip('/')}{body.return_path or '/checkout/success'}"
-    cancel_url = f"{FRONTEND_URL.rstrip('/')}/checkout/failed"
 
     # Build metadata to link back to your user
     metadata = {
@@ -398,7 +397,6 @@ async def create_checkout_session(
             # subscription_data={"trial_period_days": 3},
             metadata=metadata,
             return_url=return_url,
-            cancel_url=cancel_url,
         )
         # According to docs, response contains `checkout_url` and `session_id`
         checkout_url = getattr(session, "checkout_url", None) or getattr(session, "url", None) or session.get("checkout_url")

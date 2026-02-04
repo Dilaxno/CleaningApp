@@ -19,15 +19,22 @@ async def get_google_public_keys():
     """Fetch Google's public keys for Firebase token verification"""
     global _cached_keys
     if _cached_keys:
+        logger.debug("✅ Using cached Google public keys")
         return _cached_keys
     
-    async with httpx.AsyncClient() as client:
-        response = await client.get(
-            "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com"
-        )
-        if response.status_code == 200:
-            _cached_keys = response.json()
-            return _cached_keys
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com"
+            )
+            if response.status_code == 200:
+                _cached_keys = response.json()
+                logger.info(f"✅ Fetched {len(_cached_keys)} Google public keys")
+                return _cached_keys
+            else:
+                logger.error(f"❌ Failed to fetch Google public keys: HTTP {response.status_code}")
+    except Exception as e:
+        logger.error(f"❌ Error fetching Google public keys: {str(e)}")
     return None
 
 
@@ -53,9 +60,11 @@ async def verify_firebase_token(token: str) -> dict:
         # Split token into parts
         parts = token.split('.')
         if len(parts) != 3:
+            logger.error("❌ Invalid token format: wrong number of parts")
             raise HTTPException(status_code=401, detail="Invalid token format")
         
         header_b64, payload_b64, signature_b64 = parts
+        logger.debug("✅ Token split into 3 parts successfully")
         
         # Decode header to get key ID (kid)
         header_padding = 4 - len(header_b64) % 4
@@ -64,30 +73,43 @@ async def verify_firebase_token(token: str) -> dict:
         else:
             header_b64_padded = header_b64
         
-        header = json.loads(base64.urlsafe_b64decode(header_b64_padded))
+        try:
+            header = json.loads(base64.urlsafe_b64decode(header_b64_padded))
+            logger.debug("✅ Token header decoded successfully")
+        except Exception as e:
+            logger.error(f"❌ Failed to decode token header: {str(e)}")
+            raise HTTPException(status_code=401, detail="Invalid token header")
+        
         kid = header.get('kid')
         alg = header.get('alg')
         
         if alg != 'RS256':
+            logger.error(f"❌ Invalid token algorithm: {alg}")
             raise HTTPException(status_code=401, detail="Invalid token algorithm")
         
         if not kid:
+            logger.error("❌ Token missing key ID")
             raise HTTPException(status_code=401, detail="Token missing key ID")
+        
+        logger.debug(f"✅ Token header validated: alg={alg}, kid={kid}")
         
         # Fetch Google's public keys
         public_keys = await get_google_public_keys()
         if not public_keys or kid not in public_keys:
+            logger.warning(f"⚠️ Key ID {kid} not found in public keys, invalidating cache and retrying")
             # Invalidate cache and retry
             global _cached_keys
             _cached_keys = None
             public_keys = await get_google_public_keys()
             if not public_keys or kid not in public_keys:
+                logger.error(f"❌ Key ID {kid} not found in public keys after retry")
                 raise HTTPException(status_code=401, detail="Unable to verify token signature")
         
         # Get the certificate for this key ID
         cert_pem = public_keys[kid]
         cert = load_pem_x509_certificate(cert_pem.encode(), default_backend())
         public_key = cert.public_key()
+        logger.debug(f"✅ Public key loaded for kid: {kid}")
         
         # Decode signature
         sig_padding = 4 - len(signature_b64) % 4
@@ -96,7 +118,12 @@ async def verify_firebase_token(token: str) -> dict:
         else:
             signature_b64_padded = signature_b64
         
-        signature = base64.urlsafe_b64decode(signature_b64_padded)
+        try:
+            signature = base64.urlsafe_b64decode(signature_b64_padded)
+            logger.debug("✅ Token signature decoded successfully")
+        except Exception as e:
+            logger.error(f"❌ Failed to decode token signature: {str(e)}")
+            raise HTTPException(status_code=401, detail="Invalid token signature format")
         
         # Verify signature (header.payload signed with private key)
         message = f"{header_b64}.{payload_b64}".encode()
@@ -108,8 +135,9 @@ async def verify_firebase_token(token: str) -> dict:
                 padding.PKCS1v15(),
                 hashes.SHA256()
             )
-        except Exception:
-            logger.error("❌ Token signature verification failed")
+            logger.debug("✅ Token signature verified successfully")
+        except Exception as e:
+            logger.error(f"❌ Token signature verification failed: {str(e)}")
             raise HTTPException(status_code=401, detail="Invalid token signature")
         
         # Decode payload
@@ -157,6 +185,9 @@ async def verify_firebase_token(token: str) -> dict:
         raise
     except Exception as e:
         logger.error(f"❌ Token verification failed: {str(e)}")
+        logger.error(f"❌ Token verification error details: {type(e).__name__}: {str(e)}")
+        import traceback
+        logger.error(f"❌ Token verification traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=401, detail="Token verification failed")
 
 
