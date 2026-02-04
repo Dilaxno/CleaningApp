@@ -255,6 +255,11 @@ class BusinessConfig(Base):
     custom_inclusions = Column(JSON, default=list)  # Custom user-added inclusions
     custom_exclusions = Column(JSON, default=list)  # Custom user-added exclusions
     preferred_units = Column(String(20), default="sqft")
+    
+    # Custom packages for "packages" pricing model
+    custom_packages = Column(
+        JSON, nullable=True
+    )  # Custom packages: [{"id": "uuid", "name": "Full Deep Clean", "description": "...", "included": ["..."], "duration": 120, "priceType": "flat|range|quote", "price": 150, "priceMin": 100, "priceMax": 200}]
 
     # Custom forms domain (white-labeled public form links)
     # Example: forms.cleaningco.com (CNAME forms -> api.cleanenroll.com)

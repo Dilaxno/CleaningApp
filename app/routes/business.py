@@ -81,6 +81,9 @@ class BusinessConfigCreate(BaseModel):
     customInclusions: Optional[List[str]] = None
     customExclusions: Optional[List[str]] = None
     preferredUnits: Optional[str] = None
+    
+    # Custom packages for "packages" pricing model
+    customPackages: Optional[List[Dict]] = None
 
 
 def to_float(val: Optional[str]) -> Optional[float]:
@@ -454,6 +457,8 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 existing.custom_exclusions = data.customExclusions
             if is_provided(data.preferredUnits):
                 existing.preferred_units = data.preferredUnits
+            if data.customPackages is not None:
+                existing.custom_packages = data.customPackages
 
             db.commit()
             config = existing
@@ -515,6 +520,7 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 custom_inclusions=data.customInclusions,
                 custom_exclusions=data.customExclusions,
                 preferred_units=data.preferredUnits,
+                custom_packages=data.customPackages,
             )
             db.add(config)
             db.commit()
