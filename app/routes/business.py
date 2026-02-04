@@ -201,6 +201,7 @@ def get_current_user_business_config(
                 "daySchedules": {},
                 "offWorkPeriods": [],
                 "customAddons": [],
+                "customPackages": [],
                 "suppliesProvided": None,
                 "availableSupplies": [],
                 "ratePerSqft": None,
@@ -310,6 +311,7 @@ def get_current_user_business_config(
         "addonCarpetSmall": config.addon_carpet_small,
         "addonCarpetMedium": config.addon_carpet_medium,
         "addonCarpetLarge": config.addon_carpet_large,
+        "customPackages": config.custom_packages,
     }
 
 
@@ -638,6 +640,7 @@ def get_business_config(firebase_uid: str, db: Session = Depends(get_db)):
         "addonCarpetSmall": config.addon_carpet_small,
         "addonCarpetMedium": config.addon_carpet_medium,
         "addonCarpetLarge": config.addon_carpet_large,
+        "customPackages": config.custom_packages,
     }
 
 
