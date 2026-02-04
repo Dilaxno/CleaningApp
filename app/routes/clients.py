@@ -639,6 +639,42 @@ async def get_quote_preview(
             explanation_parts.append(
                 f"{business_name} prices their jobs at ${config.hourly_rate:.2f} per hour"
             )
+        elif pricing_model == "packages":
+            # Find the selected package for explanation
+            selected_package_id = data.formData.get("selectedPackage")
+            selected_package = None
+            if selected_package_id and config.custom_packages:
+                for package in config.custom_packages:
+                    if package.get("id") == selected_package_id:
+                        selected_package = package
+                        break
+            
+            if selected_package:
+                package_name = selected_package.get("name", "Selected package")
+                price_type = selected_package.get("priceType", "flat")
+                
+                if price_type == "flat" and selected_package.get("price"):
+                    explanation_parts.append(
+                        f"{package_name} package: ${selected_package['price']:,.2f}"
+                    )
+                elif price_type == "range":
+                    price_min = selected_package.get("priceMin", 0)
+                    price_max = selected_package.get("priceMax", 0)
+                    if price_min and price_max:
+                        explanation_parts.append(
+                            f"{package_name} package: ${price_min:,.2f} - ${price_max:,.2f}"
+                        )
+                    else:
+                        explanation_parts.append(f"{package_name} package selected")
+                else:
+                    explanation_parts.append(f"{package_name} package - quote required")
+                
+                # Add duration info if available
+                if selected_package.get("duration"):
+                    duration_hours = selected_package["duration"] / 60.0
+                    explanation_parts.append(f"Estimated duration: {duration_hours:.1f} hours")
+            else:
+                explanation_parts.append("Custom service package selected")
         elif pricing_model == "flat" and config.flat_rate:
             explanation_parts.append(
                 f"{business_name} prices their jobs at a flat rate of ${config.flat_rate:,.2f}"

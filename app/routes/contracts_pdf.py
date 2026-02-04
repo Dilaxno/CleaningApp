@@ -81,6 +81,28 @@ def calculate_estimated_hours(config: BusinessConfig, property_size: int) -> flo
         else:
             return 4.0  # Very large home: max 4 hours
 
+def _get_selected_package_details(config: BusinessConfig, form_data: dict) -> dict:
+    """Get details of the selected package for quote display"""
+    selected_package_id = form_data.get("selectedPackage")
+    if not selected_package_id or not config.custom_packages:
+        return None
+    
+    for package in config.custom_packages:
+        if package.get("id") == selected_package_id:
+            return {
+                "id": package.get("id"),
+                "name": package.get("name", "Custom Package"),
+                "description": package.get("description", ""),
+                "included": package.get("included", []),
+                "duration": package.get("duration", 0),
+                "priceType": package.get("priceType", "flat"),
+                "price": package.get("price"),
+                "priceMin": package.get("priceMin"),
+                "priceMax": package.get("priceMax"),
+            }
+    
+    return None
+
 def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
     """Calculate quote based on business config and form data"""
     import logging
@@ -108,6 +130,48 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
         # Use new three-category time estimation system
         estimated_hours = calculate_estimated_hours(config, property_size)
         base_price = estimated_hours * config.hourly_rate
+    elif pricing_model == "packages":
+        # Custom packages pricing
+        selected_package_id = form_data.get("selectedPackage")
+        if selected_package_id and config.custom_packages:
+            # Find the selected package
+            selected_package = None
+            for package in config.custom_packages:
+                if package.get("id") == selected_package_id:
+                    selected_package = package
+                    break
+            
+            if selected_package:
+                # Calculate price based on package pricing type
+                if selected_package.get("priceType") == "flat" and selected_package.get("price"):
+                    base_price = float(selected_package["price"])
+                elif selected_package.get("priceType") == "range":
+                    # For range pricing, use the minimum price as base (can be adjusted later)
+                    price_min = selected_package.get("priceMin", 0)
+                    price_max = selected_package.get("priceMax", 0)
+                    if price_min and price_max:
+                        # Use average of range for quote calculation
+                        base_price = (float(price_min) + float(price_max)) / 2
+                    elif price_min:
+                        base_price = float(price_min)
+                    elif price_max:
+                        base_price = float(price_max)
+                else:
+                    # Quote-based pricing - set flag for manual quote
+                    base_price = 0.0
+                
+                # Use package duration for time estimation
+                if selected_package.get("duration"):
+                    estimated_hours = float(selected_package["duration"]) / 60.0  # Convert minutes to hours
+                else:
+                    # Fallback to standard time estimation
+                    estimated_hours = calculate_estimated_hours(config, property_size)
+                
+                logger.info(f"📦 Package pricing - selected: {selected_package.get('name')}, price: ${base_price}, duration: {estimated_hours}h")
+            else:
+                logger.warning(f"⚠️ Selected package {selected_package_id} not found in config")
+        else:
+            logger.warning(f"⚠️ No package selected or no packages configured for packages pricing model")
     elif pricing_model == "flat":
         # Flat-fee pricing can be configured either as a single legacy flat_rate
         # or as 3 size-based rates (small/medium/large).
@@ -354,6 +418,21 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
 
     # If still no price, set a flag for "quote pending"
     quote_pending = base_price == 0 and final_price == 0
+    
+    # Special handling for packages pricing model
+    if pricing_model == "packages":
+        selected_package_id = form_data.get("selectedPackage")
+        if selected_package_id and config.custom_packages:
+            # Find the selected package
+            for package in config.custom_packages:
+                if package.get("id") == selected_package_id:
+                    # If package requires quote, set quote_pending flag
+                    if package.get("priceType") == "quote":
+                        quote_pending = True
+                    break
+        else:
+            # No package selected - quote pending
+            quote_pending = True
     return {
         "base_price": round(base_price, 2),
         "discount_percent": discount_percent,
@@ -373,6 +452,7 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
         "total_term_rate": round(total_term_rate, 2) if total_term_rate else None,
         "service_occurrences": service_occurrences,
         "quote_pending": quote_pending,
+        "selected_package": _get_selected_package_details(config, form_data) if pricing_model == "packages" else None,
     }
 
 async def generate_contract_html(
