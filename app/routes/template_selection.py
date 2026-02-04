@@ -106,6 +106,22 @@ AVAILABLE_TEMPLATES = [
         "image": "https://images.unsplash.com/photo-1581578731548-c64695cc6952?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80",
         "color": "#1a1a1a",
         "category": "Specialized"
+    },
+    {
+        "id": "outside-cleaning",
+        "name": "Outside Cleaning",
+        "description": "Exterior cleaning services for buildings and outdoor spaces.",
+        "image": "https://res.cloudinary.com/dxqum9ywx/image/upload/v1770247865/outside_cleaning_acgpg4.jpg",
+        "color": "#1a1a1a",
+        "category": "Specialized"
+    },
+    {
+        "id": "carpet-cleaning",
+        "name": "Carpet Cleaning",
+        "description": "Professional carpet and upholstery cleaning services.",
+        "image": "https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80",
+        "color": "#1a1a1a",
+        "category": "Specialized"
     }
 ]
 
