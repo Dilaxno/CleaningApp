@@ -124,6 +124,19 @@ class TemplateSelectionResponse(BaseModel):
 class UpdateActiveTemplatesRequest(BaseModel):
     activeTemplates: List[str]
 
+@router.get("/debug-auth")
+async def debug_auth(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Debug endpoint to test authentication"""
+    return {
+        "message": "Authentication successful",
+        "user_id": current_user.id,
+        "email": current_user.email,
+        "firebase_uid": current_user.firebase_uid
+    }
+
 @router.get("/available", response_model=TemplateSelectionResponse)
 async def get_available_templates(
     current_user: User = Depends(get_current_user),

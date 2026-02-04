@@ -197,13 +197,11 @@ async def get_current_user(
     db: Session = Depends(get_db),
 ) -> User:
     """Get current user from Firebase token"""
+    
     token = credentials.credentials
+    logger.info(f"🔍 Authentication attempt - Token length: {len(token)}")
     
     # Basic token format validation before processing
-    if not token:
-        logger.warning("⚠️ Empty token received")
-        raise HTTPException(status_code=401, detail="No token provided")
-    
     token_parts = token.split('.')
     if len(token_parts) != 3:
         # Log more details about malformed tokens for debugging

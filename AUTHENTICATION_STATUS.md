@@ -23,47 +23,62 @@
 - **Added**: Graceful handling of malformed tokens
 - **Status**: ✅ IMPROVED
 
-## ⚠️ Remaining Warnings (Non-Critical)
+## ❌ Current Issue: "Not authenticated" Error
 
-### Malformed Token Warnings
-```
-⚠️ Malformed token received: 1 parts
-```
-- **Cause**: Browser preflight requests, incomplete requests, or client-side issues
-- **Impact**: Low - these are handled gracefully
-- **Action**: Monitor but not critical
-
-## 🧪 Testing Tools Created
-
-### 1. Debug Token Script
-- **File**: `backend/debug_token.py`
-- **Usage**: `python debug_token.py <firebase_token>`
-- **Purpose**: Decode and analyze JWT tokens for debugging
-
-### 2. Template Loading Test
-- **File**: `backend/test_template_loading.py`
-- **Usage**: `python test_template_loading.py [firebase_token]`
-- **Purpose**: Test template endpoints and server connectivity
-
-## 📊 Current Status from Logs
-
-```
-✅ User authenticated: User 141 found
-✅ Business config retrieved successfully
-✅ Template endpoints should be working
-⚠️ Some malformed token warnings (non-critical)
+### Problem
+API endpoint `api.cleanenroll.com/template-selection/available` returns:
+```json
+{"detail":"Not authenticated"}
 ```
 
-## 🔄 Next Steps (If Issues Persist)
+### Debugging Steps Added
 
-1. **Monitor logs** for any new authentication errors
-2. **Test onboarding flow** end-to-end to verify template selection works
-3. **Check frontend console** for any client-side errors
-4. **Verify token refresh** is working properly in long sessions
+1. **Enhanced Frontend Logging**: Added detailed console logging to TemplateSelection component
+2. **Debug Endpoint**: Created `/template-selection/debug-auth` endpoint for testing
+3. **Authentication Logging**: Enhanced backend logging for token processing
 
-## 🎯 Expected Behavior
+### Next Steps to Debug
 
-- Users should be able to authenticate successfully
-- Template selection during onboarding should work
-- Business configuration should load properly
-- Malformed token warnings are expected and handled gracefully
+1. **Check Browser Console**: Look for frontend logs showing:
+   - Token length
+   - API request details
+   - Debug endpoint response
+
+2. **Test Debug Endpoint**: The debug endpoint should show if authentication is working:
+   ```
+   GET /template-selection/debug-auth
+   Authorization: Bearer <token>
+   ```
+
+3. **Check Server Logs**: Look for authentication attempt logs:
+   ```
+   🔍 Authentication attempt - Token length: XXXX
+   ```
+
+4. **Verify Token**: Use the debug script to check token format:
+   ```bash
+   python debug_token.py <firebase_token>
+   ```
+
+### Possible Causes
+
+1. **Token Not Sent**: Frontend not including Authorization header
+2. **Token Expired**: Firebase token needs refresh
+3. **CORS Issue**: Authorization header being stripped
+4. **Token Format**: Malformed or invalid token
+5. **Server Issue**: Authentication middleware not working
+
+### Testing Tools Available
+
+1. **Debug Token Script**: `backend/debug_token.py`
+2. **Auth Test Script**: `backend/test_auth_debug.py`
+3. **Template Test Script**: `backend/test_template_loading.py`
+
+## 🔄 Immediate Actions Needed
+
+1. **Open browser dev tools** and check console logs when template selection loads
+2. **Check Network tab** to see if Authorization header is being sent
+3. **Test the debug endpoint** manually or with the test script
+4. **Check server logs** for authentication attempts
+
+The authentication logic is correct, but there's likely a frontend token issue or CORS problem preventing the Authorization header from reaching the backend properly.
