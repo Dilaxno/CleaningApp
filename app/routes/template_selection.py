@@ -79,7 +79,7 @@ AVAILABLE_TEMPLATES = [
         "id": "warehouse",
         "name": "Warehouse / Industrial",
         "description": "Heavy-duty cleaning for industrial spaces.",
-        "image": "https://res.cloudinary.com/dxqum9ywx/image/upload/v1768087529/warehouse_industrial_ixqhqr.jpg",
+        "image": "https://images.unsplash.com/photo-1586864387967-d02ef85d93e8?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80",
         "color": "#1a1a1a",
         "category": "Industrial"
     },
@@ -87,7 +87,7 @@ AVAILABLE_TEMPLATES = [
         "id": "post-construction",
         "name": "Post-Construction",
         "description": "Specialized cleanup after construction work.",
-        "image": "https://res.cloudinary.com/dxqum9ywx/image/upload/v1768087529/post_construction_cleanup_ixqhqr.jpg",
+        "image": "https://images.unsplash.com/photo-1504307651254-35680f356dfd?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80",
         "color": "#1a1a1a",
         "category": "Specialized"
     },
@@ -95,7 +95,7 @@ AVAILABLE_TEMPLATES = [
         "id": "move-in-out",
         "name": "Move In / Move Out",
         "description": "Deep cleaning for property transitions.",
-        "image": "https://res.cloudinary.com/dxqum9ywx/image/upload/v1768087529/move_in_out_cleanup_ixqhqr.jpg",
+        "image": "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80",
         "color": "#1a1a1a",
         "category": "Specialized"
     },
@@ -103,7 +103,7 @@ AVAILABLE_TEMPLATES = [
         "id": "deep-clean",
         "name": "Deep Clean",
         "description": "Comprehensive deep cleaning services.",
-        "image": "https://res.cloudinary.com/dxqum9ywx/image/upload/v1768087529/deep_clean_ixqhqr.jpg",
+        "image": "https://images.unsplash.com/photo-1581578731548-c64695cc6952?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80",
         "color": "#1a1a1a",
         "category": "Specialized"
     }
