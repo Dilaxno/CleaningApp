@@ -206,39 +206,19 @@ async def get_current_user(
     try:
         # Verify the Firebase token
         decoded_token = await verify_firebase_token(token)
-        firebase_uid = decoded_token.get("uid")
+        
+        # Firebase ID tokens use 'sub' as the user ID claim, not 'uid'
+        firebase_uid = decoded_token.get("sub") or decoded_token.get("user_id") or decoded_token.get("uid")
+        email = decoded_token.get("email")
+        name = decoded_token.get("name", "")
         
         if not firebase_uid:
-            logger.error("❌ Token missing uid claim")
+            logger.error(f"❌ Token missing user ID claim. Available claims: {list(decoded_token.keys())}")
             raise HTTPException(status_code=401, detail="Invalid token claims")
-        
-        # Get user from database with optimized query
-        user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
-        
-        if not user:
-            logger.warning(f"⚠️ User not found for firebase_uid: {firebase_uid}")
-            raise HTTPException(status_code=404, detail="User not found")
-        
-        logger.debug(f"✅ User authenticated: {user.email}")
-        return user
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Authentication failed: {str(e)}")
-        raise HTTPException(status_code=401, detail="Authentication failed")
-    
-    try:
-        firebase_user = await verify_firebase_token(token)
-        firebase_uid = firebase_user.get("user_id") or firebase_user.get("sub")
-        email = firebase_user.get("email")
-        name = firebase_user.get("name", "")
-        
-        if not firebase_uid:
-            raise HTTPException(status_code=401, detail="Invalid user data")
         
         # Find or create user in our database
         user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
+        
         if not user:
             # Check if email is already registered with a different Firebase UID
             # This happens when user signs up with email/password then later uses Google auth
@@ -264,6 +244,7 @@ async def get_current_user(
                             detail="Failed to update user authentication method"
                         )
             
+            # Create new user
             logger.info(f"🆕 Creating new user: {email}")
             user = User(
                 firebase_uid=firebase_uid,
@@ -275,6 +256,7 @@ async def get_current_user(
             try:
                 db.commit()
                 db.refresh(user)
+                logger.info(f"✅ New user created: {user.email}")
             except Exception as e:
                 db.rollback()
                 # Handle race condition where email was taken between check and insert
@@ -286,9 +268,11 @@ async def get_current_user(
                     )
                 raise
         
+        logger.debug(f"✅ User authenticated: {user.email}")
         return user
+        
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"❌ Authentication failed: {str(e)}")
-        raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
+        raise HTTPException(status_code=401, detail="Authentication failed")
