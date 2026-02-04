@@ -198,6 +198,36 @@ async def get_current_user(
     """Get current user from Firebase token"""
     token = credentials.credentials
     
+    # Basic token format validation before processing
+    if not token or len(token.split('.')) != 3:
+        logger.warning(f"⚠️ Malformed token received: {len(token.split('.')) if token else 0} parts")
+        raise HTTPException(status_code=401, detail="Invalid token format")
+    
+    try:
+        # Verify the Firebase token
+        decoded_token = await verify_firebase_token(token)
+        firebase_uid = decoded_token.get("uid")
+        
+        if not firebase_uid:
+            logger.error("❌ Token missing uid claim")
+            raise HTTPException(status_code=401, detail="Invalid token claims")
+        
+        # Get user from database with optimized query
+        user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
+        
+        if not user:
+            logger.warning(f"⚠️ User not found for firebase_uid: {firebase_uid}")
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        logger.debug(f"✅ User authenticated: {user.email}")
+        return user
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Authentication failed: {str(e)}")
+        raise HTTPException(status_code=401, detail="Authentication failed")
+    
     try:
         firebase_user = await verify_firebase_token(token)
         firebase_uid = firebase_user.get("user_id") or firebase_user.get("sub")

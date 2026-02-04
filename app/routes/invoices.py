@@ -110,16 +110,19 @@ async def get_invoices(
     db: Session = Depends(get_db)
 ):
     """Get all invoices for the current user"""
-    query = db.query(Invoice).filter(Invoice.user_id == current_user.id)
+    # Optimized query with JOIN to avoid N+1 problem
+    query = db.query(Invoice, Client).join(
+        Client, Invoice.client_id == Client.id
+    ).filter(Invoice.user_id == current_user.id)
     
     if status:
         query = query.filter(Invoice.status == status)
     
-    invoices = query.order_by(Invoice.created_at.desc()).all()
+    # Order by created_at descending and execute query
+    invoice_client_pairs = query.order_by(Invoice.created_at.desc()).all()
     
     result = []
-    for inv in invoices:
-        client = db.query(Client).filter(Client.id == inv.client_id).first()
+    for inv, client in invoice_client_pairs:
         result.append(InvoiceResponse(
             id=inv.id,
             public_id=inv.public_id,
