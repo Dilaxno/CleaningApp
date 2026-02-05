@@ -50,28 +50,29 @@ def create_indexes(engine):
         "CREATE INDEX IF NOT EXISTS idx_schedules_client_id ON schedules(client_id);",
         "CREATE INDEX IF NOT EXISTS idx_schedules_scheduled_date ON schedules(scheduled_date);",
         
-        # Business config optimizations
-        "CREATE INDEX IF NOT EXISTS idx_business_config_user_id ON business_config(user_id);",
+        # Business config optimizations (correct table name)
+        "CREATE INDEX IF NOT EXISTS idx_business_configs_user_id ON business_configs(user_id);",
         
         # Template customization optimizations
         "CREATE INDEX IF NOT EXISTS idx_user_template_customization_user_active ON user_template_customizations(user_id, is_active) WHERE is_active = true;",
     ]
     
-    # Create indexes without transactions (autocommit mode)
-    with engine.connect() as conn:
-        # Enable autocommit mode to avoid transaction blocks
-        conn = conn.execution_options(autocommit=True)
-        
-        for index_sql in indexes_to_create:
-            try:
+    # Create indexes one at a time with individual connections to avoid transaction issues
+    for index_sql in indexes_to_create:
+        try:
+            # Use a fresh connection for each index to avoid transaction errors
+            with engine.connect() as conn:
+                conn = conn.execution_options(autocommit=True)
                 logger.info(f"Creating index: {index_sql[:80]}...")
                 conn.execute(text(index_sql))
                 logger.info("✅ Index created successfully")
-            except Exception as e:
-                if "already exists" in str(e).lower():
-                    logger.info("ℹ️ Index already exists, skipping")
-                else:
-                    logger.error(f"❌ Failed to create index: {e}")
+        except Exception as e:
+            if "already exists" in str(e).lower():
+                logger.info("ℹ️ Index already exists, skipping")
+            elif "does not exist" in str(e).lower():
+                logger.warning(f"⚠️ Table does not exist, skipping: {index_sql[:80]}...")
+            else:
+                logger.error(f"❌ Failed to create index: {e}")
 
 def analyze_tables(engine):
     """Run ANALYZE on all tables to update statistics"""
