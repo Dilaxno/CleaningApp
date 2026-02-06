@@ -64,6 +64,20 @@ def decrypt_token(encrypted_token: str) -> str:
 
 
 # Routes
+@router.get("/config/test")
+async def test_config():
+    """Test endpoint to verify Square configuration (for debugging)"""
+    return {
+        "environment": SQUARE_ENVIRONMENT,
+        "base_url": SQUARE_BASE_URL,
+        "api_url": SQUARE_API_URL,
+        "app_id_configured": bool(SQUARE_APPLICATION_ID),
+        "app_secret_configured": bool(SQUARE_APPLICATION_SECRET),
+        "redirect_uri": SQUARE_REDIRECT_URI,
+        "frontend_url": FRONTEND_URL
+    }
+
+
 @router.post("/oauth/initiate")
 async def initiate_oauth(
     current_user: User = Depends(get_current_user),
@@ -88,7 +102,9 @@ async def initiate_oauth(
     )
     
     logger.info(f"Square OAuth initiated for user: {current_user.email}")
-    logger.info(f"Redirect URI: {SQUARE_REDIRECT_URI}")
+    logger.info(f"Redirect URI (raw): {SQUARE_REDIRECT_URI}")
+    logger.info(f"Redirect URI (encoded): {redirect_uri_encoded}")
+    logger.info(f"Full OAuth URL: {oauth_url}")
     logger.info(f"Environment: {SQUARE_ENVIRONMENT}")
     
     return {
