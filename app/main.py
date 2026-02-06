@@ -39,11 +39,13 @@ from .routes.smarty_geocoding import router as smarty_geocoding_router
 from .routes.templates import router as templates_router
 from .routes.template_selection import router as template_selection_router
 from .routes.service_areas import router as service_areas_router
+from .routes.square import router as square_router
 
 # Import all models to ensure they're registered with SQLAlchemy Base
 # This is needed for relationships between models in different files
 from . import models  # noqa: F401
 from . import models_invoice  # noqa: F401
+from . import models_square  # noqa: F401
 
 # Configure logging
 logging.basicConfig(
@@ -210,6 +212,7 @@ app.include_router(smarty_geocoding_router)
 app.include_router(templates_router)
 app.include_router(template_selection_router)
 app.include_router(service_areas_router)
+app.include_router(square_router)
 
 
 @app.get("/")

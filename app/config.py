@@ -48,3 +48,10 @@ SMTP_ENCRYPTION_KEY = os.getenv("SMTP_ENCRYPTION_KEY")
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", f"{FRONTEND_URL}/auth/google-calendar")
+
+# Square OAuth Configuration
+SQUARE_ENVIRONMENT = os.getenv("SQUARE_ENVIRONMENT", "sandbox")  # sandbox or production
+SQUARE_APPLICATION_ID = os.getenv("SQUARE_APPLICATION_ID")
+SQUARE_APPLICATION_SECRET = os.getenv("SQUARE_APPLICATION_SECRET")
+SQUARE_REDIRECT_URI = os.getenv("SQUARE_REDIRECT_URI", f"{FRONTEND_URL}/auth/square/callback")
+SQUARE_ENCRYPTION_KEY = os.getenv("SQUARE_ENCRYPTION_KEY")  # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
