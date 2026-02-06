@@ -1,19 +1,21 @@
 """
-Square integration models
+Square Integration Models
+Database models for storing Square OAuth tokens and payment data
 """
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, JSON, Text
-from sqlalchemy.sql import func
+from sqlalchemy import Column, String, DateTime, Text, Boolean
+from datetime import datetime
 from .database import Base
 
 
-class SquareWebhookLog(Base):
-    """Log of Square webhook events for debugging and audit"""
-    __tablename__ = "square_webhook_logs"
+class SquareIntegration(Base):
+    """Store Square OAuth tokens and merchant information"""
+    __tablename__ = "square_integrations"
 
-    id = Column(Integer, primary_key=True, index=True)
-    event_type = Column(String(255), nullable=False)
-    event_id = Column(String(255), unique=True, nullable=False, index=True)
-    merchant_id = Column(String(255), nullable=True, index=True)
-    payload = Column(JSON, nullable=False)
-    processed = Column(Boolean, default=False, nullable=False)
-    created_at = Column(DateTime, server_default=func.now())
+    user_id = Column(String, primary_key=True, index=True)
+    merchant_id = Column(String, nullable=False)
+    access_token = Column(Text, nullable=False)  # Encrypted
+    refresh_token = Column(Text, nullable=True)  # Encrypted
+    token_expires_at = Column(DateTime, nullable=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
