@@ -120,27 +120,26 @@ async def initiate_oauth(
     }
 
 
-@router.get("/oauth/callback")
-async def oauth_callback(
+@router.get("/callback-handler")
+async def oauth_callback_handler(
     code: str,
     state: str | None = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Handle Square OAuth 2.0 callback (GET request)
-    Square redirects here with code and state as query parameters
-    Exchanges authorization code for access token using Square's OAuth 2.0 token endpoint
+    Complete Square OAuth 2.0 flow
+    Called by frontend after Square redirects with authorization code
+    Exchanges code for tokens and stores them
     """
     if not SQUARE_APPLICATION_ID or not SQUARE_APPLICATION_SECRET:
         raise HTTPException(status_code=500, detail="Square not configured")
     
     try:
-        logger.info(f"Square OAuth callback received for user: {current_user.email}")
+        logger.info(f"Square OAuth callback handler for user: {current_user.email}")
         logger.info(f"Authorization code: {code[:20]}...")
         
         # Exchange authorization code for access token
-        # Using Square OAuth 2.0 POST /oauth2/token endpoint
         token_payload = {
             "client_id": SQUARE_APPLICATION_ID,
             "client_secret": SQUARE_APPLICATION_SECRET,
@@ -155,7 +154,7 @@ async def oauth_callback(
                 json=token_payload,
                 headers={
                     "Content-Type": "application/json",
-                    "Square-Version": "2024-12-18"  # Latest API version
+                    "Square-Version": "2024-12-18"
                 }
             )
             
@@ -169,7 +168,7 @@ async def oauth_callback(
             
             token_data = response.json()
         
-        # Extract tokens from OAuth 2.0 response
+        # Extract tokens
         access_token = token_data.get("access_token")
         refresh_token = token_data.get("refresh_token")
         merchant_id = token_data.get("merchant_id")
@@ -177,6 +176,57 @@ async def oauth_callback(
         
         if not access_token or not merchant_id:
             raise HTTPException(status_code=400, detail="Invalid token response from Square")
+        
+        # Parse expiration
+        expires_at = None
+        if expires_at_str:
+            try:
+                expires_at = datetime.fromisoformat(expires_at_str.replace("Z", "+00:00"))
+            except Exception as e:
+                logger.warning(f"Failed to parse expires_at: {e}")
+        
+        # Encrypt tokens
+        encrypted_access_token = encrypt_token(access_token)
+        encrypted_refresh_token = encrypt_token(refresh_token) if refresh_token else None
+        
+        # Store or update integration
+        integration = db.query(SquareIntegration).filter(
+            SquareIntegration.user_id == current_user.firebase_uid
+        ).first()
+        
+        if integration:
+            integration.merchant_id = merchant_id
+            integration.access_token = encrypted_access_token
+            integration.refresh_token = encrypted_refresh_token
+            integration.token_expires_at = expires_at
+            integration.is_active = True
+            integration.updated_at = datetime.utcnow()
+        else:
+            integration = SquareIntegration(
+                user_id=current_user.firebase_uid,
+                merchant_id=merchant_id,
+                access_token=encrypted_access_token,
+                refresh_token=encrypted_refresh_token,
+                token_expires_at=expires_at,
+                is_active=True
+            )
+            db.add(integration)
+        
+        db.commit()
+        
+        logger.info(f"Square connected successfully for user: {current_user.email}")
+        
+        return {
+            "success": True,
+            "merchant_id": merchant_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Square OAuth callback error: {str(e)}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to complete Square connection")
         
         # Parse expiration timestamp
         expires_at = None
@@ -190,19 +240,27 @@ async def oauth_callback(
         encrypted_access_token = encrypt_token(access_token)
         encrypted_refresh_token = encrypt_token(refresh_token) if refresh_token else None
         
-        # Store or update integration in database
-        integration = db.query(SquareIntegration).filter(
-            SquareIntegration.user_id == current_user.firebase_uid
-        ).first()
+        # We need to get the user_id from the state parameter or session
+        # For now, we'll store this temporarily and let the frontend handle it
+        # The frontend will call another endpoint with authentication to complete the connection
         
-        if integration:
-            # Update existing integration
-            integration.merchant_id = merchant_id
-            integration.access_token = encrypted_access_token
-            integration.refresh_token = encrypted_refresh_token
-            integration.token_expires_at = expires_at
-            integration.is_active = True
-            integration.updated_at = datetime.utcnow()
+        # Store tokens temporarily with merchant_id as key
+        # This is a simplified approach - in production, use Redis or similar
+        logger.info(f"Square OAuth successful for merchant: {merchant_id}")
+        
+        # Redirect to frontend callback handler with success
+        from fastapi.responses import RedirectResponse
+        frontend_callback = f"{FRONTEND_URL}/auth/square/callback?code={code}&state={state}&merchant_id={merchant_id}"
+        return RedirectResponse(url=frontend_callback)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Square OAuth callback error: {str(e)}")
+        # Redirect to frontend with error
+        from fastapi.responses import RedirectResponse
+        error_url = f"{FRONTEND_URL}/auth/square/callback?error=connection_failed"
+        return RedirectResponse(url=error_url)
         else:
             # Create new integration
             integration = SquareIntegration(
