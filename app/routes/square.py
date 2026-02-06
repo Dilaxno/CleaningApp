@@ -1,6 +1,6 @@
 """
 Square OAuth and Payments Integration
-Clean implementation of Square OAuth flow and payment processing
+Clean implementation using Square OAuth 2.0 (latest version)
 """
 import logging
 import os
@@ -29,7 +29,7 @@ SQUARE_APPLICATION_ID = os.getenv("SQUARE_APPLICATION_ID")
 SQUARE_APPLICATION_SECRET = os.getenv("SQUARE_APPLICATION_SECRET")
 SQUARE_REDIRECT_URI = os.getenv("SQUARE_REDIRECT_URI", f"{FRONTEND_URL}/auth/square/callback")
 
-# Square API URLs
+# Square API URLs (OAuth 2.0 endpoints)
 if SQUARE_ENVIRONMENT == "production":
     SQUARE_BASE_URL = "https://connect.squareup.com"
     SQUARE_API_URL = "https://connect.squareup.com/v2"
@@ -83,29 +83,36 @@ async def initiate_oauth(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Initiate Square OAuth flow"""
+    """
+    Initiate Square OAuth 2.0 flow
+    Returns authorization URL following Square's latest OAuth 2.0 specification
+    """
     if not SQUARE_APPLICATION_ID:
         raise HTTPException(status_code=500, detail="Square not configured")
     
-    # Generate CSRF state token
+    # Generate CSRF state token for security
     state = secrets.token_urlsafe(32)
     
-    # Build OAuth URL with proper encoding
-    redirect_uri_encoded = quote(SQUARE_REDIRECT_URI, safe='')
+    # Build OAuth 2.0 authorization URL with proper encoding
+    # Square expects spaces in scope to be encoded as + signs
+    scope = "MERCHANT_PROFILE_READ PAYMENTS_WRITE INVOICES_WRITE SUBSCRIPTIONS_WRITE SUBSCRIPTIONS_READ"
+    scope_encoded = scope.replace(" ", "+")
+    
+    # Build the full OAuth URL
     oauth_url = (
         f"{SQUARE_BASE_URL}/oauth2/authorize"
         f"?client_id={SQUARE_APPLICATION_ID}"
-        f"&scope=MERCHANT_PROFILE_READ+PAYMENTS_WRITE+INVOICES_WRITE+SUBSCRIPTIONS_WRITE+SUBSCRIPTIONS_READ"
+        f"&scope={scope_encoded}"
         f"&session=false"
         f"&state={state}"
-        f"&redirect_uri={redirect_uri_encoded}"
+        f"&redirect_uri={quote(SQUARE_REDIRECT_URI, safe='')}"
     )
     
-    logger.info(f"Square OAuth initiated for user: {current_user.email}")
-    logger.info(f"Redirect URI (raw): {SQUARE_REDIRECT_URI}")
-    logger.info(f"Redirect URI (encoded): {redirect_uri_encoded}")
-    logger.info(f"Full OAuth URL: {oauth_url}")
+    logger.info(f"Square OAuth 2.0 initiated for user: {current_user.email}")
     logger.info(f"Environment: {SQUARE_ENVIRONMENT}")
+    logger.info(f"Base URL: {SQUARE_BASE_URL}")
+    logger.info(f"Redirect URI: {SQUARE_REDIRECT_URI}")
+    logger.info(f"Full OAuth URL: {oauth_url}")
     
     return {
         "oauth_url": oauth_url,
@@ -119,50 +126,72 @@ async def oauth_callback(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Handle Square OAuth callback"""
+    """
+    Handle Square OAuth 2.0 callback
+    Exchanges authorization code for access token using Square's OAuth 2.0 token endpoint
+    """
     if not SQUARE_APPLICATION_ID or not SQUARE_APPLICATION_SECRET:
         raise HTTPException(status_code=500, detail="Square not configured")
     
     try:
         # Exchange authorization code for access token
+        # Using Square OAuth 2.0 POST /oauth2/token endpoint
+        token_payload = {
+            "client_id": SQUARE_APPLICATION_ID,
+            "client_secret": SQUARE_APPLICATION_SECRET,
+            "code": callback_data.code,
+            "grant_type": "authorization_code",
+            "redirect_uri": SQUARE_REDIRECT_URI
+        }
+        
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 f"{SQUARE_BASE_URL}/oauth2/token",
-                json={
-                    "client_id": SQUARE_APPLICATION_ID,
-                    "client_secret": SQUARE_APPLICATION_SECRET,
-                    "code": callback_data.code,
-                    "grant_type": "authorization_code",
-                    "redirect_uri": SQUARE_REDIRECT_URI
-                },
-                headers={"Content-Type": "application/json"}
+                json=token_payload,
+                headers={
+                    "Content-Type": "application/json",
+                    "Square-Version": "2024-12-18"  # Latest API version
+                }
             )
             
             if response.status_code != 200:
-                logger.error(f"Square token exchange failed: {response.text}")
-                raise HTTPException(status_code=400, detail="Failed to exchange authorization code")
+                error_detail = response.text
+                logger.error(f"Square token exchange failed: {error_detail}")
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Failed to exchange authorization code: {error_detail}"
+                )
             
             token_data = response.json()
         
-        # Extract tokens
+        # Extract tokens from OAuth 2.0 response
         access_token = token_data.get("access_token")
         refresh_token = token_data.get("refresh_token")
         merchant_id = token_data.get("merchant_id")
+        expires_at_str = token_data.get("expires_at")
+        
+        if not access_token or not merchant_id:
+            raise HTTPException(status_code=400, detail="Invalid token response from Square")
+        
+        # Parse expiration timestamp
         expires_at = None
+        if expires_at_str:
+            try:
+                expires_at = datetime.fromisoformat(expires_at_str.replace("Z", "+00:00"))
+            except Exception as e:
+                logger.warning(f"Failed to parse expires_at: {e}")
         
-        if token_data.get("expires_at"):
-            expires_at = datetime.fromisoformat(token_data["expires_at"].replace("Z", "+00:00"))
-        
-        # Encrypt tokens
+        # Encrypt tokens for secure storage
         encrypted_access_token = encrypt_token(access_token)
         encrypted_refresh_token = encrypt_token(refresh_token) if refresh_token else None
         
-        # Store or update integration
+        # Store or update integration in database
         integration = db.query(SquareIntegration).filter(
             SquareIntegration.user_id == current_user.firebase_uid
         ).first()
         
         if integration:
+            # Update existing integration
             integration.merchant_id = merchant_id
             integration.access_token = encrypted_access_token
             integration.refresh_token = encrypted_refresh_token
@@ -170,6 +199,7 @@ async def oauth_callback(
             integration.is_active = True
             integration.updated_at = datetime.utcnow()
         else:
+            # Create new integration
             integration = SquareIntegration(
                 user_id=current_user.firebase_uid,
                 merchant_id=merchant_id,
@@ -182,13 +212,16 @@ async def oauth_callback(
         
         db.commit()
         
-        logger.info(f"Square connected successfully for user: {current_user.email}")
+        logger.info(f"Square OAuth 2.0 connected successfully for user: {current_user.email}")
+        logger.info(f"Merchant ID: {merchant_id}")
         
         return {
             "success": True,
             "merchant_id": merchant_id
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Square OAuth callback error: {str(e)}")
         db.rollback()
