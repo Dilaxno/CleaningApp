@@ -30,11 +30,13 @@ SQUARE_APPLICATION_SECRET = os.getenv("SQUARE_APPLICATION_SECRET")
 SQUARE_REDIRECT_URI = os.getenv("SQUARE_REDIRECT_URI", f"{FRONTEND_URL}/auth/square/callback")
 
 # Square API URLs (OAuth 2.0 endpoints)
+# Note: OAuth authorization uses connect.squareup.com for both sandbox and production
+# The environment is determined by the client_id prefix (sandbox-sq0idb vs sq0idp)
+SQUARE_OAUTH_URL = "https://connect.squareup.com"
+
 if SQUARE_ENVIRONMENT == "production":
-    SQUARE_BASE_URL = "https://connect.squareup.com"
     SQUARE_API_URL = "https://connect.squareup.com/v2"
 else:
-    SQUARE_BASE_URL = "https://connect.squareupsandbox.com"
     SQUARE_API_URL = "https://connect.squareupsandbox.com/v2"
 
 # Encryption for tokens
@@ -64,7 +66,7 @@ async def test_config():
     """Test endpoint to verify Square configuration (for debugging)"""
     return {
         "environment": SQUARE_ENVIRONMENT,
-        "base_url": SQUARE_BASE_URL,
+        "oauth_url": SQUARE_OAUTH_URL,
         "api_url": SQUARE_API_URL,
         "app_id_configured": bool(SQUARE_APPLICATION_ID),
         "app_secret_configured": bool(SQUARE_APPLICATION_SECRET),
@@ -94,9 +96,12 @@ async def initiate_oauth(
     scope_encoded = scope.replace(" ", "+")
     
     # Build the full OAuth URL
+    # IMPORTANT: Use connect.squareup.com for both sandbox and production
+    # The environment is determined by the client_id prefix
     oauth_url = (
-        f"{SQUARE_BASE_URL}/oauth2/authorize"
+        f"{SQUARE_OAUTH_URL}/oauth2/authorize"
         f"?client_id={SQUARE_APPLICATION_ID}"
+        f"&response_type=code"
         f"&scope={scope_encoded}"
         f"&session=false"
         f"&state={state}"
@@ -105,7 +110,7 @@ async def initiate_oauth(
     
     logger.info(f"Square OAuth 2.0 initiated for user: {current_user.email}")
     logger.info(f"Environment: {SQUARE_ENVIRONMENT}")
-    logger.info(f"Base URL: {SQUARE_BASE_URL}")
+    logger.info(f"OAuth URL: {SQUARE_OAUTH_URL}")
     logger.info(f"Redirect URI: {SQUARE_REDIRECT_URI}")
     logger.info(f"Full OAuth URL: {oauth_url}")
     
@@ -145,7 +150,7 @@ async def oauth_callback_handler(
         
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                f"{SQUARE_BASE_URL}/oauth2/token",
+                f"{SQUARE_OAUTH_URL}/oauth2/token",
                 json=token_payload,
                 headers={
                     "Content-Type": "application/json",
@@ -263,7 +268,7 @@ async def disconnect(
         
         async with httpx.AsyncClient() as client:
             await client.post(
-                f"{SQUARE_BASE_URL}/oauth2/revoke",
+                f"{SQUARE_OAUTH_URL}/oauth2/revoke",
                 json={
                     "client_id": SQUARE_APPLICATION_ID,
                     "access_token": access_token
