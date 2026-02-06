@@ -120,26 +120,31 @@ async def initiate_oauth(
     }
 
 
-@router.post("/oauth/callback")
+@router.get("/oauth/callback")
 async def oauth_callback(
-    callback_data: OAuthCallbackRequest,
+    code: str,
+    state: str | None = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Handle Square OAuth 2.0 callback
+    Handle Square OAuth 2.0 callback (GET request)
+    Square redirects here with code and state as query parameters
     Exchanges authorization code for access token using Square's OAuth 2.0 token endpoint
     """
     if not SQUARE_APPLICATION_ID or not SQUARE_APPLICATION_SECRET:
         raise HTTPException(status_code=500, detail="Square not configured")
     
     try:
+        logger.info(f"Square OAuth callback received for user: {current_user.email}")
+        logger.info(f"Authorization code: {code[:20]}...")
+        
         # Exchange authorization code for access token
         # Using Square OAuth 2.0 POST /oauth2/token endpoint
         token_payload = {
             "client_id": SQUARE_APPLICATION_ID,
             "client_secret": SQUARE_APPLICATION_SECRET,
-            "code": callback_data.code,
+            "code": code,
             "grant_type": "authorization_code",
             "redirect_uri": SQUARE_REDIRECT_URI
         }
