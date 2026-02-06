@@ -146,6 +146,7 @@ async def initiate_square_oauth(
         f"&scope=MERCHANT_PROFILE_READ+PAYMENTS_WRITE+INVOICES_WRITE+SUBSCRIPTIONS_WRITE+SUBSCRIPTIONS_READ"
         f"&session=false"
         f"&state={state}"
+        f"&redirect_uri={SQUARE_REDIRECT_URI}"
     )
     
     logger.info(f"Initiating Square OAuth for user {current_user.email}")
