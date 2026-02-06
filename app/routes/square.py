@@ -42,11 +42,6 @@ cipher_suite = Fernet(SECRET_KEY.encode()[:44].ljust(44, b'='))
 
 
 # Pydantic Models
-class OAuthCallbackRequest(BaseModel):
-    code: str
-    state: str
-
-
 class SquareStatusResponse(BaseModel):
     connected: bool
     merchant_id: Optional[str] = None
@@ -215,68 +210,6 @@ async def oauth_callback_handler(
         db.commit()
         
         logger.info(f"Square connected successfully for user: {current_user.email}")
-        
-        return {
-            "success": True,
-            "merchant_id": merchant_id
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Square OAuth callback error: {str(e)}")
-        db.rollback()
-        raise HTTPException(status_code=500, detail="Failed to complete Square connection")
-        
-        # Parse expiration timestamp
-        expires_at = None
-        if expires_at_str:
-            try:
-                expires_at = datetime.fromisoformat(expires_at_str.replace("Z", "+00:00"))
-            except Exception as e:
-                logger.warning(f"Failed to parse expires_at: {e}")
-        
-        # Encrypt tokens for secure storage
-        encrypted_access_token = encrypt_token(access_token)
-        encrypted_refresh_token = encrypt_token(refresh_token) if refresh_token else None
-        
-        # We need to get the user_id from the state parameter or session
-        # For now, we'll store this temporarily and let the frontend handle it
-        # The frontend will call another endpoint with authentication to complete the connection
-        
-        # Store tokens temporarily with merchant_id as key
-        # This is a simplified approach - in production, use Redis or similar
-        logger.info(f"Square OAuth successful for merchant: {merchant_id}")
-        
-        # Redirect to frontend callback handler with success
-        from fastapi.responses import RedirectResponse
-        frontend_callback = f"{FRONTEND_URL}/auth/square/callback?code={code}&state={state}&merchant_id={merchant_id}"
-        return RedirectResponse(url=frontend_callback)
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Square OAuth callback error: {str(e)}")
-        # Redirect to frontend with error
-        from fastapi.responses import RedirectResponse
-        error_url = f"{FRONTEND_URL}/auth/square/callback?error=connection_failed"
-        return RedirectResponse(url=error_url)
-        else:
-            # Create new integration
-            integration = SquareIntegration(
-                user_id=current_user.firebase_uid,
-                merchant_id=merchant_id,
-                access_token=encrypted_access_token,
-                refresh_token=encrypted_refresh_token,
-                token_expires_at=expires_at,
-                is_active=True
-            )
-            db.add(integration)
-        
-        db.commit()
-        
-        logger.info(f"Square OAuth 2.0 connected successfully for user: {current_user.email}")
-        logger.info(f"Merchant ID: {merchant_id}")
         
         return {
             "success": True,
