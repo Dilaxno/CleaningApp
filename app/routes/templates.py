@@ -69,14 +69,34 @@ async def get_templates(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get all available templates for the current user"""
+    """Get all available templates for the current user (filtered by active templates)"""
+    
+    # Get user's business config to check active templates
+    business_config = db.query(BusinessConfig).filter(
+        BusinessConfig.user_id == current_user.id
+    ).first()
+    
+    # Get active template IDs
+    active_template_ids = None
+    if business_config and business_config.active_templates:
+        active_template_ids = business_config.active_templates
+    # If no active templates configured, return all templates (backward compatibility)
+    
     # Get system templates (pre-built)
-    system_templates = db.query(FormTemplate).filter(
+    system_templates_query = db.query(FormTemplate).filter(
         FormTemplate.is_system_template == True,
         FormTemplate.is_active == True
-    ).all()
+    )
     
-    # Get user's custom templates
+    # Filter by active templates if configured
+    if active_template_ids:
+        system_templates_query = system_templates_query.filter(
+            FormTemplate.template_id.in_(active_template_ids)
+        )
+    
+    system_templates = system_templates_query.all()
+    
+    # Get user's custom templates (always include these)
     user_templates = db.query(FormTemplate).filter(
         FormTemplate.user_id == current_user.id,
         FormTemplate.is_active == True
@@ -387,7 +407,7 @@ async def get_templates_by_domain(
     request: Request,
     db: Session = Depends(get_db)
 ):
-    """Get all templates for a business via custom domain (secure)"""
+    """Get all templates for a business via custom domain (secure) - filtered by active templates"""
     # Check if this is a custom domain request
     if not hasattr(request.state, 'is_custom_domain') or not request.state.is_custom_domain:
         raise HTTPException(
@@ -403,13 +423,32 @@ async def get_templates_by_domain(
     
     user_id = request.state.custom_domain_user_id
     
+    # Get user's business config to check active templates
+    business_config = db.query(BusinessConfig).filter(
+        BusinessConfig.user_id == user_id
+    ).first()
+    
+    # Get active template IDs
+    active_template_ids = None
+    if business_config and business_config.active_templates:
+        active_template_ids = business_config.active_templates
+    # If no active templates configured, return all templates (backward compatibility)
+    
     # Get system templates (pre-built)
-    system_templates = db.query(FormTemplate).filter(
+    system_templates_query = db.query(FormTemplate).filter(
         FormTemplate.is_system_template == True,
         FormTemplate.is_active == True
-    ).all()
+    )
     
-    # Get user's custom templates
+    # Filter by active templates if configured
+    if active_template_ids:
+        system_templates_query = system_templates_query.filter(
+            FormTemplate.template_id.in_(active_template_ids)
+        )
+    
+    system_templates = system_templates_query.all()
+    
+    # Get user's custom templates (always include these)
     user_templates = db.query(FormTemplate).filter(
         FormTemplate.user_id == user_id,
         FormTemplate.is_active == True
@@ -532,7 +571,7 @@ async def get_public_templates(
     request: Request,
     db: Session = Depends(get_db)
 ):
-    """Get all templates for a business (public access for embed/template selection)"""
+    """Get all templates for a business (public access for embed/template selection) - filtered by active templates"""
     # If this is a custom domain request, validate that the domain belongs to the requested user
     if hasattr(request.state, 'is_custom_domain') and request.state.is_custom_domain:
         if (not hasattr(request.state, 'custom_domain_user_uid') or 
@@ -550,13 +589,32 @@ async def get_public_templates(
             detail="User not found"
         )
     
+    # Get user's business config to check active templates
+    business_config = db.query(BusinessConfig).filter(
+        BusinessConfig.user_id == user.id
+    ).first()
+    
+    # Get active template IDs
+    active_template_ids = None
+    if business_config and business_config.active_templates:
+        active_template_ids = business_config.active_templates
+    # If no active templates configured, return all templates (backward compatibility)
+    
     # Get system templates (pre-built)
-    system_templates = db.query(FormTemplate).filter(
+    system_templates_query = db.query(FormTemplate).filter(
         FormTemplate.is_system_template == True,
         FormTemplate.is_active == True
-    ).all()
+    )
     
-    # Get user's custom templates
+    # Filter by active templates if configured
+    if active_template_ids:
+        system_templates_query = system_templates_query.filter(
+            FormTemplate.template_id.in_(active_template_ids)
+        )
+    
+    system_templates = system_templates_query.all()
+    
+    # Get user's custom templates (always include these)
     user_templates = db.query(FormTemplate).filter(
         FormTemplate.user_id == user.id,
         FormTemplate.is_active == True
