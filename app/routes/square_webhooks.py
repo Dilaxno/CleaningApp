@@ -6,6 +6,7 @@ import logging
 import hmac
 import hashlib
 import json
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Request, HTTPException, Depends
 from sqlalchemy.orm import Session
 
@@ -102,6 +103,7 @@ async def handle_square_payment_webhook(
     except Exception as e:
         logger.error(f"❌ Webhook processing error: {str(e)}")
         raise HTTPException(status_code=500, detail="Webhook processing failed")
+
 
 
 async def handle_invoice_payment(event_data: dict, db: Session):
@@ -233,6 +235,7 @@ async def handle_payment_event(event_data: dict, db: Session):
         
     except Exception as e:
         logger.error(f"❌ Error handling payment event: {str(e)}")
+
 
 
 async def send_payment_confirmation_email(client: Client, contract: Contract, user: User):
@@ -435,52 +438,7 @@ async def send_payment_confirmation_email(client: Client, contract: Contract, us
         
     except Exception as e:
         logger.error(f"❌ Failed to send payment confirmation emails: {str(e)}")
-            <p><strong>Amount Paid:</strong> ${contract.total_value:.2f}</p>
-            <p><strong>Payment Date:</strong> {datetime.utcnow().strftime('%B %d, %Y')}</p>
-            
-            {f'<p><strong>Service Frequency:</strong> {contract.frequency}</p>' if contract.frequency else ''}
-            
-            <p>Your service is now confirmed and scheduled. We look forward to serving you!</p>
-            
-            <p>If you have any questions, please don't hesitate to reach out.</p>
-            
-            <p>Best regards,<br>{business_name}</p>
-            """
-            
-            await send_email(
-                to=client.email,
-                subject=f"Payment Received - {contract.title}",
-                html_content=client_html,
-                business_config=business_config
-            )
-        
-        # Email to owner
-        if user.email:
-            owner_html = f"""
-            <h2>Payment Received from Client</h2>
-            <p>Hi {user.full_name or 'there'},</p>
-            <p>You've received a payment from <strong>{client.business_name}</strong>.</p>
-            <p><strong>Contract:</strong> {contract.title}</p>
-            <p><strong>Amount:</strong> ${contract.total_value:.2f}</p>
-            <p><strong>Client:</strong> {client.contact_name or client.business_name}</p>
-            <p><strong>Email:</strong> {client.email}</p>
-            
-            <p>The payment has been processed through Square and will be deposited according to your Square payout schedule.</p>
-            
-            <p><a href="{FRONTEND_URL}/dashboard/contracts/{contract.id}">View Contract Details</a></p>
-            """
-            
-            await send_email(
-                to=user.email,
-                subject=f"Payment Received - {client.business_name}",
-                html_content=owner_html,
-                business_config=business_config
-            )
-        
-        logger.info(f"✅ Payment confirmation emails sent for contract {contract.id}")
-        
-    except Exception as e:
-        logger.error(f"❌ Failed to send payment confirmation emails: {str(e)}")
+
 
 
 async def send_subscription_confirmation_email(
@@ -503,7 +461,6 @@ async def send_subscription_confirmation_email(
         business_name = business_config.business_name if business_config else "CleanEnroll"
         
         # Calculate next billing date based on frequency
-        from datetime import timedelta
         next_billing_date = datetime.utcnow()
         if contract.frequency.lower() == "weekly":
             next_billing_date += timedelta(days=7)
@@ -629,7 +586,7 @@ async def send_subscription_confirmation_email(
         
     except Exception as e:
         logger.error(f"❌ Failed to send subscription confirmation email: {str(e)}")
-        # Don't raise exception - email failure shouldn't break the subscription creation
+
 
 
 async def send_subscription_notification_to_owner(
@@ -652,7 +609,6 @@ async def send_subscription_notification_to_owner(
         business_name = business_config.business_name if business_config else "CleanEnroll"
         
         # Calculate next billing date
-        from datetime import timedelta
         next_billing_date = datetime.utcnow()
         if contract.frequency.lower() == "weekly":
             next_billing_date += timedelta(days=7)
@@ -791,8 +747,3 @@ async def send_subscription_notification_to_owner(
         
     except Exception as e:
         logger.error(f"❌ Failed to send subscription notification to owner: {str(e)}")
-        # Don't raise exception - email failure shouldn't break the subscription creation
-
-
-# Import datetime at the top
-from datetime import datetime
