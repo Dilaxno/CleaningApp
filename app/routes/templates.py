@@ -2,12 +2,13 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
+import logging
 
 from ..database import get_db
 from ..models import FormTemplate, User, UserTemplateCustomization, BusinessConfig
 from ..auth import get_current_user
 
-
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/templates", tags=["templates"])
 
 
@@ -80,6 +81,9 @@ async def get_templates(
     active_template_ids = None
     if business_config and business_config.active_templates:
         active_template_ids = business_config.active_templates
+        logger.info(f"🔍 User {current_user.email} has active templates: {active_template_ids}")
+    else:
+        logger.info(f"⚠️ User {current_user.email} has no active templates configured - showing all")
     # If no active templates configured, return all templates (backward compatibility)
     
     # Get system templates (pre-built)
@@ -93,8 +97,10 @@ async def get_templates(
         system_templates_query = system_templates_query.filter(
             FormTemplate.template_id.in_(active_template_ids)
         )
+        logger.info(f"🎯 Filtering templates to: {active_template_ids}")
     
     system_templates = system_templates_query.all()
+    logger.info(f"📋 Found {len(system_templates)} system templates after filtering")
     
     # Get user's custom templates (always include these)
     user_templates = db.query(FormTemplate).filter(
@@ -143,6 +149,7 @@ async def get_templates(
             sections=template.template_data.get("sections", [])
         ))
     
+    logger.info(f"✅ Returning {len(templates)} total templates to user {current_user.email}")
     return templates
 
 
