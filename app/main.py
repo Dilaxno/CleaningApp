@@ -215,12 +215,27 @@ app.include_router(service_areas_router)
 app.include_router(square_router)
 
 
-# Square OAuth callback route (must match redirect URI exactly)
+# Square OAuth callback routes (must match redirect URI exactly)
+# Supporting both /auth/square/callback and /square/oauth/callback for flexibility
 @app.get("/auth/square/callback")
-async def square_oauth_callback(code: str, state: str | None = None):
+async def square_oauth_callback_auth(code: str, state: str | None = None):
     """
     Square OAuth callback - redirects to frontend
     This route matches the redirect URI registered in Square Dashboard
+    """
+    from fastapi.responses import RedirectResponse
+    from .config import FRONTEND_URL
+    
+    # Redirect to frontend callback handler with the code and state
+    frontend_callback = f"{FRONTEND_URL}/auth/square/callback?code={code}&state={state or ''}"
+    return RedirectResponse(url=frontend_callback)
+
+
+@app.get("/square/oauth/callback")
+async def square_oauth_callback_legacy(code: str, state: str | None = None):
+    """
+    Square OAuth callback (legacy path) - redirects to frontend
+    This route supports the old redirect URI path
     """
     from fastapi.responses import RedirectResponse
     from .config import FRONTEND_URL
