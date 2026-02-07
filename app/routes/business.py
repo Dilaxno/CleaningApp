@@ -295,7 +295,8 @@ def get_current_user_business_config(
         "bufferTime": config.buffer_time,
         "premiumEveningWeekend": config.premium_evening_weekend,
         "premiumDeepClean": config.premium_deep_clean,
-        "discountWeekly": config.discount_weekly,`n        "discountBiweekly": config.discount_biweekly,
+        "discountWeekly": config.discount_weekly,
+        "discountBiweekly": config.discount_biweekly,
         "discountMonthly": config.discount_monthly,
         "discountLongTerm": config.discount_long_term,
         "firstCleaningDiscountType": config.first_cleaning_discount_type,
@@ -627,7 +628,8 @@ def get_business_config(firebase_uid: str, db: Session = Depends(get_db)):
         "bufferTime": config.buffer_time,
         "premiumEveningWeekend": config.premium_evening_weekend,
         "premiumDeepClean": config.premium_deep_clean,
-        "discountWeekly": config.discount_weekly,`n        "discountBiweekly": config.discount_biweekly,
+        "discountWeekly": config.discount_weekly,
+        "discountBiweekly": config.discount_biweekly,
         "discountMonthly": config.discount_monthly,
         "discountLongTerm": config.discount_long_term,
         "firstCleaningDiscountType": config.first_cleaning_discount_type,
@@ -775,7 +777,8 @@ def get_public_addons(
         "addonCarpetSmall": config.addon_carpet_small,
         "addonCarpetMedium": config.addon_carpet_medium,
         "addonCarpetLarge": config.addon_carpet_large,
-        "discountWeekly": config.discount_weekly,`n        "discountBiweekly": config.discount_biweekly,
+        "discountWeekly": config.discount_weekly,
+        "discountBiweekly": config.discount_biweekly,
         "discountMonthly": config.discount_monthly,
     }
 
@@ -894,3 +897,4 @@ def get_public_business_info(
         "day_schedules": day_schedules,
         "off_work_periods": off_work_periods,
     }
+
