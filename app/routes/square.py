@@ -30,13 +30,12 @@ SQUARE_APPLICATION_SECRET = os.getenv("SQUARE_APPLICATION_SECRET")
 SQUARE_REDIRECT_URI = os.getenv("SQUARE_REDIRECT_URI", f"{FRONTEND_URL}/auth/square/callback")
 
 # Square API URLs (OAuth 2.0 endpoints)
-# Note: OAuth authorization uses connect.squareup.com for both sandbox and production
-# The environment is determined by the client_id prefix (sandbox-sq0idb vs sq0idp)
-SQUARE_OAUTH_URL = "https://connect.squareup.com"
-
+# Sandbox and production use different OAuth URLs
 if SQUARE_ENVIRONMENT == "production":
+    SQUARE_OAUTH_URL = "https://connect.squareup.com"
     SQUARE_API_URL = "https://connect.squareup.com/v2"
 else:
+    SQUARE_OAUTH_URL = "https://connect.squareupsandbox.com"
     SQUARE_API_URL = "https://connect.squareupsandbox.com/v2"
 
 # Encryption for tokens
@@ -96,8 +95,7 @@ async def initiate_oauth(
     scope_encoded = scope.replace(" ", "+")
     
     # Build the full OAuth URL
-    # IMPORTANT: Use connect.squareup.com for both sandbox and production
-    # The environment is determined by the client_id prefix
+    # IMPORTANT: Sandbox uses connect.squareupsandbox.com, Production uses connect.squareup.com
     oauth_url = (
         f"{SQUARE_OAUTH_URL}/oauth2/authorize"
         f"?client_id={SQUARE_APPLICATION_ID}"
