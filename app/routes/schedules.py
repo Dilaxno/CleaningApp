@@ -341,6 +341,9 @@ async def approve_schedule(
             
             if square_result.get("success"):
                 logger.info(f"✅ Square invoice created: {square_result.get('invoice_id')}")
+                # Mark invoice as auto-generated
+                contract.invoice_auto_generated = True
+                db.commit()
                 # Invoice URL is now stored in contract.square_invoice_url
             else:
                 # Log but don't fail the schedule approval

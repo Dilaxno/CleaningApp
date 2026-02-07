@@ -40,6 +40,7 @@ from .routes.templates import router as templates_router
 from .routes.template_selection import router as template_selection_router
 from .routes.service_areas import router as service_areas_router
 from .routes.square import router as square_router
+from .routes.square_webhooks import router as square_webhooks_router
 
 # Import all models to ensure they're registered with SQLAlchemy Base
 # This is needed for relationships between models in different files
@@ -213,6 +214,7 @@ app.include_router(templates_router)
 app.include_router(template_selection_router)
 app.include_router(service_areas_router)
 app.include_router(square_router)
+app.include_router(square_webhooks_router)
 
 
 # Square OAuth callback routes (must match redirect URI exactly)

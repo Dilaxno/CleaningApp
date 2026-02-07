@@ -254,8 +254,10 @@ def get_current_user_business_config(
     # Return true if EITHER is true (prevents losing onboarding status)
     onboarding_complete = config.onboarding_complete or current_user.onboarding_completed
     
-    if onboarding_complete != config.onboarding_complete:
-        logger.info(f"🔄 Syncing onboarding status: BusinessConfig={config.onboarding_complete}, User={current_user.onboarding_completed}, returning={onboarding_complete}")
+    logger.info(f"🔄 Onboarding status check for user {current_user.id}:")
+    logger.info(f"   - BusinessConfig.onboarding_complete: {config.onboarding_complete}")
+    logger.info(f"   - User.onboarding_completed: {current_user.onboarding_completed}")
+    logger.info(f"   - Returning onboardingComplete: {onboarding_complete}")
 
     return {
         "businessName": config.business_name,

@@ -330,6 +330,11 @@ class Client(Base):
     pending_contract_payment_terms = Column(String(255), nullable=True)
     pending_contract_terms_conditions = Column(String(5000), nullable=True)
     
+    # Square subscription tracking (for recurring services)
+    square_subscription_id = Column(String(255), nullable=True)  # Square subscription ID
+    subscription_status = Column(String(50), nullable=True)  # active, paused, cancelled
+    subscription_frequency = Column(String(50), nullable=True)  # weekly, bi-weekly, monthly
+    
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
@@ -424,6 +429,17 @@ class Contract(Base):
     square_invoice_url = Column(Text, nullable=True)  # Public Square payment URL
     square_payment_status = Column(String(50), nullable=True)  # pending, paid, failed, cancelled
     square_invoice_created_at = Column(DateTime, nullable=True)  # When invoice was created
+    
+    # Square subscription integration (for recurring services)
+    square_subscription_id = Column(String(255), nullable=True)  # Square subscription ID
+    square_subscription_status = Column(String(50), nullable=True)  # active, paused, cancelled
+    square_subscription_created_at = Column(DateTime, nullable=True)  # When subscription was created
+    frequency = Column(String(50), nullable=True)  # weekly, bi-weekly, monthly, etc.
+    
+    # Enhanced signature tracking
+    provider_signed_at = Column(DateTime, nullable=True)  # When provider signed
+    both_parties_signed_at = Column(DateTime, nullable=True)  # When both parties signed
+    invoice_auto_generated = Column(Boolean, default=False)  # Whether invoice was auto-generated
 
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
