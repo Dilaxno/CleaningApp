@@ -426,9 +426,12 @@ async def sign_contract_as_provider(
     db.commit()
     db.refresh(contract)
     
-    # Increment client count now that contract is fully signed
-    from ..plan_limits import increment_client_count
-    increment_client_count(current_user, db)
+    # NOTE: Client count is NOT incremented here
+    # Client is only counted as "completed" after BOTH:
+    # 1. Contract is fully signed (this step)
+    # 2. Schedule is accepted by provider (client_onboarding_status = "completed")
+    # The increment happens in schedules.py when provider accepts the schedule
+    
     # Regenerate PDF with provider signature
     try:
         import hashlib

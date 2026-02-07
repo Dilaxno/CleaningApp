@@ -236,6 +236,7 @@ class BusinessConfig(Base):
     premium_evening_weekend = Column(Float, nullable=True)
     premium_deep_clean = Column(Float, nullable=True)
     discount_weekly = Column(Float, nullable=True)
+    discount_biweekly = Column(Float, nullable=True)
     discount_monthly = Column(Float, nullable=True)
     discount_long_term = Column(Float, nullable=True)
     # First cleaning discount (applied only to the first cleaning session)
@@ -417,6 +418,12 @@ class Contract(Base):
     custom_scope = Column(
         JSON, nullable=True
     )  # Provider's custom scope (inclusions/exclusions)
+
+    # Square payment integration
+    square_invoice_id = Column(String(255), nullable=True)  # Square invoice ID
+    square_invoice_url = Column(Text, nullable=True)  # Public Square payment URL
+    square_payment_status = Column(String(50), nullable=True)  # pending, paid, failed, cancelled
+    square_invoice_created_at = Column(DateTime, nullable=True)  # When invoice was created
 
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

@@ -62,6 +62,7 @@ class BusinessConfigCreate(BaseModel):
     premiumEveningWeekend: Optional[str] = None
     premiumDeepClean: Optional[str] = None
     discountWeekly: Optional[str] = None
+    discountBiweekly: Optional[str] = None
     discountMonthly: Optional[str] = None
     discountLongTerm: Optional[str] = None
 
@@ -294,7 +295,7 @@ def get_current_user_business_config(
         "bufferTime": config.buffer_time,
         "premiumEveningWeekend": config.premium_evening_weekend,
         "premiumDeepClean": config.premium_deep_clean,
-        "discountWeekly": config.discount_weekly,
+        "discountWeekly": config.discount_weekly,`n        "discountBiweekly": config.discount_biweekly,
         "discountMonthly": config.discount_monthly,
         "discountLongTerm": config.discount_long_term,
         "firstCleaningDiscountType": config.first_cleaning_discount_type,
@@ -424,6 +425,8 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 existing.premium_deep_clean = to_float(data.premiumDeepClean)
             if is_provided(data.discountWeekly):
                 existing.discount_weekly = to_float(data.discountWeekly)
+            if is_provided(data.discountBiweekly):
+                existing.discount_biweekly = to_float(data.discountBiweekly)
             if is_provided(data.discountMonthly):
                 existing.discount_monthly = to_float(data.discountMonthly)
             if is_provided(data.discountLongTerm):
@@ -511,6 +514,7 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 premium_evening_weekend=to_float(data.premiumEveningWeekend),
                 premium_deep_clean=to_float(data.premiumDeepClean),
                 discount_weekly=to_float(data.discountWeekly),
+                discount_biweekly=to_float(data.discountBiweekly),
                 discount_monthly=to_float(data.discountMonthly),
                 discount_long_term=to_float(data.discountLongTerm),
                 first_cleaning_discount_type=data.firstCleaningDiscountType,
@@ -623,7 +627,7 @@ def get_business_config(firebase_uid: str, db: Session = Depends(get_db)):
         "bufferTime": config.buffer_time,
         "premiumEveningWeekend": config.premium_evening_weekend,
         "premiumDeepClean": config.premium_deep_clean,
-        "discountWeekly": config.discount_weekly,
+        "discountWeekly": config.discount_weekly,`n        "discountBiweekly": config.discount_biweekly,
         "discountMonthly": config.discount_monthly,
         "discountLongTerm": config.discount_long_term,
         "firstCleaningDiscountType": config.first_cleaning_discount_type,
@@ -771,7 +775,7 @@ def get_public_addons(
         "addonCarpetSmall": config.addon_carpet_small,
         "addonCarpetMedium": config.addon_carpet_medium,
         "addonCarpetLarge": config.addon_carpet_large,
-        "discountWeekly": config.discount_weekly,
+        "discountWeekly": config.discount_weekly,`n        "discountBiweekly": config.discount_biweekly,
         "discountMonthly": config.discount_monthly,
     }
 

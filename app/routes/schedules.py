@@ -277,6 +277,7 @@ async def approve_schedule(
 ):
     """Accept or request change for a pending schedule"""
     from .. import email_service
+    from ..services.square_service import create_square_invoice_for_contract
     
     schedule = db.query(Schedule).filter(
         Schedule.id == schedule_id, 
@@ -319,8 +320,36 @@ async def approve_schedule(
 
         # Mark onboarding complete ONLY after provider acceptance.
         contract.client_onboarding_status = "completed"
+        
+        # Increment client count now that BOTH contract is signed AND schedule is accepted
+        # This is when the client is truly "completed" and should count toward plan limits
+        from ..plan_limits import increment_client_count
+        increment_client_count(current_user, db)
          
         db.commit()
+        
+        # 🆕 CREATE SQUARE INVOICE AFTER SCHEDULE APPROVAL
+        # This is the trigger point - provider has accepted the schedule
+        try:
+            square_result = await create_square_invoice_for_contract(
+                contract=contract,
+                client=client,
+                schedule=schedule,
+                user=current_user,
+                db=db
+            )
+            
+            if square_result.get("success"):
+                logger.info(f"✅ Square invoice created: {square_result.get('invoice_id')}")
+                # Invoice URL is now stored in contract.square_invoice_url
+            else:
+                # Log but don't fail the schedule approval
+                reason = square_result.get("reason", "unknown")
+                logger.info(f"ℹ️ Square invoice not created: {reason}")
+        except Exception as e:
+            # Log error but don't fail the schedule approval
+            logger.error(f"⚠️ Failed to create Square invoice: {str(e)}")
+        
         # Send confirmation email to client
         if client and client.email:
             try:

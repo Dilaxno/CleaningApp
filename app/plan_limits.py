@@ -90,7 +90,9 @@ def can_add_client(user: User, db: Session) -> tuple:
 def increment_client_count(user: User, db: Session) -> None:
     """
     Increment the user's monthly client count.
-    Should be called when a contract is fully signed by both parties.
+    Should be called when a client completes full onboarding:
+    1. Contract is fully signed by both parties
+    2. Schedule is accepted by provider (client_onboarding_status = "completed")
     """
     check_and_reset_monthly_counter(user, db)
     user.clients_this_month += 1
@@ -99,8 +101,10 @@ def increment_client_count(user: User, db: Session) -> None:
 def decrement_client_count(user: User, db: Session) -> None:
     """
     Decrement the user's monthly client count.
-    Should be called when a client with a fully signed contract is deleted.
+    Should be called when a client with completed onboarding is deleted.
     Only decrements if count is greater than 0.
+    A client is considered "completed" when client_onboarding_status = "completed"
+    (both contract signed AND schedule accepted).
     """
     check_and_reset_monthly_counter(user, db)
     if user.clients_this_month > 0:

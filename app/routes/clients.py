@@ -308,17 +308,18 @@ async def delete_client(
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
 
-    # Check if client had a fully signed contract (both parties signed)
-    # This is when the count was incremented, so we need to decrement
-    has_signed_contract = any(
-        c.client_signature_timestamp and c.signed_at for c in client.contracts
+    # Check if client had a fully completed onboarding (signed contract AND accepted schedule)
+    # Client count is only incremented when client_onboarding_status = "completed"
+    # So we only decrement if they reached that stage
+    has_completed_onboarding = any(
+        c.client_onboarding_status == "completed" for c in client.contracts
     )
 
     db.delete(client)
     db.commit()
 
-    # Decrement client count if they had a signed contract
-    if has_signed_contract:
+    # Decrement client count if they had completed onboarding
+    if has_completed_onboarding:
         decrement_client_count(current_user, db)
     return {"message": "Client deleted"}
 
@@ -342,7 +343,7 @@ async def batch_delete_clients(
 
     # Verify all clients belong to the current user and delete them
     deleted_count = 0
-    signed_contracts_count = 0
+    completed_onboarding_count = 0
 
     for client_id in data.clientIds:
         client = (
@@ -351,12 +352,12 @@ async def batch_delete_clients(
             .first()
         )
         if client:
-            # Check if client had a fully signed contract
-            has_signed_contract = any(
-                c.client_signature_timestamp and c.signed_at for c in client.contracts
+            # Check if client had completed onboarding (signed contract AND accepted schedule)
+            has_completed_onboarding = any(
+                c.client_onboarding_status == "completed" for c in client.contracts
             )
-            if has_signed_contract:
-                signed_contracts_count += 1
+            if has_completed_onboarding:
+                completed_onboarding_count += 1
 
             # Get contract IDs for this client
             contract_ids = [c.id for c in client.contracts]
@@ -372,8 +373,8 @@ async def batch_delete_clients(
 
     db.commit()
 
-    # Decrement client count for each deleted client that had a signed contract
-    for _ in range(signed_contracts_count):
+    # Decrement client count for each deleted client that had completed onboarding
+    for _ in range(completed_onboarding_count):
         decrement_client_count(current_user, db)
 
     return {
@@ -1321,13 +1322,17 @@ async def sign_contract(
         )
         business_name = config.business_name if config else "Your Business"
 
-        if user.email:
+        # Check notification preference before sending
+        if user.email and user.notify_contract_signed:
             await send_contract_signed_notification(
                 to=user.email,
                 business_name=sanitize_string(business_name),
                 client_name=sanitize_string(client.contact_name or client.business_name),
                 contract_title=sanitize_string(contract.title),
             )
+            logger.info(f"✅ Contract signed notification sent to {user.email}")
+        elif user.email and not user.notify_contract_signed:
+            logger.info(f"ℹ️ Contract signed notification skipped - user preference disabled")
     except Exception as email_err:
         logger.warning(f"⚠️ Failed to send contract signed notification: {email_err}")
 

@@ -337,9 +337,11 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
     discount_percent = 0
     if frequency == "Weekly" and config.discount_weekly:
         discount_percent = config.discount_weekly
-    elif frequency == "Bi-weekly" and config.discount_monthly:
+    elif frequency == "Bi-weekly" and config.discount_biweekly:
+        discount_percent = config.discount_biweekly
+    elif frequency == "Monthly" and config.discount_monthly:
         discount_percent = config.discount_monthly
-    elif frequency == "Monthly" and config.discount_long_term:
+    elif frequency == "Long-term" and config.discount_long_term:
         discount_percent = config.discount_long_term
 
     discount_amount = base_price * (discount_percent / 100) if discount_percent else 0
