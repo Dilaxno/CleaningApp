@@ -55,3 +55,4 @@ SQUARE_APPLICATION_ID = os.getenv("SQUARE_APPLICATION_ID")
 SQUARE_APPLICATION_SECRET = os.getenv("SQUARE_APPLICATION_SECRET")
 SQUARE_REDIRECT_URI = os.getenv("SQUARE_REDIRECT_URI", f"{FRONTEND_URL}/auth/square/callback")
 SQUARE_ENCRYPTION_KEY = os.getenv("SQUARE_ENCRYPTION_KEY")  # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+SQUARE_WEBHOOK_SIGNATURE_KEY = os.getenv("SQUARE_WEBHOOK_SIGNATURE_KEY")  # Webhook signature key from Square Dashboard
