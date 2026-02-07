@@ -496,6 +496,7 @@ class PublicClientCreate(BaseModel):
     formData: Optional[dict] = None  # Store all form fields as JSON
     clientSignature: Optional[str] = None  # Base64 signature from client
     quoteAccepted: Optional[bool] = False  # Whether client accepted the quote
+    createOnly: Optional[bool] = False  # NEW: Only create client, don't generate contract yet
 
     @field_validator("phone")
     @classmethod
@@ -512,14 +513,26 @@ class QuotePreviewRequest(BaseModel):
     formData: dict
 
 
+class AddonDetail(BaseModel):
+    """Schema for addon detail in quote"""
+    name: str
+    quantity: int
+    unitPrice: float
+    totalPrice: float
+    pricingMetric: str
+
+
 class QuotePreviewResponse(BaseModel):
     """Response for quote preview"""
 
     basePrice: float
     discountPercent: float
     discountAmount: float
+    firstCleaningDiscountType: Optional[str] = None
+    firstCleaningDiscountValue: Optional[float] = None
+    firstCleaningDiscountAmount: Optional[float] = 0
     addonAmount: float = 0
-    addonDetails: List[dict] = []
+    addonDetails: List[AddonDetail] = []
     finalPrice: float
     estimatedHours: float
     cleaners: int
@@ -527,6 +540,7 @@ class QuotePreviewResponse(BaseModel):
     frequency: str
     pricingExplanation: str
     quotePending: bool = False
+    selectedPackage: Optional[dict] = None
 
 
 class PublicSubmitResponse(BaseModel):
@@ -609,6 +623,18 @@ async def get_quote_preview(
     # Calculate quote
     quote = calculate_quote(config, data.formData)
 
+    # Convert addon details from snake_case to camelCase for API response
+    addon_details_camel = [
+        AddonDetail(
+            name=addon["name"],
+            quantity=addon["quantity"],
+            unitPrice=addon["unit_price"],
+            totalPrice=addon["total_price"],
+            pricingMetric=addon["pricing_metric"]
+        )
+        for addon in quote.get("addon_details", [])
+    ]
+
     # Build pricing explanation
     pricing_model = config.pricing_model or ""
     property_size = int(data.formData.get("squareFootage", 0) or 0)
@@ -689,12 +715,16 @@ async def get_quote_preview(
             )
 
         explanation = " • ".join(explanation_parts)
+    
     return QuotePreviewResponse(
         basePrice=quote["base_price"],
         discountPercent=quote["discount_percent"],
         discountAmount=quote["discount_amount"],
+        firstCleaningDiscountType=quote.get("first_cleaning_discount_type"),
+        firstCleaningDiscountValue=quote.get("first_cleaning_discount_value"),
+        firstCleaningDiscountAmount=quote.get("first_cleaning_discount_amount", 0),
         addonAmount=quote.get("addon_amount", 0),
-        addonDetails=quote.get("addon_details", []),
+        addonDetails=addon_details_camel,
         finalPrice=quote["final_price"],
         estimatedHours=quote["estimated_hours"],
         cleaners=quote["cleaners"],
@@ -702,6 +732,7 @@ async def get_quote_preview(
         frequency=frequency,
         pricingExplanation=explanation,
         quotePending=quote.get("quote_pending", False),
+        selectedPackage=quote.get("selected_package"),
     )
 
 
@@ -868,6 +899,30 @@ async def submit_public_form(
     db.add(client)
     db.commit()
     db.refresh(client)
+    
+    # If createOnly flag is set, skip contract generation and return client data immediately
+    if data.createOnly:
+        logger.info(f"✅ Client created (ID: {client.id}) - skipping contract generation (createOnly=True)")
+        return PublicSubmitResponse(
+            client=ClientResponse(
+                id=client.id,
+                public_id=client.public_id,
+                businessName=client.business_name,
+                contactName=client.contact_name,
+                email=client.email,
+                phone=client.phone,
+                propertyType=client.property_type,
+                propertySize=client.property_size,
+                frequency=client.frequency,
+                status=client.status,
+                notes=client.notes,
+                created_at=client.created_at,
+            ),
+            contractPdfUrl=None,
+            jobId=None,
+            message="Client created successfully - ready for scheduling",
+        )
+    
     # Queue contract PDF generation as background job (async to prevent timeout)
     job_id = None
     if data.formData:
@@ -947,10 +1002,85 @@ class SignContractRequest(BaseModel):
     signature: str
 
 
+class GenerateContractRequest(BaseModel):
+    """Schema for generating contract for existing client"""
+    formData: dict
+
+
 # Rate limiter for contract signing - 10 per hour per IP
 rate_limit_sign_contract = create_rate_limiter(
     limit=10, window_seconds=3600, key_prefix="sign_contract", use_ip=True
 )
+
+
+@router.post("/{client_id}/generate-contract")
+async def generate_contract_for_client(
+    client_id: int,
+    data: GenerateContractRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Public endpoint to generate a contract for an existing client.
+    Used in the new flow: create client → schedule → generate contract → sign.
+    No authentication required - accessed via public form flow.
+    """
+    from arq import create_pool
+    from ..worker import get_redis_settings
+
+    logger.info(f"📋 Generating contract for client ID: {client_id}")
+
+    # Find the client
+    client = db.query(Client).filter(Client.id == client_id).first()
+    if not client:
+        logger.error(f"❌ Client not found: {client_id}")
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    # Get the user/business owner
+    user = db.query(User).filter(User.id == client.user_id).first()
+    if not user:
+        logger.error(f"❌ User not found for client: {client_id}")
+        raise HTTPException(status_code=404, detail="Business not found")
+
+    # Get business config
+    config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
+    if not config:
+        logger.warning(f"⚠️ No business config found for user {user.id}")
+        raise HTTPException(status_code=404, detail="Business configuration not found")
+
+    # Update client's form_data if provided
+    if data.formData:
+        client.form_data = data.formData
+        db.commit()
+        db.refresh(client)
+
+    try:
+        # Enqueue contract generation job
+        redis_settings = get_redis_settings()
+        pool = await create_pool(redis_settings)
+
+        job = await pool.enqueue_job(
+            "generate_contract_pdf_task",
+            client.id,
+            user.firebase_uid,
+            data.formData,
+            None,  # No signature yet - client will sign after reviewing
+        )
+
+        job_id = job.job_id
+        logger.info(f"📋 Contract generation job queued: {job_id} for client {client_id}")
+
+        return {
+            "message": "Contract generation started",
+            "jobId": job_id,
+            "clientId": client.id,
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Failed to queue contract generation for client {client_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to start contract generation"
+        )
 
 
 @router.post("/public/sign-contract")
