@@ -41,12 +41,13 @@ def get_csp_policy() -> str:
     directives = [
         "default-src 'self'",  # Allow same-origin by default for API functionality
         f"frame-ancestors {frame_ancestors}",  # Allow embedding from frontend domains
-        "script-src 'self' https://apis.google.com https://accounts.google.com https://www.gstatic.com https://*.googleapis.com https://static.cloudflareinsights.com https://challenges.cloudflare.com https://player.vimeo.com https://assets.calendly.com data:",  # Removed unsafe-inline and unsafe-eval
+        "script-src 'self' https://apis.google.com https://accounts.google.com https://www.gstatic.com https://*.googleapis.com https://static.cloudflareinsights.com https://challenges.cloudflare.com https://player.vimeo.com https://assets.calendly.com https://widget.intercom.io https://js.intercomcdn.com data:",  # Allow Intercom scripts
         "style-src 'self' https://accounts.google.com https://fonts.googleapis.com",  # Removed unsafe-inline
-        "font-src 'self' https://fonts.gstatic.com https://r2cdn.perplexity.ai",  # Allow Google fonts and Perplexity fonts
-        "img-src 'self' data: blob: https: https://www.google.com https://accounts.google.com",  # Allow Google auth images and blob URLs for thumbnails
-        "frame-src 'self' https://accounts.google.com https://*.firebaseapp.com https://calendly.com https://*.calendly.com",  # Allow Google/Firebase auth frames and Calendly embeds
-        "connect-src 'self' https://accounts.google.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.googleapis.com https://*.firebaseapp.com https://calendly.com https://*.calendly.com https://assets.calendly.com",  # Allow Firebase connections and Calendly
+        "font-src 'self' https://fonts.gstatic.com https://r2cdn.perplexity.ai https://js.intercomcdn.com",  # Allow Intercom fonts
+        "img-src 'self' data: blob: https: https://www.google.com https://accounts.google.com https://static.intercomassets.com https://js.intercomcdn.com",  # Allow Intercom images
+        "frame-src 'self' https://accounts.google.com https://*.firebaseapp.com https://calendly.com https://*.calendly.com https://intercom-sheets.com https://*.intercom.io",  # Allow Intercom frames
+        "connect-src 'self' https://accounts.google.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.googleapis.com https://*.firebaseapp.com https://calendly.com https://*.calendly.com https://assets.calendly.com https://api-iam.intercom.io https://api-ping.intercom.io https://nexus-websocket-a.intercom.io wss://nexus-websocket-a.intercom.io https://*.intercom.io",  # Allow Intercom connections
+        "media-src 'self' https://js.intercomcdn.com",  # Allow Intercom media
         "base-uri 'none'",  # Prevent base tag injection
         "form-action 'self'",  # Allow form submissions to same origin
     ]
