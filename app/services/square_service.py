@@ -191,6 +191,34 @@ async def create_square_invoice_for_contract(
                 logger.warning(f"⚠️ Failed to publish invoice {invoice_id}: {publish_result.get('message')}")
             else:
                 logger.info(f"✅ Square invoice published (ready for manual sharing): {invoice_id}")
+                
+                # Fetch the published invoice to get the public_url
+                # The public_url is only available after publishing
+                try:
+                    async with httpx.AsyncClient(timeout=30.0) as http_client:
+                        get_response = await http_client.get(
+                            f"{SQUARE_API_URL}/invoices/{invoice_id}",
+                            headers={
+                                "Square-Version": "2024-12-18",
+                                "Authorization": f"Bearer {access_token}",
+                                "Content-Type": "application/json"
+                            }
+                        )
+                        
+                        if get_response.status_code == 200:
+                            updated_invoice = get_response.json().get("invoice", {})
+                            updated_url = updated_invoice.get("public_url")
+                            
+                            if updated_url and updated_url != invoice_url:
+                                # Update the contract with the published invoice URL
+                                contract.square_invoice_url = updated_url
+                                db.commit()
+                                invoice_url = updated_url
+                                logger.info(f"✅ Updated invoice URL after publishing: {updated_url}")
+                        else:
+                            logger.warning(f"⚠️ Failed to fetch published invoice: {get_response.text}")
+                except Exception as e:
+                    logger.error(f"⚠️ Error fetching published invoice URL: {str(e)}")
             
             return {
                 "success": True,
