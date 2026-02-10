@@ -1,0 +1,206 @@
+"""Public upload + signed URL access for client-submitted property photos.
+
+Security goals:
+- Objects stored in PRIVATE R2 bucket.
+- Upload is public (no auth) but requires a valid ownerUid (Firebase UID) and is rate-limited upstream.
+- View is done through short-lived presigned URLs, accessible only to the authenticated business owner.
+
+We store only the R2 object keys in the client's form_data (JSON).
+"""
+
+import logging
+import mimetypes
+import os
+import re
+import uuid
+from typing import Optional
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+from ..auth import get_current_user
+from ..config import R2_BUCKET_NAME
+from ..database import get_db
+from ..models import Client, User
+from .upload import generate_presigned_url, get_r2_client
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/uploads", tags=["Uploads"])
+
+
+def _safe_segment(value: str, max_len: int = 80) -> str:
+    value = (value or "").strip().lower()
+    value = re.sub(r"[^a-z0-9_-]+", "-", value)
+    value = value.strip("-")
+    return value[:max_len] or "na"
+
+
+def _validate_owner_uid(owner_uid: str) -> None:
+    # Basic sanity. Firebase UIDs are usually urlsafe-ish.
+    if not owner_uid or len(owner_uid) > 200:
+        raise HTTPException(status_code=400, detail="Invalid ownerUid")
+    if ".." in owner_uid or "/" in owner_uid or "\\" in owner_uid:
+        raise HTTPException(status_code=400, detail="Invalid ownerUid")
+
+
+class PropertyShotUploadResponse(BaseModel):
+    key: str
+
+
+@router.post("/public/property-shot", response_model=PropertyShotUploadResponse)
+async def upload_property_shot_public(
+    file: UploadFile = File(...),
+    ownerUid: str = Form(...),
+    fieldId: str = Form("propertyShots"),
+    templateId: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+):
+    """Public endpoint used by the embedded/client intake form.
+
+    Uploads a single image to the PRIVATE R2 bucket and returns its object key.
+
+    NOTE: This endpoint intentionally does NOT accept arbitrary content types.
+    """
+
+    _validate_owner_uid(ownerUid)
+
+    # Validate that business exists
+    user = db.query(User).filter(User.firebase_uid == ownerUid).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Business not found")
+
+    if not file or not file.filename:
+        raise HTTPException(status_code=400, detail="No file provided")
+
+    content_type = (file.content_type or "").lower()
+    if not content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Only image uploads are allowed")
+
+    # Limit size (10MB default)
+    max_bytes = int(os.getenv("PROPERTY_SHOT_MAX_BYTES", "10485760"))
+    contents = await file.read()
+    if len(contents) == 0:
+        raise HTTPException(status_code=400, detail="Empty file")
+    if len(contents) > max_bytes:
+        raise HTTPException(status_code=400, detail="Image too large (max 10MB)")
+
+    # Determine extension
+    ext = os.path.splitext(file.filename)[1].lower()
+
+    # Accept common image MIME types even if the filename extension is missing or uncommon.
+    # Some devices/browsers upload HEIC/HEIF/AVIF with unexpected extensions or none at all.
+    allowed_exts = {
+        ".jpg",
+        ".jpeg",
+        ".jfif",
+        ".png",
+        ".webp",
+        ".gif",
+        ".bmp",
+        ".tif",
+        ".tiff",
+        ".heic",
+        ".heif",
+        ".avif",
+    }
+    allowed_content_types = {
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+        "image/webp",
+        "image/gif",
+        "image/bmp",
+        "image/tiff",
+        "image/heic",
+        "image/heif",
+        "image/avif",
+    }
+
+    if not ext:
+        guessed = mimetypes.guess_extension(content_type) or ".jpg"
+        ext = (guessed or ".jpg").lower()
+
+    # If the extension is unknown but the MIME type is a supported image type,
+    # we still accept it and pick a safe extension based on the MIME type.
+    if ext not in allowed_exts:
+        if content_type in allowed_content_types:
+            ext = (mimetypes.guess_extension(content_type) or ".jpg").lower()
+            # mimetypes may return '.jpe' for image/jpeg
+            if ext == ".jpe":
+                ext = ".jpg"
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported image type")
+
+    # Final guard
+    if ext not in allowed_exts:
+        raise HTTPException(status_code=400, detail="Unsupported image type")
+
+    # Build key
+    safe_template = _safe_segment(templateId or "intake")
+    safe_field = _safe_segment(fieldId or "propertyShots")
+    key = (
+        f"property-shots/{ownerUid}/{safe_template}/{safe_field}/"
+        f"{uuid.uuid4().hex}{ext}"
+    )
+
+    try:
+        r2 = get_r2_client()
+        r2.put_object(
+            Bucket=R2_BUCKET_NAME,
+            Key=key,
+            Body=contents,
+            ContentType=content_type,
+            # Keep private. (R2 defaults to private, but be explicit for S3 compatibility)
+            ACL="private",
+        )
+        return PropertyShotUploadResponse(key=key)
+    except Exception as e:
+        logger.error(f"❌ Failed to upload property shot: {e}")
+        raise HTTPException(status_code=500, detail="Failed to upload image")
+
+
+class PropertyShotSignedUrlRequest(BaseModel):
+    clientId: int
+    key: str
+
+
+class PropertyShotSignedUrlResponse(BaseModel):
+    url: str
+
+
+@router.post("/property-shots/signed-url", response_model=PropertyShotSignedUrlResponse)
+async def get_property_shot_signed_url(
+    payload: PropertyShotSignedUrlRequest,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Authenticated endpoint for the business owner to get a signed URL.
+
+    Ensures the requested object key belongs to the requesting user's client.
+    """
+
+    client = (
+        db.query(Client)
+        .filter(Client.id == payload.clientId, Client.user_id == current_user.id)
+        .first()
+    )
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    form_data = client.form_data or {}
+    allowed_keys = form_data.get("propertyShots") or []
+
+    if isinstance(allowed_keys, str):
+        allowed_keys = [allowed_keys]
+
+    if payload.key not in allowed_keys:
+        raise HTTPException(status_code=403, detail="Not authorized for this image")
+
+    try:
+        url = generate_presigned_url(payload.key, expiration=3600)  # 1 hour
+        return PropertyShotSignedUrlResponse(url=url)
+    except Exception as e:
+        logger.error(f"❌ Failed to generate signed URL: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate signed URL")
