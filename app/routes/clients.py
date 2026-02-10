@@ -683,19 +683,28 @@ async def get_quote_preview(
     if quote.get("quote_pending"):
         explanation = "Quote will be provided by the service provider after reviewing your requirements."
     else:
-        # Base rate explanation - show business name and rate per metric
-        if pricing_model == "sqft" and config.rate_per_sqft:
+        # Base rate explanation - show business name and rate per metric with calculation
+        if pricing_model == "sqft" and config.rate_per_sqft and property_size > 0:
+            base_calculation = property_size * config.rate_per_sqft
             explanation_parts.append(
-                f"{business_name} prices their jobs at ${config.rate_per_sqft:.2f} per sq ft"
+                f"{business_name} charges ${config.rate_per_sqft:.2f} per sq ft ({property_size:,} sq ft × ${config.rate_per_sqft:.2f} = ${base_calculation:,.2f})"
             )
-        elif pricing_model == "room" and config.rate_per_room:
+        elif pricing_model == "room" and config.rate_per_room and num_rooms > 0:
+            base_calculation = num_rooms * config.rate_per_room
             explanation_parts.append(
-                f"{business_name} prices their jobs at ${config.rate_per_room:.2f} per room"
+                f"{business_name} charges ${config.rate_per_room:.2f} per room ({num_rooms} room{'s' if num_rooms != 1 else ''} × ${config.rate_per_room:.2f} = ${base_calculation:,.2f})"
             )
         elif pricing_model == "hourly" and config.hourly_rate:
-            explanation_parts.append(
-                f"{business_name} prices their jobs at ${config.hourly_rate:.2f} per hour"
-            )
+            estimated_hours = quote.get("estimated_hours", 0)
+            if estimated_hours > 0:
+                base_calculation = estimated_hours * config.hourly_rate
+                explanation_parts.append(
+                    f"{business_name} charges ${config.hourly_rate:.2f} per hour ({estimated_hours:.1f} hours × ${config.hourly_rate:.2f} = ${base_calculation:,.2f})"
+                )
+            else:
+                explanation_parts.append(
+                    f"{business_name} charges ${config.hourly_rate:.2f} per hour"
+                )
         elif pricing_model == "packages":
             # Find the selected package for explanation
             selected_package_id = data.formData.get("selectedPackage")
@@ -732,17 +741,39 @@ async def get_quote_preview(
                     explanation_parts.append(f"Estimated duration: {duration_hours:.1f} hours")
             else:
                 explanation_parts.append("Custom service package selected")
-        elif pricing_model == "flat" and config.flat_rate:
-            explanation_parts.append(
-                f"{business_name} prices their jobs at a flat rate of ${config.flat_rate:,.2f}"
-            )
+        elif pricing_model == "flat":
+            if config.flat_rate:
+                explanation_parts.append(
+                    f"{business_name} charges a flat rate of ${config.flat_rate:,.2f} per service"
+                )
+            elif config.flat_rate_small or config.flat_rate_medium or config.flat_rate_large:
+                # Tiered flat rate - determine which tier applies
+                if property_size > 0:
+                    if property_size <= 1500 and config.flat_rate_small:
+                        explanation_parts.append(
+                            f"{business_name} charges ${config.flat_rate_small:,.2f} for small properties (up to 1,500 sq ft)"
+                        )
+                    elif property_size <= 3000 and config.flat_rate_medium:
+                        explanation_parts.append(
+                            f"{business_name} charges ${config.flat_rate_medium:,.2f} for medium properties (1,501-3,000 sq ft)"
+                        )
+                    elif config.flat_rate_large:
+                        explanation_parts.append(
+                            f"{business_name} charges ${config.flat_rate_large:,.2f} for large properties (3,000+ sq ft)"
+                        )
+                else:
+                    explanation_parts.append(f"{business_name} uses tiered flat rate pricing")
+            else:
+                explanation_parts.append(
+                    f"{business_name} charges a flat rate of ${config.flat_rate:,.2f}"
+                )
         else:
             explanation_parts.append(f"Base service rate: ${quote['base_price']:,.2f}")
 
         # Discount explanation
         if quote["discount_percent"] > 0:
             explanation_parts.append(
-                f"{quote['discount_percent']:.0f}% {frequency.lower()} discount applied"
+                f"{quote['discount_percent']:.0f}% {frequency.lower()} frequency discount applied"
             )
 
         explanation = " • ".join(explanation_parts)
