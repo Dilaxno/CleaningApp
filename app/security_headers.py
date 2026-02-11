@@ -47,7 +47,7 @@ def get_csp_policy() -> str:
         "img-src 'self' data: blob: https: https://www.google.com https://accounts.google.com https://static.intercomassets.com https://js.intercomcdn.com",  # Allow Intercom images
         "frame-src 'self' https://accounts.google.com https://*.firebaseapp.com https://calendly.com https://*.calendly.com https://intercom-sheets.com https://*.intercom.io",  # Allow Intercom frames
         "connect-src 'self' https://accounts.google.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.googleapis.com https://*.firebaseapp.com https://calendly.com https://*.calendly.com https://assets.calendly.com https://api-iam.intercom.io https://api-ping.intercom.io https://nexus-websocket-a.intercom.io wss://nexus-websocket-a.intercom.io https://*.intercom.io",  # Allow Intercom connections
-        "media-src 'self' https://js.intercomcdn.com",  # Allow Intercom media
+        "media-src 'self' blob: https: https://js.intercomcdn.com",  # Allow Intercom media and blob URLs for video preview
         "base-uri 'none'",  # Prevent base tag injection
         "form-action 'self'",  # Allow form submissions to same origin
     ]
