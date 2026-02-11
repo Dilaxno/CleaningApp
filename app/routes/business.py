@@ -43,7 +43,6 @@ class BusinessConfigCreate(BaseModel):
     suppliesProvided: Optional[str] = None  # "provider" or "client"
     availableSupplies: Optional[List[str]] = None  # List of supply IDs
     ratePerSqft: Optional[str] = None
-    ratePerRoom: Optional[str] = None
     hourlyRate: Optional[str] = None
     flatRate: Optional[str] = None
     flatRateSmall: Optional[str] = None
@@ -215,7 +214,6 @@ def get_current_user_business_config(
                 "suppliesProvided": None,
                 "availableSupplies": [],
                 "ratePerSqft": None,
-                "ratePerRoom": None,
                 "hourlyRate": None,
                 "flatRate": None,
                 "flatRateSmall": None,
@@ -293,7 +291,6 @@ def get_current_user_business_config(
         "suppliesProvided": config.supplies_provided,
         "availableSupplies": config.available_supplies,
         "ratePerSqft": config.rate_per_sqft,
-        "ratePerRoom": config.rate_per_room,
         "hourlyRate": config.hourly_rate,
         "flatRate": config.flat_rate,
         "flatRateSmall": config.flat_rate_small,
@@ -343,7 +340,7 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
         f"📋 Data received: pricingModel={data.pricingModel}, logoUrl={data.logoUrl}"
     )
     logger.info(
-        f"📋 Pricing data: ratePerSqft={data.ratePerSqft}, ratePerRoom={data.ratePerRoom}, hourlyRate={data.hourlyRate}, flatRate={data.flatRate}"
+        f"📋 Pricing data: ratePerSqft={data.ratePerSqft}, hourlyRate={data.hourlyRate}, flatRate={data.flatRate}"
     )
     logger.info(f"📋 Business name: {data.businessName}")
     logger.info(f"📋 All data fields: {data.model_dump()}")
@@ -408,8 +405,6 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
 
             if is_provided(data.ratePerSqft):
                 existing.rate_per_sqft = to_float(data.ratePerSqft)
-            if is_provided(data.ratePerRoom):
-                existing.rate_per_room = to_float(data.ratePerRoom)
             if is_provided(data.hourlyRate):
                 existing.hourly_rate = to_float(data.hourlyRate)
             if is_provided(data.flatRate):

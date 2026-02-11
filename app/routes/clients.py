@@ -689,11 +689,6 @@ async def get_quote_preview(
             explanation_parts.append(
                 f"{business_name} charges ${config.rate_per_sqft:.2f} per sq ft ({property_size:,} sq ft × ${config.rate_per_sqft:.2f} = ${base_calculation:,.2f})"
             )
-        elif pricing_model == "room" and config.rate_per_room and num_rooms > 0:
-            base_calculation = num_rooms * config.rate_per_room
-            explanation_parts.append(
-                f"{business_name} charges ${config.rate_per_room:.2f} per room ({num_rooms} room{'s' if num_rooms != 1 else ''} × ${config.rate_per_room:.2f} = ${base_calculation:,.2f})"
-            )
         elif pricing_model == "hourly" and config.hourly_rate:
             estimated_hours = quote.get("estimated_hours", 0)
             if estimated_hours > 0:

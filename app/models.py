@@ -216,7 +216,6 @@ class BusinessConfig(Base):
         JSON, nullable=True
     )  # List of supply IDs the provider brings
     rate_per_sqft = Column(Float, nullable=True)
-    rate_per_room = Column(Float, nullable=True)
     hourly_rate = Column(Float, nullable=True)
     flat_rate = Column(Float, nullable=True)
     # Flat fee by job size (used when pricing_model == "flat")

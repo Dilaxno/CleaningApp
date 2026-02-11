@@ -115,7 +115,7 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
     property_size = int(form_data.get("squareFootage", 0) or 0)
     num_rooms = int(form_data.get("numberOfOffices", 0) or form_data.get("numberOfRooms", 0) or 0)
     frequency = form_data.get("cleaningFrequency", "Weekly")
-    logger.info(f"📊 Config rates - sqft: {config.rate_per_sqft}, room: {config.rate_per_room}, hourly: {config.hourly_rate}, flat: {config.flat_rate}")
+    logger.info(f"📊 Config rates - sqft: {config.rate_per_sqft}, hourly: {config.hourly_rate}, flat: {config.flat_rate}")
     logger.info(f"📊 Pricing model: {pricing_model}, property_size: {property_size}, num_rooms: {num_rooms}, frequency: {frequency}")
 
     base_price = 0.0
@@ -124,10 +124,6 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
     # Calculate base price based on pricing model
     if pricing_model == "sqft" and config.rate_per_sqft:
         base_price = property_size * config.rate_per_sqft
-        # Use new three-category time estimation system
-        estimated_hours = calculate_estimated_hours(config, property_size)
-    elif pricing_model == "room" and config.rate_per_room:
-        base_price = num_rooms * config.rate_per_room
         # Use new three-category time estimation system
         estimated_hours = calculate_estimated_hours(config, property_size)
     elif pricing_model == "hourly" and config.hourly_rate:
@@ -240,11 +236,6 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
                 estimated_hours = 3.5
             else:
                 estimated_hours = 4.0
-        elif config.rate_per_room and config.rate_per_room > 0:
-            # Realistic room and time estimates
-            rooms = num_rooms if num_rooms > 0 else max(1, property_size / 300) if property_size > 0 else 4  # ~300 sqft per room average
-            base_price = rooms * config.rate_per_room
-            estimated_hours = min(4.0, rooms * 0.5)  # Cap at 4 hours, 30 min per room
     # Apply minimum charge
     if config.minimum_charge and base_price < config.minimum_charge:
         logger.info(f"📊 Applying minimum charge: ${config.minimum_charge} (was ${base_price})")
@@ -483,7 +474,7 @@ async def generate_contract_html(
     logger.info(f"🖼️ Business config branding - name: {business_config.business_name}, logo: {business_config.logo_url}")
 
     # Warn if all pricing fields are NULL
-    if not any([business_config.rate_per_sqft, business_config.rate_per_room, business_config.hourly_rate, business_config.flat_rate]):
+    if not any([business_config.rate_per_sqft, business_config.hourly_rate, business_config.flat_rate]):
         logger.warning(f"⚠️ ALL PRICING FIELDS ARE NULL for user_id: {business_config.user_id} - user needs to update pricing in Settings")
 
     # Debug logging for signatures - INPUT
