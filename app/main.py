@@ -45,6 +45,7 @@ from .routes.square_webhooks import router as square_webhooks_router
 from .routes.google_calendar import router as google_calendar_router
 from .routes.quickbooks import router as quickbooks_router
 from .routes.custom_quotes import router as custom_quotes_router
+from .routes.intercom import router as intercom_router
 
 # Import all models to ensure they're registered with SQLAlchemy Base
 # This is needed for relationships between models in different files
@@ -254,6 +255,7 @@ app.include_router(square_webhooks_router)
 app.include_router(google_calendar_router)
 app.include_router(quickbooks_router)
 app.include_router(custom_quotes_router)
+app.include_router(intercom_router)
 
 
 # Square OAuth callback routes (must match redirect URI exactly)
