@@ -180,6 +180,8 @@ async def get_property_shot_signed_url(
 
     Ensures the requested object key belongs to the requesting user's client.
     """
+    
+    logger.info(f"🔍 Fetching signed URL for client {payload.clientId}, key: {payload.key}")
 
     client = (
         db.query(Client)
@@ -187,6 +189,7 @@ async def get_property_shot_signed_url(
         .first()
     )
     if not client:
+        logger.warning(f"❌ Client {payload.clientId} not found for user {current_user.id}")
         raise HTTPException(status_code=404, detail="Client not found")
 
     form_data = client.form_data or {}
@@ -195,12 +198,16 @@ async def get_property_shot_signed_url(
     if isinstance(allowed_keys, str):
         allowed_keys = [allowed_keys]
 
+    logger.info(f"📋 Allowed keys for client {payload.clientId}: {allowed_keys}")
+
     if payload.key not in allowed_keys:
+        logger.warning(f"❌ Key {payload.key} not in allowed keys for client {payload.clientId}")
         raise HTTPException(status_code=403, detail="Not authorized for this image")
 
     try:
         url = generate_presigned_url(payload.key, expiration=3600)  # 1 hour
+        logger.info(f"✅ Generated signed URL for client {payload.clientId}, key: {payload.key}")
         return PropertyShotSignedUrlResponse(url=url)
     except Exception as e:
-        logger.error(f"❌ Failed to generate signed URL: {e}")
+        logger.error(f"❌ Failed to generate signed URL for client {payload.clientId}, key {payload.key}: {e}")
         raise HTTPException(status_code=500, detail="Failed to generate signed URL")

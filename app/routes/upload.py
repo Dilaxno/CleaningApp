@@ -46,7 +46,7 @@ def get_r2_client():
     )
 
 def generate_presigned_url(key: str, expiration: int = PRESIGNED_URL_EXPIRATION) -> str:
-    """Generate a presigned URL for accessing a private object."""
+    """Generate a presigned URL for accessing a private object in R2."""
     r2 = get_r2_client()
     
     # Add response content type for SVG files to ensure proper rendering
@@ -57,11 +57,21 @@ def generate_presigned_url(key: str, expiration: int = PRESIGNED_URL_EXPIRATION)
         params["ResponseContentType"] = "image/svg+xml"
         params["ResponseContentDisposition"] = "inline"
     
-    return r2.generate_presigned_url(
-        "get_object",
-        Params=params,
-        ExpiresIn=expiration,
-    )
+    # For image files, set proper content type and disposition
+    if any(key.lower().endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.heic', '.heif', '.avif']):
+        params["ResponseContentDisposition"] = "inline"
+    
+    try:
+        url = r2.generate_presigned_url(
+            "get_object",
+            Params=params,
+            ExpiresIn=expiration,
+        )
+        logger.info(f"✅ Generated presigned URL for key: {key}")
+        return url
+    except Exception as e:
+        logger.error(f"❌ Failed to generate presigned URL for key {key}: {e}")
+        raise
 
 @router.post("/logo/{firebase_uid}")
 async def upload_logo(

@@ -72,6 +72,7 @@ class ScheduleResponse(BaseModel):
     calendlyEventId: Optional[str] = None
     calendlyBookingMethod: Optional[str] = None
     googleCalendarEventId: Optional[str] = None
+    contractStatus: Optional[str] = None  # Contract status for validation
     createdAt: datetime
 
     class Config:
@@ -94,6 +95,15 @@ async def get_schedules(
             # Also check form_data for property type
             if not property_type and client.form_data:
                 property_type = client.form_data.get('propertyType') or client.form_data.get('property_type')
+        
+        # Get contract status for validation
+        contract_status = None
+        if client:
+            contract = db.query(Contract).filter(
+                Contract.client_id == client.id
+            ).order_by(Contract.created_at.desc()).first()
+            if contract:
+                contract_status = contract.status
         
         result.append(ScheduleResponse(
             id=s.id,
@@ -122,6 +132,7 @@ async def get_schedules(
             calendlyEventUri=s.calendly_event_uri,
             calendlyEventId=s.calendly_event_id,
             calendlyBookingMethod=s.calendly_booking_method,
+            contractStatus=contract_status,
             createdAt=s.created_at
         ))
     return result
@@ -326,7 +337,7 @@ async def approve_schedule(
         if not contract or contract.status != "signed":
             raise HTTPException(
                 status_code=400,
-                detail="Contract must be signed by the provider before accepting a schedule."
+                detail="You must review and sign the contract before accepting this appointment. Please go to the Contracts page to sign the contract first."
             )
 
         # If this is a client counter-proposal, use the client's proposed time

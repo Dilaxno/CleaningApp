@@ -204,15 +204,19 @@ class ServiceAreaValidator:
         try:
             user = self.db.query(User).filter(User.firebase_uid == business_uid).first()
             if not user or not user.business_config:
+                logger.error(f"User or business config not found for {business_uid}")
                 return False
             
             # Validate service area format
-            for area in service_areas:
+            for i, area in enumerate(service_areas):
                 if not self._validate_service_area_format(area):
+                    logger.error(f"Invalid service area format at index {i}: {area}")
                     return False
             
+            logger.info(f"Updating service areas for {business_uid}: {service_areas}")
             user.business_config.service_areas = service_areas
             self.db.commit()
+            logger.info(f"Successfully updated service areas for {business_uid}")
             return True
             
         except Exception as e:
@@ -238,18 +242,18 @@ class ServiceAreaValidator:
         
         # Type-specific validation
         if area_type == 'state':
-            # State must have valid state code
-            state_code = area.get('state', '').upper()
+            # For state type, the state code is in the 'value' field
+            state_code = area.get('value', '').upper()
             return state_code in US_STATES
             
         elif area_type in ['county', 'neighborhood', 'city']:
-            # County/neighborhood must have state
+            # County/neighborhood/city must have state field
             state_code = area.get('state', '').upper()
             if state_code not in US_STATES:
                 return False
             
-            # County/neighborhood must have county if type is neighborhood
-            if area_type in ['neighborhood', 'city'] and not area.get('county'):
+            # Neighborhood type must have county
+            if area_type == 'neighborhood' and not area.get('county'):
                 return False
         
         return True

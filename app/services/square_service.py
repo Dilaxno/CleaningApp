@@ -192,33 +192,21 @@ async def create_square_invoice_for_contract(
             else:
                 logger.info(f"✅ Square invoice published (ready for manual sharing): {invoice_id}")
                 
-                # Fetch the published invoice to get the public_url
-                # The public_url is only available after publishing
-                try:
-                    async with httpx.AsyncClient(timeout=30.0) as http_client:
-                        get_response = await http_client.get(
-                            f"{SQUARE_API_URL}/invoices/{invoice_id}",
-                            headers={
-                                "Square-Version": "2024-12-18",
-                                "Authorization": f"Bearer {access_token}",
-                                "Content-Type": "application/json"
-                            }
-                        )
-                        
-                        if get_response.status_code == 200:
-                            updated_invoice = get_response.json().get("invoice", {})
-                            updated_url = updated_invoice.get("public_url")
-                            
-                            if updated_url and updated_url != invoice_url:
-                                # Update the contract with the published invoice URL
-                                contract.square_invoice_url = updated_url
-                                db.commit()
-                                invoice_url = updated_url
-                                logger.info(f"✅ Updated invoice URL after publishing: {updated_url}")
-                        else:
-                            logger.warning(f"⚠️ Failed to fetch published invoice: {get_response.text}")
-                except Exception as e:
-                    logger.error(f"⚠️ Error fetching published invoice URL: {str(e)}")
+                # Try to get the public_url from the publish response first
+                published_url = publish_result.get("public_url")
+                if published_url and published_url != invoice_url:
+                    contract.square_invoice_url = published_url
+                    db.commit()
+                    invoice_url = published_url
+                    logger.info(f"✅ Got invoice URL from publish response: {published_url}")
+                elif not invoice_url:
+                    # If no URL yet, construct the Square invoice URL manually
+                    # Format: https://squareup.com/pay-invoice/{invoice_id}
+                    constructed_url = f"https://squareup.com/pay-invoice/{invoice_id}"
+                    contract.square_invoice_url = constructed_url
+                    db.commit()
+                    invoice_url = constructed_url
+                    logger.info(f"✅ Constructed invoice URL: {constructed_url}")
             
             return {
                 "success": True,
@@ -466,10 +454,16 @@ async def _publish_square_invoice(
                     "message": f"Failed to publish invoice: {error_detail}"
                 }
             
+            # Extract public_url from the publish response
+            publish_result = response.json()
+            published_invoice = publish_result.get("invoice", {})
+            public_url = published_invoice.get("public_url")
+            
             logger.info(f"✅ Square invoice published: {invoice_id}")
             return {
                 "success": True,
-                "message": "Invoice published successfully"
+                "message": "Invoice published successfully",
+                "public_url": public_url
             }
             
     except Exception as e:
