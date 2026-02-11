@@ -528,7 +528,6 @@ class PublicClientCreate(BaseModel):
     clientSignature: Optional[str] = None  # Base64 signature from client
     quoteAccepted: Optional[bool] = False  # Whether client accepted the quote
     createOnly: Optional[bool] = False  # NEW: Only create client, don't generate contract yet
-    requestCustomQuote: Optional[bool] = False  # NEW: Client wants custom quote instead of auto-quote
 
     @field_validator("phone")
     @classmethod
@@ -982,11 +981,8 @@ async def submit_public_form(
         )
     
     # Queue contract PDF generation as background job (async to prevent timeout)
-    # Skip if this is a custom quote request
     job_id = None
-    if data.requestCustomQuote:
-        logger.info(f"🎯 Custom quote requested - skipping automatic contract generation for client {client.id}")
-    elif data.formData:
+    if data.formData:
         try:
             # Get business config to check if it exists
             config = (
@@ -1033,9 +1029,7 @@ async def submit_public_form(
         # Continue - email failure shouldn't fail the submission
 
     # Determine response message based on request type
-    if data.requestCustomQuote:
-        response_message = "Form submitted successfully - Ready for custom quote"
-    elif job_id:
+    if job_id:
         response_message = "Form submitted successfully - Contract generation in progress"
     else:
         response_message = "Form submitted successfully"
