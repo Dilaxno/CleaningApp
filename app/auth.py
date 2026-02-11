@@ -69,10 +69,7 @@ async def verify_firebase_token(token: str) -> dict:
         
         # Decode header to get key ID (kid)
         header_padding = 4 - len(header_b64) % 4
-        if header_padding != 4:
-            header_b64_padded = header_b64 + '=' * header_padding
-        else:
-            header_b64_padded = header_b64
+        header_b64_padded = header_b64 + ('=' * header_padding if header_padding != 4 else '')
         
         try:
             header = json.loads(base64.urlsafe_b64decode(header_b64_padded))
@@ -114,10 +111,7 @@ async def verify_firebase_token(token: str) -> dict:
         
         # Decode signature
         sig_padding = 4 - len(signature_b64) % 4
-        if sig_padding != 4:
-            signature_b64_padded = signature_b64 + '=' * sig_padding
-        else:
-            signature_b64_padded = signature_b64
+        signature_b64_padded = signature_b64 + ('=' * sig_padding if sig_padding != 4 else '')
         
         try:
             signature = base64.urlsafe_b64decode(signature_b64_padded)
@@ -143,10 +137,7 @@ async def verify_firebase_token(token: str) -> dict:
         
         # Decode payload
         payload_padding = 4 - len(payload_b64) % 4
-        if payload_padding != 4:
-            payload_b64_padded = payload_b64 + '=' * payload_padding
-        else:
-            payload_b64_padded = payload_b64
+        payload_b64_padded = payload_b64 + ('=' * payload_padding if payload_padding != 4 else '')
         
         decoded_payload = json.loads(base64.urlsafe_b64decode(payload_b64_padded))
         

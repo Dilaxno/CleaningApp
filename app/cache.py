@@ -169,7 +169,9 @@ def invalidate_user_plan_cache(user_id: int) -> bool:
 
 def invalidate_user_cache(user_id: int) -> int:
     """Invalidate all cache entries for a user"""
-    return cache.delete_pattern(f"*:{user_id}:*") + cache.delete_pattern(f"*:{user_id}")
+    pattern1_count = cache.delete_pattern(f"*:{user_id}:*")
+    pattern2_count = cache.delete_pattern(f"*:{user_id}")
+    return pattern1_count + pattern2_count
 
 
 # Cache key builders for complex scenarios
@@ -205,7 +207,7 @@ def get_cache_stats() -> dict:
             "keyspace_misses": info.get("keyspace_misses", 0),
             "hit_rate": (
                 info.get("keyspace_hits", 0) / 
-                (info.get("keyspace_hits", 0) + info.get("keyspace_misses", 1))
+                max(info.get("keyspace_hits", 0) + info.get("keyspace_misses", 0), 1)
             ) * 100
         }
     except Exception as e:

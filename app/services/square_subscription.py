@@ -153,9 +153,9 @@ async def create_square_subscription(
             "location_id": square_integration.merchant_id,
             "plan_id": plan_id,
             "customer_id": customer_id,
-            "start_date": (datetime.utcnow() + timedelta(days=7)).strftime("%Y-%m-%d"),  # Start next billing cycle
-            "card_id": card_id,  # Use card from first payment if available
-            "timezone": "America/New_York",  # TODO: Make configurable
+            "start_date": (datetime.utcnow() + timedelta(days=7)).strftime("%Y-%m-%d"),
+            "card_id": card_id,
+            "timezone": "America/New_York"
             "source": {
                 "name": f"CleanEnroll - {contract.title}"
             }

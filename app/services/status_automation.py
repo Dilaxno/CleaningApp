@@ -79,7 +79,7 @@ def update_contract_statuses(db: Session) -> dict:
                 logger.info(f"✅ Client {client.id} transitioned: scheduled → active (schedule {first_schedule.id} date arrived)")
         
         # Commit all changes
-        total = summary["signed_to_active"] + summary["active_to_completed"] + summary["clients_to_active"]
+        total = sum([summary["signed_to_active"], summary["active_to_completed"], summary["clients_to_active"]])
         if total > 0:
             db.commit()
             summary["total_updated"] = total

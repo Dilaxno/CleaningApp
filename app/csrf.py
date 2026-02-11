@@ -29,11 +29,11 @@ PROTECTED_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
 # Paths that are exempt from CSRF protection (webhooks, public endpoints, API routes)
 EXEMPT_PATHS: List[str] = [
-    "/webhooks/",  # All webhook endpoints
-    "/api/payments/",  # Payment webhooks
-    "/clients/public/",  # Public form submissions (already rate-limited + captcha)
-    "/clients",  # Client management (authenticated via JWT)
-    "/contracts",  # Contract management (authenticated via JWT)
+    "/webhooks/",
+    "/api/payments/",
+    "/clients/public/",
+    "/clients",
+    "/contracts",
     "/schedules",  # Schedule management (authenticated via JWT)
     "/invoices",  # Invoice management (authenticated via JWT)
     "/business-config",  # Business config (authenticated via JWT)

@@ -150,8 +150,8 @@ def mask_email(email: str) -> str:
         return "***@***.***"
     local, domain = email.split('@')
     domain_parts = domain.split('.')
-    masked_local = local[:2] + "***" if len(local) > 2 else local[0] + "***"
-    masked_domain = domain_parts[0][:2] + "***" if len(domain_parts[0]) > 2 else domain_parts[0][0] + "***"
+    masked_local = f"{local[:2]}***" if len(local) > 2 else f"{local[0]}***"
+    masked_domain = f"{domain_parts[0][:2]}***" if len(domain_parts[0]) > 2 else f"{domain_parts[0][0]}***"
     return f"{masked_local}@{masked_domain}.{domain_parts[-1]}"
 
 def mask_phone(phone: str) -> str:

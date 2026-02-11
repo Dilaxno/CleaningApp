@@ -42,7 +42,12 @@ def get_redis_client() -> redis.Redis:
         
         if redis_url:
             # Mask password in URL for logging
-            masked_url = redis_url.split('@')[0].split(':')[0] + ":****@" + redis_url.split('@')[1] if '@' in redis_url else "****"
+            if '@' in redis_url:
+                url_parts = redis_url.split('@')
+                protocol = url_parts[0].split(':')[0]
+                masked_url = f"{protocol}:****@{url_parts[1]}"
+            else:
+                masked_url = "****"
             logger.info(f"📡 Using Redis URL connection: {masked_url}")
             
             # Use Redis URL (Upstash or other managed Redis)
@@ -190,7 +195,7 @@ def check_rate_limit(
                 # Reset window
                 cache_entry['count'] = 0
                 cache_entry['reset_time'] = current_time + window_seconds
-                cache_entry['last_redis_sync'] = 0  # Force sync on next interval
+                cache_entry['last_redis_sync'] = 0
             
             # Check limit
             current_count = cache_entry['count']

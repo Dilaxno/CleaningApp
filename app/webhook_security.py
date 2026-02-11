@@ -167,7 +167,7 @@ async def verify_dodo_webhook(
     # Prepare Svix key bytes and byte-perfect signed message: id.timestamp.payload
     signing_key = extract_svix_signing_key(secret)
     logger.info(f"🔑 Webhook signing key bytes length: {len(signing_key)}")
-    signed_message_bytes = webhook_id.encode("utf-8") + b"." + timestamp.encode("utf-8") + b"." + raw_body
+    signed_message_bytes = b".".join([webhook_id.encode("utf-8"), timestamp.encode("utf-8"), raw_body])
 
     expected_signature = base64.b64encode(
         hmac.new(signing_key, signed_message_bytes, hashlib.sha256).digest()
@@ -333,23 +333,23 @@ async def verify_dodo_webhook_legacy(
         
         if expected_with_timestamp_hex:
             signature_candidates.extend([
-                ("timestamp+body_hex", expected_with_timestamp_hex),
-                ("timestamp+body_base64", expected_with_timestamp_base64),
-                ("sha256=timestamp+body_hex", f"sha256={expected_with_timestamp_hex}"),
-                ("sha256=timestamp+body_base64", f"sha256={expected_with_timestamp_base64}"),
+                ("timestamp_body_hex", expected_with_timestamp_hex),
+                ("timestamp_body_base64", expected_with_timestamp_base64),
+                ("sha256_timestamp_body_hex", f"sha256={expected_with_timestamp_hex}"),
+                ("sha256_timestamp_body_base64", f"sha256={expected_with_timestamp_base64}"),
             ])
             
             # Handle v1 format with timestamp
             if signature.startswith("v1,"):
                 signature_without_prefix = signature[3:]
                 signature_candidates.extend([
-                    ("v1_timestamp+body_hex", expected_with_timestamp_hex),
-                    ("v1_timestamp+body_base64", expected_with_timestamp_base64),
+                    ("v1_timestamp_body_hex", expected_with_timestamp_hex),
+                    ("v1_timestamp_body_base64", expected_with_timestamp_base64),
                 ])
                 # Try comparing timestamp variants against signature without prefix
                 for method, expected in [
-                    ("v1_stripped_timestamp+body_hex", expected_with_timestamp_hex),
-                    ("v1_stripped_timestamp+body_base64", expected_with_timestamp_base64),
+                    ("v1_stripped_timestamp_body_hex", expected_with_timestamp_hex),
+                    ("v1_stripped_timestamp_body_base64", expected_with_timestamp_base64),
                 ]:
                     if constant_time_compare(expected, signature_without_prefix):
                         logger.info(f"✅ Signature matched using {method} with secret variant {secret_variant[:10]}...")
