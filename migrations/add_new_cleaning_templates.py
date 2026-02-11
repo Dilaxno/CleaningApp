@@ -18,16 +18,15 @@ def run_migration():
         "deep-clean", "outside-cleaning", "carpet-cleaning"
     ]
     
-    # For SQLite, we need to use different JSON functions
-    # First, let's update configs that have exactly 12 templates (the old complete set)
+    # For PostgreSQL with JSON type (not JSONB), use json_array_length and CAST
     sql = text("""
         UPDATE business_configs 
-        SET active_templates = :new_templates
-        WHERE json_array_length(active_templates) = 12
-        AND json_extract(active_templates, '$') LIKE '%"office"%'
-        AND json_extract(active_templates, '$') LIKE '%"deep-clean"%'
-        AND json_extract(active_templates, '$') NOT LIKE '%"outside-cleaning"%'
-        AND json_extract(active_templates, '$') NOT LIKE '%"carpet-cleaning"%';
+        SET active_templates = CAST(:new_templates AS json)
+        WHERE json_array_length(CAST(active_templates AS json)) = 12
+        AND CAST(active_templates AS text) LIKE '%"office"%'
+        AND CAST(active_templates AS text) LIKE '%"deep-clean"%'
+        AND CAST(active_templates AS text) NOT LIKE '%"outside-cleaning"%'
+        AND CAST(active_templates AS text) NOT LIKE '%"carpet-cleaning"%';
     """)
     
     try:
@@ -40,10 +39,10 @@ def run_migration():
             # Also update any configs that are empty or null (backward compatibility)
             sql_empty = text("""
                 UPDATE business_configs 
-                SET active_templates = :new_templates
+                SET active_templates = CAST(:new_templates AS json)
                 WHERE active_templates IS NULL 
-                OR active_templates = '[]' 
-                OR json_array_length(active_templates) = 0;
+                OR CAST(active_templates AS text) = '[]'
+                OR json_array_length(CAST(active_templates AS json)) = 0;
             """)
             
             result_empty = connection.execute(sql_empty, {"new_templates": json.dumps(all_templates)})
@@ -51,8 +50,14 @@ def run_migration():
             rows_empty = result_empty.rowcount
             print(f"✅ Successfully set default templates for {rows_empty} business configs with empty templates.")
             
+            print(f"\n🎉 Migration completed successfully!")
+            print(f"   - Updated {rows_updated} existing configs")
+            print(f"   - Set defaults for {rows_empty} empty configs")
+            
     except Exception as e:
         print(f"❌ Error running migration: {e}")
+        import traceback
+        traceback.print_exc()
 
 if __name__ == "__main__":
     run_migration()

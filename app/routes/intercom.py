@@ -8,6 +8,7 @@ import hmac
 import hashlib
 import os
 from ..auth import get_current_user
+from ..models import User
 
 router = APIRouter(prefix="/intercom", tags=["intercom"])
 
@@ -21,7 +22,7 @@ class IntercomHashResponse(BaseModel):
 
 
 @router.get("/user-hash", response_model=IntercomHashResponse)
-async def get_intercom_user_hash(current_user=Depends(get_current_user)):
+async def get_intercom_user_hash(current_user: User = Depends(get_current_user)):
     """
     Generate a secure HMAC SHA256 hash for Intercom identity verification.
     
@@ -45,8 +46,8 @@ async def get_intercom_user_hash(current_user=Depends(get_current_user)):
             detail="Intercom secret key not configured"
         )
     
-    # Generate HMAC SHA256 hash using user's UID
-    user_id = current_user["uid"]
+    # Generate HMAC SHA256 hash using user's Firebase UID
+    user_id = current_user.firebase_uid
     
     # Create HMAC hash
     user_hash = hmac.new(
