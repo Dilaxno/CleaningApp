@@ -253,7 +253,7 @@ def get_video_url(
 
 
 @router.post("/{public_id}/quote", response_model=CustomQuoteRequestResponse)
-def submit_custom_quote(
+async def submit_custom_quote(
     public_id: str,
     quote_data: CustomQuoteSubmission,
     current_user: User = Depends(get_current_user),
