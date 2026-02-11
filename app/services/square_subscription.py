@@ -155,7 +155,7 @@ async def create_square_subscription(
             "customer_id": customer_id,
             "start_date": (datetime.utcnow() + timedelta(days=7)).strftime("%Y-%m-%d"),
             "card_id": card_id,
-            "timezone": "America/New_York"
+            "timezone": "America/New_York",
             "source": {
                 "name": f"CleanEnroll - {contract.title}"
             }
