@@ -1847,3 +1847,226 @@ async def send_pending_booking_notification(
         is_user_email=True,
         business_config=None
     )
+
+
+# ============================================
+# Custom Quote Request Email Templates
+# ============================================
+
+async def send_custom_quote_request_notification(
+    provider_email: str,
+    provider_name: str,
+    client_name: str,
+    client_email: str,
+    client_phone: Optional[str],
+    property_type: str,
+    property_size: int,
+    frequency: str,
+    video_duration: float,
+    request_public_id: str,
+    business_config=None
+) -> dict:
+    """
+    Notify provider when client uploads a video for custom quote request.
+    
+    Email 1: New Custom Quote Request (to Provider)
+    """
+    
+    content = f"""
+    <p>Hi {provider_name},</p>
+    <p>You have received a new custom quote request from <strong>{client_name}</strong>.</p>
+    <p>The client has uploaded a video walkthrough of their property and is waiting for your custom quote.</p>
+    
+    <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0;">
+        <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #1e293b;">Client Details</h3>
+        <div style="margin-bottom: 12px;">
+            <div style="color: #64748b; font-size: 13px; margin-bottom: 4px;">👤 Client Name</div>
+            <div style="font-size: 15px; color: #1e293b; font-weight: 600;">{client_name}</div>
+        </div>
+        <div style="margin-bottom: 12px;">
+            <div style="color: #64748b; font-size: 13px; margin-bottom: 4px;">📧 Email</div>
+            <div style="font-size: 15px; color: #1e293b;">{client_email}</div>
+        </div>
+        {f'<div style="margin-bottom: 12px;"><div style="color: #64748b; font-size: 13px; margin-bottom: 4px;">📞 Phone</div><div style="font-size: 15px; color: #1e293b;">{client_phone}</div></div>' if client_phone else ''}
+        <div style="margin-bottom: 12px;">
+            <div style="color: #64748b; font-size: 13px; margin-bottom: 4px;">🏢 Property Type</div>
+            <div style="font-size: 15px; color: #1e293b;">{property_type}</div>
+        </div>
+        <div style="margin-bottom: 12px;">
+            <div style="color: #64748b; font-size: 13px; margin-bottom: 4px;">📏 Property Size</div>
+            <div style="font-size: 15px; color: #1e293b;">{property_size:,} sq ft</div>
+        </div>
+        <div style="margin-bottom: 12px;">
+            <div style="color: #64748b; font-size: 13px; margin-bottom: 4px;">📅 Frequency</div>
+            <div style="font-size: 15px; color: #1e293b;">{frequency}</div>
+        </div>
+        <div>
+            <div style="color: #64748b; font-size: 13px; margin-bottom: 4px;">🎥 Video Duration</div>
+            <div style="font-size: 15px; color: #1e293b;">{int(video_duration)} seconds</div>
+        </div>
+    </div>
+    
+    <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
+        <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
+            🎬 Video walkthrough uploaded and ready for review
+        </p>
+    </div>
+    
+    <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;">
+        <p style="margin: 0; color: #92400e; font-size: 14px; font-weight: 600;">
+            ⏳ Action Required: Watch the video and submit your custom quote
+        </p>
+    </div>
+    
+    <p style="color: #64748b; font-size: 14px;">
+        Click the button below to view the video walkthrough and submit your custom quote.
+    </p>
+    """
+    
+    return await send_email(
+        to=provider_email,
+        subject=f"🎥 New Custom Quote Request from {client_name}",
+        title="New Custom Quote Request",
+        intro=f"{client_name} has uploaded a video walkthrough and needs a custom quote.",
+        content_html=content,
+        cta_url=f"{FRONTEND_URL}/dashboard/custom-quotes/{request_public_id}",
+        cta_label="View Request & Submit Quote",
+        is_user_email=True,
+        business_config=business_config
+    )
+
+
+async def send_custom_quote_ready_notification(
+    client_email: str,
+    client_name: str,
+    business_name: str,
+    quote_amount: float,
+    quote_description: Optional[str],
+    quote_notes: Optional[str],
+    request_public_id: str,
+    business_config=None
+) -> dict:
+    """
+    Notify client when provider submits a custom quote.
+    
+    Email 2: Custom Quote Ready (to Client)
+    """
+    
+    content = f"""
+    <p>Hi {client_name},</p>
+    <p><strong>{business_name}</strong> has reviewed your property video and prepared a custom quote for you.</p>
+    
+    <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0;">
+        <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #1e293b;">Your Custom Quote</h3>
+        <div style="margin-bottom: 20px;">
+            <div style="color: #64748b; font-size: 13px; margin-bottom: 6px;">💰 Total Amount</div>
+            <div style="font-size: 28px; color: #00C4B4; font-weight: 700;">${quote_amount:.2f}</div>
+        </div>
+        {f'<div style="margin-bottom: 16px;"><div style="color: #64748b; font-size: 13px; margin-bottom: 6px;">📋 Service Description</div><div style="font-size: 15px; color: #1e293b; line-height: 1.6;">{quote_description}</div></div>' if quote_description else ''}
+        {f'<div><div style="color: #64748b; font-size: 13px; margin-bottom: 6px;">📝 Additional Notes</div><div style="font-size: 15px; color: #1e293b; line-height: 1.6;">{quote_notes}</div></div>' if quote_notes else ''}
+    </div>
+    
+    <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
+        <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
+            ✨ Your custom quote is ready! Review and approve to schedule your service.
+        </p>
+    </div>
+    
+    <div style="background: #f8fafc; border-radius: 12px; padding: 20px; margin: 20px 0;">
+        <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #1e293b;">What's Next:</h3>
+        <div style="font-size: 14px; color: #1e293b; line-height: 1.8;">
+            <div style="margin-bottom: 8px;">✓ Review the quote details above</div>
+            <div style="margin-bottom: 8px;">✓ Click "Approve & Schedule" to proceed</div>
+            <div style="margin-bottom: 8px;">✓ Complete scheduling and contract signing</div>
+            <div>✓ Receive your first cleaning service!</div>
+        </div>
+    </div>
+    
+    <p style="color: #64748b; font-size: 14px;">
+        If you have any questions about the quote, please don't hesitate to reach out to {business_name} directly.
+    </p>
+    """
+    
+    return await send_email(
+        to=client_email,
+        subject=f"Your Custom Quote from {business_name} is Ready! 💰",
+        title="Your Custom Quote is Ready",
+        intro=f"{business_name} has prepared a custom quote based on your video walkthrough.",
+        content_html=content,
+        cta_url=f"{FRONTEND_URL}/quote/{request_public_id}/approve",
+        cta_label="Approve & Schedule",
+        business_config=business_config
+    )
+
+
+async def send_custom_quote_approved_notification(
+    provider_email: str,
+    provider_name: str,
+    client_name: str,
+    client_email: str,
+    quote_amount: float,
+    client_response_notes: Optional[str],
+    business_config=None
+) -> dict:
+    """
+    Notify provider when client approves the custom quote.
+    
+    Email 3: Quote Approved (to Provider)
+    """
+    
+    content = f"""
+    <p>Hi {provider_name},</p>
+    <p>Great news! <strong>{client_name}</strong> has approved your custom quote.</p>
+    
+    <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 20px; margin: 24px 0; text-align: center;">
+        <div style="font-size: 48px; margin-bottom: 8px;">🎉</div>
+        <div style="font-size: 18px; color: #166534; font-weight: 700; margin-bottom: 8px;">Quote Approved!</div>
+        <div style="font-size: 24px; color: #00C4B4; font-weight: 700;">${quote_amount:.2f}</div>
+    </div>
+    
+    <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0;">
+        <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #1e293b;">Client Information</h3>
+        <div style="margin-bottom: 12px;">
+            <div style="color: #64748b; font-size: 13px; margin-bottom: 4px;">👤 Client Name</div>
+            <div style="font-size: 15px; color: #1e293b; font-weight: 600;">{client_name}</div>
+        </div>
+        <div style="margin-bottom: 12px;">
+            <div style="color: #64748b; font-size: 13px; margin-bottom: 4px;">📧 Email</div>
+            <div style="font-size: 15px; color: #1e293b;">{client_email}</div>
+        </div>
+        {f'<div><div style="color: #64748b; font-size: 13px; margin-bottom: 4px;">💬 Client Notes</div><div style="font-size: 15px; color: #1e293b; line-height: 1.6;">{client_response_notes}</div></div>' if client_response_notes else ''}
+    </div>
+    
+    <div style="background: #f8fafc; border-radius: 12px; padding: 20px; margin: 20px 0;">
+        <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #1e293b;">Next Steps:</h3>
+        <div style="font-size: 14px; color: #1e293b; line-height: 1.8;">
+            <div style="margin-bottom: 8px;">✓ Contract has been automatically generated</div>
+            <div style="margin-bottom: 8px;">✓ Client will complete scheduling and sign the contract</div>
+            <div style="margin-bottom: 8px;">✓ Review and sign the contract when ready</div>
+            <div style="margin-bottom: 8px;">✓ Confirm the client's proposed schedule</div>
+            <div>✓ Invoice will be sent automatically (if Square is integrated)</div>
+        </div>
+    </div>
+    
+    <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;">
+        <p style="margin: 0; color: #92400e; font-size: 14px; font-weight: 600;">
+            📋 Action Required: Review the contract and confirm the schedule when the client completes their part
+        </p>
+    </div>
+    
+    <p style="color: #64748b; font-size: 14px;">
+        Visit your Contracts page to track the progress and complete the next steps.
+    </p>
+    """
+    
+    return await send_email(
+        to=provider_email,
+        subject=f"🎉 {client_name} Approved Your Custom Quote (${quote_amount:.2f})",
+        title="Custom Quote Approved!",
+        intro=f"{client_name} has approved your custom quote and is ready to proceed.",
+        content_html=content,
+        cta_url=f"{FRONTEND_URL}/dashboard/contracts",
+        cta_label="View Contracts",
+        is_user_email=True,
+        business_config=business_config
+    )
