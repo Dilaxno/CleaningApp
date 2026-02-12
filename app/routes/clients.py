@@ -1690,6 +1690,11 @@ async def submit_client_schedule(
             # This ensures the provider sees it in their schedule view and gets a notification badge
             scheduled_datetime = datetime.fromisoformat(scheduled_start)
             
+            # Extract address from form_data if available
+            address = None
+            if client.form_data and isinstance(client.form_data, dict):
+                address = client.form_data.get('address') or client.form_data.get('serviceAddress')
+            
             new_schedule = Schedule(
                 user_id=client.user_id,
                 client_id=client.id,
@@ -1702,7 +1707,7 @@ async def submit_client_schedule(
                 duration_minutes=data.durationMinutes,
                 status="scheduled",
                 approval_status="pending",  # This triggers the notification badge
-                address=client.address,
+                address=address,
                 price=None,  # Will be set when provider confirms
                 is_recurring=False,
                 calendly_booking_method="client_selected",
