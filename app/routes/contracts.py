@@ -580,6 +580,60 @@ async def delete_contract(
         raise HTTPException(status_code=500, detail="Failed to delete contract")
 
 
+class BatchDeleteRequest(BaseModel):
+    contract_ids: List[int]
+
+
+@router.post("/batch-delete")
+async def batch_delete_contracts(
+    data: BatchDeleteRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete multiple contracts and their related data"""
+    from ..models_invoice import Invoice
+    
+    if not data.contract_ids:
+        raise HTTPException(status_code=400, detail="No contract IDs provided")
+    
+    try:
+        # Verify all contracts belong to the user
+        contracts = db.query(Contract).filter(
+            Contract.id.in_(data.contract_ids),
+            Contract.user_id == current_user.id
+        ).all()
+        
+        if len(contracts) != len(data.contract_ids):
+            raise HTTPException(status_code=404, detail="One or more contracts not found")
+        
+        # Delete related invoices for all contracts
+        deleted_invoices = db.query(Invoice).filter(
+            Invoice.contract_id.in_(data.contract_ids)
+        ).delete(synchronize_session=False)
+        logger.info(f"🗑️ Deleted {deleted_invoices} invoices for {len(data.contract_ids)} contracts")
+        
+        # Delete all contracts
+        deleted_count = db.query(Contract).filter(
+            Contract.id.in_(data.contract_ids),
+            Contract.user_id == current_user.id
+        ).delete(synchronize_session=False)
+        
+        db.commit()
+        
+        logger.info(f"✅ Batch deleted {deleted_count} contracts and related data")
+        return {
+            "message": f"Successfully deleted {deleted_count} contracts",
+            "deleted_count": deleted_count
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to batch delete contracts: {str(e)}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to delete contracts")
+
+
 @router.post("/{contract_id}/send-square-invoice-email")
 async def send_square_invoice_email(
     contract_id: int,
