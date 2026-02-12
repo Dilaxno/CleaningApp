@@ -322,6 +322,16 @@ async def create_client(
     """Create a new client"""
     logger.info(f"📥 Creating client for user_id: {current_user.id}")
 
+    # SECURITY: Require email verification before creating clients
+    if not current_user.email_verified:
+        logger.warning(
+            f"⚠️ User {current_user.id} attempted to create client without verified email"
+        )
+        raise HTTPException(
+            status_code=403, 
+            detail="Email verification required. Please verify your email address before creating clients."
+        )
+
     # Check if user can add more clients (but don't increment yet - that happens when contract is signed)
     from ..plan_limits import can_add_client
 

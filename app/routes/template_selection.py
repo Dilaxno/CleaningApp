@@ -17,7 +17,7 @@ AVAILABLE_TEMPLATES = [
         "description": "Professional cleaning for offices and commercial spaces.",
         "image": "https://res.cloudinary.com/dxqum9ywx/image/upload/v1768087509/commercial_office_jf1pvb.jpg",
         "color": "#1a1a1a",
-        "category": "🏢 Commercial"
+        "category": "Commercial"
     },
     {
         "id": "retail",
@@ -25,7 +25,7 @@ AVAILABLE_TEMPLATES = [
         "description": "Keep your store spotless for customers.",
         "image": "https://res.cloudinary.com/dxqum9ywx/image/upload/v1768087528/retail_store_h567sp.jpg",
         "color": "#1a1a1a",
-        "category": "🏢 Commercial"
+        "category": "Commercial"
     },
     {
         "id": "medical",
@@ -33,7 +33,7 @@ AVAILABLE_TEMPLATES = [
         "description": "Specialized cleaning for healthcare facilities.",
         "image": "https://res.cloudinary.com/dxqum9ywx/image/upload/v1768087509/Medical_Clinic_rnq02h.jpg",
         "color": "#1a1a1a",
-        "category": "🏢 Commercial"
+        "category": "Commercial"
     },
     {
         "id": "gym",
@@ -41,7 +41,7 @@ AVAILABLE_TEMPLATES = [
         "description": "Keep your gym fresh and clean.",
         "image": "https://res.cloudinary.com/dxqum9ywx/image/upload/v1768087510/gym_uhy5i9.jpg",
         "color": "#1a1a1a",
-        "category": "🏢 Commercial"
+        "category": "Commercial"
     },
     {
         "id": "restaurant",
@@ -49,7 +49,7 @@ AVAILABLE_TEMPLATES = [
         "description": "Professional cleaning for food service.",
         "image": "https://res.cloudinary.com/dxqum9ywx/image/upload/v1768087529/cafe_vlqstf.webp",
         "color": "#1a1a1a",
-        "category": "🏢 Commercial"
+        "category": "Commercial"
     },
     {
         "id": "school",
@@ -57,7 +57,7 @@ AVAILABLE_TEMPLATES = [
         "description": "Safe cleaning for educational facilities.",
         "image": "https://res.cloudinary.com/dxqum9ywx/image/upload/v1768087528/school_opn4hw.jpg",
         "color": "#1a1a1a",
-        "category": "🏢 Commercial"
+        "category": "Commercial"
     },
     {
         "id": "warehouse",
@@ -65,7 +65,7 @@ AVAILABLE_TEMPLATES = [
         "description": "Heavy-duty cleaning for industrial spaces.",
         "image": "https://res.cloudinary.com/dxqum9ywx/image/upload/v1768087528/warehouse_korsp2.jpg",
         "color": "#1a1a1a",
-        "category": "🏢 Commercial"
+        "category": "Commercial"
     },
     {
         "id": "residential",
@@ -73,7 +73,7 @@ AVAILABLE_TEMPLATES = [
         "description": "Professional home cleaning services.",
         "image": "https://res.cloudinary.com/dxqum9ywx/image/upload/v1768087528/residential_aoijhw.jpg",
         "color": "#1a1a1a",
-        "category": "🏠 Residential"
+        "category": "Residential"
     },
     {
         "id": "airbnb",
@@ -81,7 +81,7 @@ AVAILABLE_TEMPLATES = [
         "description": "Turnover cleaning for vacation rentals.",
         "image": "https://res.cloudinary.com/dxqum9ywx/image/upload/v1768087528/Airbnb_qopjpn.jpg",
         "color": "#1a1a1a",
-        "category": "🏠 Residential"
+        "category": "Residential"
     },
     {
         "id": "move-in-out",
@@ -89,7 +89,7 @@ AVAILABLE_TEMPLATES = [
         "description": "Deep cleaning for property transitions.",
         "image": "https://res.cloudinary.com/dxqum9ywx/image/upload/v1768087527/Move_in_Move_out_srjbid.webp",
         "color": "#1a1a1a",
-        "category": "🏠 Residential"
+        "category": "Residential"
     },
     {
         "id": "deep-clean",
@@ -97,7 +97,7 @@ AVAILABLE_TEMPLATES = [
         "description": "Comprehensive deep cleaning services.",
         "image": "https://res.cloudinary.com/dxqum9ywx/image/upload/v1770038049/deep_clean_tvl1an.jpg",
         "color": "#1a1a1a",
-        "category": "🏠 Residential"
+        "category": "Residential"
     },
     {
         "id": "post-construction",
@@ -105,7 +105,7 @@ AVAILABLE_TEMPLATES = [
         "description": "Specialized cleanup after construction work.",
         "image": "https://res.cloudinary.com/dxqum9ywx/image/upload/v1768087528/post_construction_uqr9kl.jpg",
         "color": "#1a1a1a",
-        "category": "🏗 Specialty"
+        "category": "Specialty"
     },
     {
         "id": "outside-cleaning",
@@ -113,7 +113,7 @@ AVAILABLE_TEMPLATES = [
         "description": "Exterior cleaning services for buildings and outdoor spaces.",
         "image": "https://res.cloudinary.com/dxqum9ywx/image/upload/v1770247865/outside_cleaning_acgpg4.jpg",
         "color": "#1a1a1a",
-        "category": "🏗 Specialty"
+        "category": "Specialty"
     },
     {
         "id": "carpet-cleaning",
@@ -121,7 +121,7 @@ AVAILABLE_TEMPLATES = [
         "description": "Professional carpet and upholstery cleaning services.",
         "image": "https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80",
         "color": "#1a1a1a",
-        "category": "🏗 Specialty"
+        "category": "Specialty"
     }
 ]
 
