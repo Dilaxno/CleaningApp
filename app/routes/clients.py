@@ -1686,13 +1686,39 @@ async def submit_client_schedule(
             client.scheduled_end_time = scheduled_end
             client.scheduling_status = "pending_provider_confirmation"
             
+            # Create a Schedule record with pending approval status
+            # This ensures the provider sees it in their schedule view and gets a notification badge
+            scheduled_datetime = datetime.fromisoformat(scheduled_start)
+            
+            new_schedule = Schedule(
+                user_id=client.user_id,
+                client_id=client.id,
+                title=f"Cleaning for {client.contact_name or client.business_name}",
+                description=f"Client-requested cleaning appointment",
+                service_type=client.property_type or "standard",
+                scheduled_date=scheduled_datetime,
+                start_time=data.scheduledTime,
+                end_time=data.endTime,
+                duration_minutes=data.durationMinutes,
+                status="scheduled",
+                approval_status="pending",  # This triggers the notification badge
+                address=client.address,
+                price=None,  # Will be set when provider confirms
+                is_recurring=False,
+                calendly_booking_method="client_selected",
+            )
+            
+            db.add(new_schedule)
             db.commit()
             db.refresh(client)
+            db.refresh(new_schedule)
             
             logger.info(f"✅ Client {client_id} submitted schedule: {scheduled_start} - {scheduled_end}")
+            logger.info(f"✅ Created Schedule record {new_schedule.id} with approval_status='pending'")
             
         except Exception as parse_err:
-            logger.error(f"❌ Failed to parse schedule times: {parse_err}")
+            logger.error(f"❌ Failed to parse schedule times or create schedule: {parse_err}")
+            db.rollback()
             raise HTTPException(status_code=400, detail="Invalid date/time format")
 
         # Send notification email to provider
@@ -1728,7 +1754,7 @@ async def submit_client_schedule(
                 </div>
                 
                 <p style="margin-top: 24px;">
-                  <a href="{config.custom_domain or 'https://cleanenroll.com'}/dashboard/clients" 
+                  <a href="{config.custom_domain or 'https://cleanenroll.com'}/schedule" 
                      style="display: inline-block; background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); color: white; padding: 14px 28px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 15px;">
                     Review Schedule →
                   </a>
@@ -1760,10 +1786,12 @@ async def submit_client_schedule(
             "message": "Schedule submitted successfully. Provider will be notified.",
             "scheduledStartTime": scheduled_start,
             "scheduledEndTime": scheduled_end,
+            "scheduleId": new_schedule.id,
         }
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"❌ Error submitting client schedule: {str(e)}")
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
