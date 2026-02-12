@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from ..auth import get_current_user
 from ..database import get_db
-from ..models import BusinessConfig, Client, User, Contract
+from ..models import BusinessConfig, Client, User, Contract, Schedule
 from ..rate_limiter import create_rate_limiter, get_redis_client, rate_limit_dependency
 from ..utils.sanitization import sanitize_string
 
