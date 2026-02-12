@@ -211,6 +211,33 @@ THEME = {
 
 LOGO_URL = "https://cleanenroll.com/CleaningAPP%20logo%20black%20new.png"
 
+# Premium SVG Icons
+ICONS = {
+    "calendar": """<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="6" width="18" height="15" rx="2" stroke="currentColor" stroke-width="2"/><path d="M3 10h18M8 3v4M16 3v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>""",
+    "clock": """<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>""",
+    "location": """<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="9" r="2.5" stroke="currentColor" stroke-width="2"/></svg>""",
+    "user": """<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="2"/><path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>""",
+    "check": """<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="#22c55e"/><path d="M8 12l3 3 5-6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>""",
+    "money": """<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="6" width="20" height="12" rx="2" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/><path d="M18 10v4M6 10v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>""",
+    "document": """<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>""",
+    "video": """<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="6" width="14" height="12" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 10l6-3v10l-6-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>""",
+    "sparkles": """<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2l2.5 7.5L22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5L12 2z" fill="currentColor"/><path d="M18 3l1 3 3 1-3 1-1 3-1-3-3-1 3-1 1-3z" fill="currentColor"/></svg>""",
+    "warning": """<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L2 20h20L12 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 9v4M12 17h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>""",
+    "info": """<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M12 16v-4M12 8h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>""",
+    "building": """<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="2" width="16" height="20" rx="2" stroke="currentColor" stroke-width="2"/><path d="M9 22V18h6v4M8 6h2M14 6h2M8 10h2M14 10h2M8 14h2M14 14h2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>""",
+    "chat": """<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>""",
+    "image": """<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><path d="M21 15l-5-5L5 21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>""",
+}
+
+def icon(name: str, color: str = "currentColor", size: int = 20) -> str:
+    """Get an SVG icon with specified color and size"""
+    svg = ICONS.get(name, ICONS["info"])
+    # Replace currentColor with actual color and adjust size
+    svg = svg.replace('width="24"', f'width="{size}"')
+    svg = svg.replace('height="24"', f'height="{size}"')
+    svg = svg.replace('currentColor', color)
+    return f'<span style="display: inline-block; vertical-align: middle; line-height: 0;">{svg}</span>'
+
 # Base HTML email template - Modern Akkio-style with clean top bar
 BASE_TEMPLATE = """
 <!doctype html>
@@ -583,10 +610,10 @@ async def send_new_client_notification(
                     "content_type": "application/zip"
                 }]
                 
-                property_shots_info = f"<div style='background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;'><p style='margin: 0; color: #166534; font-size: 14px; font-weight: 600;'>📸 Property photos attached as ZIP file ({len(property_shots_keys)} images)</p></div>"
+                property_shots_info = f"<div style='background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;'><p style='margin: 0; color: #166534; font-size: 14px; font-weight: 600;'>{icon('image', '#22c55e', 18)} Property photos attached as ZIP file ({len(property_shots_keys)} images)</p></div>"
         except Exception as e:
             logger.warning(f"Failed to create property shots zip for {client_name}: {e}")
-            property_shots_info = f"<div style='background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;'><p style='margin: 0; color: #92400e; font-size: 14px;'>⚠️ Property photos available in dashboard ({len(property_shots_keys)} images)</p></div>"
+            property_shots_info = f"<div style='background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;'><p style='margin: 0; color: #92400e; font-size: 14px;'>{icon('warning', '#f59e0b', 18)} Property photos available in dashboard ({len(property_shots_keys)} images)</p></div>"
     
     content = f"""
     <p>Hi {business_name},</p>
@@ -595,7 +622,7 @@ async def send_new_client_notification(
     {property_shots_info}
     
     <div style="background: {THEME['background']}; border-radius: 12px; padding: 20px; margin: 20px 0;">
-      <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: {THEME['text_primary']};">Key Details Captured:</h3>
+      <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: {THEME['text_primary']};">{icon('building', THEME['primary'], 20)} Key Details Captured:</h3>
       <div style="margin-bottom: 12px;">
         <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 4px;">Property type: {property_type}</div>
         <div style="font-size: 14px; color: {THEME['text_muted']};">Full intake details available in dashboard (sq ft, peak hours, security codes, fragile displays)</div>
@@ -603,11 +630,11 @@ async def send_new_client_notification(
     </div>
     
     <div style="background: {THEME['background']}; border-radius: 12px; padding: 20px; margin: 20px 0;">
-      <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: {THEME['text_primary']};">Next Steps:</h3>
+      <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: {THEME['text_primary']};">{icon('sparkles', THEME['primary'], 20)} Next Steps:</h3>
       <p style="margin: 0; font-size: 14px; color: {THEME['text_primary']};">Review property specifics in dashboard → Wait for auto-generated contract to be reviewed and signed by client</p>
     </div>
     
-    <p style="font-size: 15px; color: {THEME['text_primary']}; font-weight: 600;">First booking awaits! 🚀</p>
+    <p style="font-size: 15px; color: {THEME['text_primary']}; font-weight: 600;">First booking awaits! {icon('check', THEME['success'], 20)}</p>
     
     <p style="margin-top: 20px;">Best,<br/><strong>Cleanenroll Team</strong></p>
     """
@@ -752,23 +779,23 @@ async def send_form_submission_confirmation(
     <div style="background: {THEME['background']}; border-radius: 12px; padding: 20px; margin: 20px 0;">
       <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: {THEME['text_primary']};">What's Next:</h3>
       <div style="font-size: 14px; color: {THEME['text_primary']};">
-        <div style="margin-bottom: 8px;">✓ Auto-generated contract with dynamic pricing sent to your email</div>
-        <div style="margin-bottom: 8px;">✓ Review & sign at your convenience</div>
-        <div>✓ {business_name} will review your proposed schedule and confirm</div>
+        <div style="margin-bottom: 8px;">{icon('check', THEME['success'], 18)} Auto-generated contract with dynamic pricing sent to your email</div>
+        <div style="margin-bottom: 8px;">{icon('check', THEME['success'], 18)} Review & sign at your convenience</div>
+        <div>{icon('check', THEME['success'], 18)} {business_name} will review your proposed schedule and confirm</div>
       </div>
     </div>
     
     <div style="background: {THEME['background']}; border-radius: 12px; padding: 20px; margin: 20px 0;">
       <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: {THEME['text_primary']};">Quick Confirmation:</h3>
       <div style="font-size: 14px; color: {THEME['text_primary']};">
-        <div style="margin-bottom: 8px;">✅ {property_type} property intake completed</div>
-        <div style="margin-bottom: 8px;">✅ Proposed schedule submitted</div>
-        <div>✅ Ready for your review</div>
+        <div style="margin-bottom: 8px;">{icon('check', THEME['success'], 18)} {property_type} property intake completed</div>
+        <div style="margin-bottom: 8px;">{icon('check', THEME['success'], 18)} Proposed schedule submitted</div>
+        <div>{icon('check', THEME['success'], 18)} Ready for your review</div>
       </div>
     </div>
     
     <p style="color: {THEME['text_muted']}; font-size: 14px;">
-      Questions? Contact {business_name} directly. Excited to get your store sparkling! ✨
+      Questions? Contact {business_name} directly. Excited to get your store sparkling! {icon('sparkles', THEME['primary'], 18)}
     </p>
     
     <p style="margin-top: 20px;">Best,<br/><strong>Cleanenroll</strong></p>
@@ -802,13 +829,13 @@ async def send_contract_signed_notification(
       <div>
         <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 4px;">Status</div>
         <div style="display: inline-flex; align-items: center; gap: 6px; background: #fef3c7; color: #92400e; padding: 4px 12px; border-radius: 9999px; font-size: 13px; font-weight: 600;">
-          ⏳ Awaiting Your Signature
+          {icon('clock', '#f59e0b', 16)} Awaiting Your Signature
         </div>
       </div>
     </div>
     
     <div style="background: #e0f2fe; border-left: 4px solid #0ea5e9; padding: 16px; margin: 20px 0; border-radius: 8px;">
-      <p style="margin: 0; color: #0369a1; font-weight: 600; font-size: 14px;">📅 Next Steps:</p>
+      <p style="margin: 0; color: #0369a1; font-weight: 600; font-size: 14px;">{icon('calendar', '#0ea5e9', 18)} Next Steps:</p>
       <ul style="margin: 12px 0 0 0; padding-left: 20px; color: #0369a1;">
         <li style="margin-bottom: 8px;">Review the schedule submitted by the client</li>
         <li style="margin-bottom: 8px;">Accept the proposed time or suggest an alternative</li>
@@ -849,7 +876,7 @@ async def send_client_signature_confirmation(
       <div>
         <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 4px;">Status</div>
         <div style="display: inline-flex; align-items: center; gap: 6px; background: #dbeafe; color: #1e40af; padding: 4px 12px; border-radius: 9999px; font-size: 13px; font-weight: 600;">
-          ⏳ Awaiting Provider Signature
+          {icon('clock', '#1e40af', 16)} Awaiting Provider Signature
         </div>
       </div>
     </div>
@@ -857,7 +884,7 @@ async def send_client_signature_confirmation(
     <p>Your signature has been recorded successfully. The service provider will review and sign the contract shortly.</p>
     
     <div style="background: #f0fdf4; border-left: 4px solid #22c55e; padding: 16px; margin: 20px 0; border-radius: 8px;">
-      <p style="margin: 0; color: #166534; font-weight: 600; font-size: 14px;">✅ What happens next?</p>
+      <p style="margin: 0; color: #166534; font-weight: 600; font-size: 14px;">{icon('check', '#22c55e', 18)} What happens next?</p>
       <ul style="margin: 12px 0 0 0; padding-left: 20px; color: #166534;">
         <li style="margin-bottom: 8px;">The provider will review your proposed schedule</li>
         <li style="margin-bottom: 8px;">They will either accept your time or suggest an alternative</li>
@@ -916,10 +943,10 @@ async def send_contract_fully_executed_email(
         schedule_section = f"""
         <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
           <p style="margin: 0 0 8px 0; color: #166534; font-size: 14px; font-weight: 600;">
-            ✓ First Cleaning Confirmed
+            {icon('check', '#22c55e', 18)} First Cleaning Confirmed
           </p>
           <p style="margin: 0; color: #166534; font-size: 14px;">
-            📅 {scheduled_start_time}
+            {icon('calendar', '#166534', 18)} {scheduled_start_time}
           </p>
         </div>
         """
@@ -927,7 +954,7 @@ async def send_contract_fully_executed_email(
         schedule_section = f"""
         <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0; text-align: center;">
           <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
-            � Your signed contract PDF is attached. Your schedule has been confirmed!
+            {icon('check', '#22c55e', 18)} Your signed contract PDF is attached. Your schedule has been confirmed!
           </p>
         </div>
         """
@@ -935,7 +962,7 @@ async def send_contract_fully_executed_email(
         schedule_section = f"""
         <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0; text-align: center;">
           <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
-            🚀 Your signed contract PDF is attached. Your schedule has been confirmed!
+            {icon('sparkles', '#22c55e', 18)} Your signed contract PDF is attached. Your schedule has been confirmed!
           </p>
         </div>
         """
@@ -1004,7 +1031,7 @@ async def send_provider_contract_signed_confirmation(
     
     <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
       <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
-        ✓ Schedule confirmed - Ready to start service
+        {icon('check', '#22c55e', 18)} Schedule confirmed - Ready to start service
       </p>
     </div>
     
@@ -1039,7 +1066,7 @@ async def send_scheduling_proposal_email(
         <div style="background: {THEME['background']}; border-radius: 8px; padding: 16px; margin-bottom: 12px;">
             <div style="font-weight: 600; color: {THEME['text_primary']}; margin-bottom: 4px;">Option {i}{recommended}</div>
             <div style="color: {THEME['text_muted']}; font-size: 14px;">
-                📅 {slot.get('date')} | ⏰ {slot.get('start_time')} - {slot.get('end_time')}
+                {icon('calendar', THEME['muted'], 16)} {slot.get('date')} | {icon('clock', THEME['muted'], 16)} {slot.get('start_time')} - {slot.get('end_time')}
             </div>
         </div>
         """
@@ -1057,7 +1084,7 @@ async def send_scheduling_proposal_email(
     
     <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
         <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
-            💡 Tip: Click the button below to select a time slot or suggest your own preferred times!
+            {icon('info', '#22c55e', 18)} Tip: Click the button below to select a time slot or suggest your own preferred times!
         </p>
     </div>
     
@@ -1091,20 +1118,20 @@ async def send_scheduling_accepted_email(
     <p>{client_name} has accepted a time slot for Contract {contract_id}:</p>
     
     <div style="background: {THEME['background']}; border-radius: 12px; padding: 20px; margin: 24px 0;">
-        <div style="margin-bottom: 12px;">
-            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 4px;">Scheduled Date</div>
-            <div style="font-weight: 600; font-size: 16px; color: {THEME['text_primary']};">📅 {selected_date}</div>
+        <div style="margin-bottom: 16px;">
+            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">{icon('calendar', THEME['primary'], 18)} Scheduled Date</div>
+            <div style="font-size: 16px; color: {THEME['text_primary']}; font-weight: 600;">{selected_date}</div>
         </div>
         <div style="margin-bottom: 12px;">
-            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 4px;">Time</div>
-            <div style="font-weight: 600; font-size: 16px; color: {THEME['text_primary']};">⏰ {start_time} - {end_time}</div>
+            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">{icon('clock', THEME['primary'], 18)} Time</div>
+            <div style="font-weight: 600; font-size: 16px; color: {THEME['text_primary']};">{start_time} - {end_time}</div>
         </div>
         {f'<div><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 4px;">Location</div><div style="font-size: 15px; color: {THEME["text_primary"]};">{property_address}</div></div>' if property_address else ''}
     </div>
     
     <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
         <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
-            ✓ Appointment confirmed
+            {icon('check', '#22c55e', 18)} Appointment confirmed
         </p>
     </div>
     """
@@ -1134,14 +1161,14 @@ async def send_scheduling_counter_proposal_email(
     <p>{client_name} has suggested alternative scheduling preferences for Contract {contract_id}:</p>
     
     <div style="background: {THEME['background']}; border-radius: 12px; padding: 20px; margin: 24px 0;">
-        {f'<div style="margin-bottom: 12px;"><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 4px;">Preferred Days</div><div style="font-size: 15px; color: {THEME["text_primary"]};">📅 {preferred_days}</div></div>' if preferred_days else ''}
-        {f'<div style="margin-bottom: 12px;"><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 4px;">Time Window</div><div style="font-size: 15px; color: {THEME["text_primary"]};">⏰ {time_window}</div></div>' if time_window else ''}
-        {f'<div><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 4px;">Client Notes</div><div style="font-size: 15px; color: {THEME["text_primary"]}; font-style: italic;">"{client_notes}"</div></div>' if client_notes else ''}
+        {f'<div style="margin-bottom: 12px;"><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 4px;">{icon("calendar", THEME["primary"], 18)} Preferred Days</div><div style="font-size: 15px; color: {THEME["text_primary"]};">{preferred_days}</div></div>' if preferred_days else ''}
+        {f'<div style="margin-bottom: 12px;"><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 4px;">{icon("clock", THEME["primary"], 18)} Time Window</div><div style="font-size: 15px; color: {THEME["text_primary"]};">{time_window}</div></div>' if time_window else ''}
+        {f'<div><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 4px;">{icon("chat", THEME["primary"], 18)} Client Notes</div><div style="font-size: 15px; color: {THEME["text_primary"]}; font-style: italic;">"{client_notes}"</div></div>' if client_notes else ''}
     </div>
     
     <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;">
         <p style="margin: 0; color: #92400e; font-size: 14px; font-weight: 600;">
-            ⏳ Counter-proposal received - Please review and respond
+            {icon('clock', '#f59e0b', 18)} Counter-proposal received - Please review and respond
         </p>
     </div>
     """
@@ -1176,7 +1203,7 @@ async def send_email_verification_otp(to: str, user_name: str, otp: str) -> dict
     
     <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;">
         <p style="margin: 0; color: #92400e; font-size: 13px;">
-            ⚠️ If you didn't request this code, you can safely ignore this email.
+            {icon('warning', '#f59e0b', 18)} If you didn't request this code, you can safely ignore this email.
         </p>
     </div>
     """
@@ -1207,19 +1234,19 @@ async def send_appointment_notification(
     
     <div style="background: {THEME['background']}; border-radius: 12px; padding: 24px; margin: 24px 0;">
         <div style="margin-bottom: 16px;">
-            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">📅 Requested Date & Time</div>
+            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">{icon('calendar', THEME['primary'], 18)} Requested Date & Time</div>
             <div style="font-size: 16px; color: {THEME['text_primary']}; font-weight: 600;">{formatted_time}</div>
         </div>
-        {f'<div style="margin-bottom: 16px;"><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 6px;">📍 Location</div><div style="font-size: 15px; color: {THEME["text_primary"]};">{location}</div></div>' if location else ''}
+        {f'<div style="margin-bottom: 16px;"><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 6px;">{icon("location", THEME["primary"], 18)} Location</div><div style="font-size: 15px; color: {THEME["text_primary"]};">{location}</div></div>' if location else ''}
         <div>
-            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">👤 Client</div>
+            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">{icon('user', THEME['primary'], 18)} Client</div>
             <div style="font-size: 15px; color: {THEME['text_primary']};">{client_name}</div>
         </div>
     </div>
     
     <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;">
         <p style="margin: 0; color: #92400e; font-size: 14px; font-weight: 600;">
-            ⏳ Action Required: Please review and accept or request a different time
+            {icon('clock', '#f59e0b', 18)} Action Required: Please review and accept or request a different time
         </p>
     </div>
     
@@ -1255,19 +1282,19 @@ async def send_appointment_confirmation(
     
     <div style="background: {THEME['background']}; border-radius: 12px; padding: 24px; margin: 24px 0;">
         <div style="margin-bottom: 16px;">
-            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">📅 Confirmed Date & Time</div>
+            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">{icon('calendar', THEME['primary'], 18)} Confirmed Date & Time</div>
             <div style="font-size: 16px; color: {THEME['text_primary']}; font-weight: 600;">{formatted_time}</div>
         </div>
-        {f'<div style="margin-bottom: 16px;"><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 6px;">📍 Location</div><div style="font-size: 15px; color: {THEME["text_primary"]};">{location}</div></div>' if location else ''}
+        {f'<div style="margin-bottom: 16px;"><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 6px;">{icon("location", THEME["primary"], 18)} Location</div><div style="font-size: 15px; color: {THEME["text_primary"]};">{location}</div></div>' if location else ''}
         <div>
-            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">🧹 Service Provider</div>
+            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">{icon('building', THEME['primary'], 18)} Service Provider</div>
             <div style="font-size: 15px; color: {THEME['text_primary']};">{provider_name}</div>
         </div>
     </div>
     
     <div style="background: #d1fae5; border: 1px solid #10b981; border-radius: 12px; padding: 16px; margin: 20px 0;">
         <p style="margin: 0; color: #065f46; font-size: 14px; font-weight: 600;">
-            ✅ Your appointment is confirmed and has been added to your calendar
+            {icon('check', '#10b981', 18)} Your appointment is confirmed and has been added to your calendar
         </p>
     </div>
     
@@ -1314,18 +1341,18 @@ async def send_schedule_change_request(
     
     <div style="background: {THEME['background']}; border-radius: 12px; padding: 24px; margin: 24px 0;">
         <div style="margin-bottom: 20px;">
-            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">📅 Your Requested Time</div>
+            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">{icon('calendar', THEME['muted'], 18)} Your Requested Time</div>
             <div style="font-size: 15px; color: {THEME['text_muted']}; text-decoration: line-through;">{original_formatted}</div>
         </div>
         <div>
-            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">✨ Proposed Alternative</div>
+            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">{icon('sparkles', THEME['primary'], 18)} Proposed Alternative</div>
             <div style="font-size: 16px; color: {THEME['text_primary']}; font-weight: 600;">{proposed_formatted} from {proposed_start} to {proposed_end}</div>
         </div>
     </div>
     
     <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;">
         <p style="margin: 0; color: #92400e; font-size: 14px; font-weight: 600;">
-            ⏳ Response Needed: Please confirm or suggest another time
+            {icon('clock', '#f59e0b', 18)} Response Needed: Please confirm or suggest another time
         </p>
     </div>
     """
@@ -1362,7 +1389,7 @@ async def send_client_accepted_proposal(
     <p>Great news! <strong>{client_name}</strong> has accepted your proposed appointment time.</p>
     
     <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 24px; margin: 24px 0;">
-        <div style="color: #166534; font-size: 13px; margin-bottom: 6px;">✅ Confirmed Appointment</div>
+        <div style="color: #166534; font-size: 13px; margin-bottom: 6px;">{icon('check', '#22c55e', 18)} Confirmed Appointment</div>
         <div style="font-size: 18px; color: #166534; font-weight: 600;">{date_formatted}</div>
         <div style="font-size: 15px; color: #166534; margin-top: 4px;">{accepted_start_time} - {accepted_end_time}</div>
     </div>
@@ -1400,7 +1427,7 @@ async def send_appointment_confirmed_to_client(
     <p>Your appointment with <strong>{provider_name}</strong> has been confirmed!</p>
     
     <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 24px; margin: 24px 0;">
-        <div style="color: #166534; font-size: 13px; margin-bottom: 6px;">✅ Confirmed Appointment</div>
+        <div style="color: #166534; font-size: 13px; margin-bottom: 6px;">{icon('check', '#22c55e', 18)} Confirmed Appointment</div>
         <div style="font-size: 18px; color: #166534; font-weight: 600;">{date_formatted}</div>
         <div style="font-size: 15px; color: #166534; margin-top: 4px;">{confirmed_start_time} - {confirmed_end_time}</div>
     </div>
@@ -1437,23 +1464,23 @@ async def send_schedule_accepted_confirmation_to_provider(
     
     <div style="background: {THEME['background']}; border-radius: 12px; padding: 24px; margin: 24px 0;">
         <div style="margin-bottom: 16px;">
-            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">📅 Appointment Date</div>
+            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">{icon('calendar', THEME['primary'], 18)} Appointment Date</div>
             <div style="font-size: 16px; color: {THEME['text_primary']}; font-weight: 600;">{formatted_date}</div>
         </div>
         <div style="margin-bottom: 16px;">
-            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">🕐 Time</div>
+            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">{icon('clock', THEME['primary'], 18)} Time</div>
             <div style="font-size: 15px; color: {THEME['text_primary']};">{confirmed_start_time} - {confirmed_end_time}</div>
         </div>
         <div style="margin-bottom: 16px;">
-            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">👤 Client</div>
+            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">{icon('user', THEME['primary'], 18)} Client</div>
             <div style="font-size: 15px; color: {THEME['text_primary']};">{client_name}</div>
         </div>
-        {f'<div><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 6px;">📍 Location</div><div style="font-size: 15px; color: {THEME["text_primary"]};">{client_address}</div></div>' if client_address else ''}
+        {f'<div><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 6px;">{icon("location", THEME["primary"], 18)} Location</div><div style="font-size: 15px; color: {THEME["text_primary"]};">{client_address}</div></div>' if client_address else ''}
     </div>
     
     <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
         <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
-            ✓ Appointment confirmed and client notified
+            {icon('check', '#22c55e', 18)} Appointment confirmed and client notified
         </p>
     </div>
     
@@ -1495,18 +1522,18 @@ async def send_client_counter_proposal(
     
     <div style="background: {THEME['background']}; border-radius: 12px; padding: 24px; margin: 24px 0;">
         <div style="margin-bottom: 20px;">
-            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">📅 Your Proposed Time</div>
+            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">{icon('calendar', THEME['muted'], 18)} Your Proposed Time</div>
             <div style="font-size: 15px; color: {THEME['text_muted']}; text-decoration: line-through;">{original_formatted}</div>
         </div>
         <div>
-            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">✨ Client's Preferred Time</div>
+            <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">{icon('sparkles', THEME['primary'], 18)} Client's Preferred Time</div>
             <div style="font-size: 16px; color: {THEME['text_primary']}; font-weight: 600;">{preferred_formatted}</div>
             <div style="font-size: 14px; color: {THEME['text_primary']}; margin-top: 4px;">{client_preferred_start} - {client_preferred_end}</div>
         </div>
     </div>
     
     <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;">
-        <p style="margin: 0 0 8px 0; color: #92400e; font-size: 13px; font-weight: 600;">💬 Client's Reason:</p>
+        <p style="margin: 0 0 8px 0; color: #92400e; font-size: 13px; font-weight: 600;">{icon('chat', '#f59e0b', 18)} Client's Reason:</p>
         <p style="margin: 0; color: #92400e; font-size: 14px; font-style: italic;">"{client_reason}"</p>
     </div>
     
@@ -1577,7 +1604,7 @@ async def send_invoice_payment_link_email(
     
     <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
         <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
-            💳 Click the button below to pay securely online
+            {icon('money', '#22c55e', 18)} Click the button below to pay securely online
         </p>
     </div>
     
@@ -1610,7 +1637,7 @@ async def send_payment_received_notification(
     
     content = f"""
     <p>Hi {provider_name},</p>
-    <p>🎉 <strong>Excellent news!</strong> <strong>{client_name}</strong> has just paid their invoice.</p>
+    <p>{icon('sparkles', THEME['primary'], 20)} <strong>Excellent news!</strong> <strong>{client_name}</strong> has just paid their invoice.</p>
     
     <div style="background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); border: 2px solid #22c55e; border-radius: 16px; padding: 28px; margin: 24px 0; box-shadow: 0 4px 12px rgba(34, 197, 94, 0.15);">
         <div style="text-align: center; margin-bottom: 20px;">
@@ -1646,14 +1673,14 @@ async def send_payment_received_notification(
                 </svg>
             </div>
             <div>
-                <div style="color: #92400e; font-size: 14px; font-weight: 700; margin-bottom: 2px;">💰 Ready for Payout</div>
+                <div style="color: #92400e; font-size: 14px; font-weight: 700; margin-bottom: 2px;">{icon('money', '#f59e0b', 18)} Ready for Payout</div>
                 <div style="color: #92400e; font-size: 13px;">This payment has been added to your available balance and is ready for withdrawal.</div>
             </div>
         </div>
     </div>
     
     <p style="color: {THEME['text_muted']}; font-size: 14px; text-align: center; margin-top: 24px;">
-        🚀 <strong>Ready to withdraw?</strong> Visit your payouts dashboard to request a withdrawal to your bank account.
+        {icon('sparkles', THEME['primary'], 18)} <strong>Ready to withdraw?</strong> Visit your payouts dashboard to request a withdrawal to your bank account.
     </p>
     """
     
@@ -1698,7 +1725,7 @@ async def send_payment_thank_you_email(
     
     <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
         <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
-            ✅ Your payment has been processed successfully
+            {icon('check', '#22c55e', 18)} Your payment has been processed successfully
         </p>
     </div>
     
@@ -1706,7 +1733,7 @@ async def send_payment_thank_you_email(
         We look forward to providing you with excellent service. If you have any questions, please contact {business_name} directly.
     </p>
     
-    <p style="margin-top: 24px;">Thank you for your business! ✨</p>
+    <p style="margin-top: 24px;">Thank you for your business! {icon('sparkles', THEME['primary'], 18)}</p>
     """
     
     return await send_email(
@@ -1811,23 +1838,23 @@ async def send_pending_booking_notification(
     
     <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0;">
         <div style="margin-bottom: 16px;">
-            <div style="color: #64748b; font-size: 13px; margin-bottom: 6px;">📅 Requested Date</div>
+            <div style="color: #64748b; font-size: 13px; margin-bottom: 6px;">{icon('calendar', '#00C4B4', 18)} Requested Date</div>
             <div style="font-size: 16px; color: #1e293b; font-weight: 600;">{scheduled_date}</div>
         </div>
         <div style="margin-bottom: 16px;">
-            <div style="color: #64748b; font-size: 13px; margin-bottom: 6px;">⏰ Time</div>
+            <div style="color: #64748b; font-size: 13px; margin-bottom: 6px;">{icon('clock', '#00C4B4', 18)} Time</div>
             <div style="font-size: 16px; color: #1e293b; font-weight: 600;">{start_time} - {end_time}</div>
         </div>
-        {f'<div style="margin-bottom: 16px;"><div style="color: #64748b; font-size: 13px; margin-bottom: 6px;">📍 Location</div><div style="font-size: 15px; color: #1e293b;">{property_address}</div></div>' if property_address else ''}
+        {f'<div style="margin-bottom: 16px;"><div style="color: #64748b; font-size: 13px; margin-bottom: 6px;">{icon("location", "#00C4B4", 18)} Location</div><div style="font-size: 15px; color: #1e293b;">{property_address}</div></div>' if property_address else ''}
         <div>
-            <div style="color: #64748b; font-size: 13px; margin-bottom: 6px;">👤 Client</div>
+            <div style="color: #64748b; font-size: 13px; margin-bottom: 6px;">{icon('user', '#00C4B4', 18)} Client</div>
             <div style="font-size: 15px; color: #1e293b;">{client_name}</div>
         </div>
     </div>
     
     <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;">
         <p style="margin: 0; color: #92400e; font-size: 14px; font-weight: 600;">
-            ⏳ Action Required: Accept this appointment or propose an alternative time
+            {icon('clock', '#f59e0b', 18)} Action Required: Accept this appointment or propose an alternative time
         </p>
     </div>
     
@@ -1880,41 +1907,41 @@ async def send_custom_quote_request_notification(
     <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0;">
         <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #1e293b;">Client Details</h3>
         <div style="margin-bottom: 12px;">
-            <div style="color: #64748b; font-size: 13px; margin-bottom: 4px;">👤 Client Name</div>
+            <div style="color: #64748b; font-size: 13px; margin-bottom: 4px;">{icon('user', '#00C4B4', 18)} Client Name</div>
             <div style="font-size: 15px; color: #1e293b; font-weight: 600;">{client_name}</div>
         </div>
         <div style="margin-bottom: 12px;">
-            <div style="color: #64748b; font-size: 13px; margin-bottom: 4px;">📧 Email</div>
+            <div style="color: #64748b; font-size: 13px; margin-bottom: 4px;">{icon('chat', '#00C4B4', 18)} Email</div>
             <div style="font-size: 15px; color: #1e293b;">{client_email}</div>
         </div>
-        {f'<div style="margin-bottom: 12px;"><div style="color: #64748b; font-size: 13px; margin-bottom: 4px;">📞 Phone</div><div style="font-size: 15px; color: #1e293b;">{client_phone}</div></div>' if client_phone else ''}
+        {f'<div style="margin-bottom: 12px;"><div style="color: #64748b; font-size: 13px; margin-bottom: 4px;">{icon("chat", "#00C4B4", 18)} Phone</div><div style="font-size: 15px; color: #1e293b;">{client_phone}</div></div>' if client_phone else ''}
         <div style="margin-bottom: 12px;">
-            <div style="color: #64748b; font-size: 13px; margin-bottom: 4px;">🏢 Property Type</div>
+            <div style="color: #64748b; font-size: 13px; margin-bottom: 4px;">{icon('building', '#00C4B4', 18)} Property Type</div>
             <div style="font-size: 15px; color: #1e293b;">{property_type}</div>
         </div>
         <div style="margin-bottom: 12px;">
-            <div style="color: #64748b; font-size: 13px; margin-bottom: 4px;">📏 Property Size</div>
+            <div style="color: #64748b; font-size: 13px; margin-bottom: 4px;">{icon('building', '#00C4B4', 18)} Property Size</div>
             <div style="font-size: 15px; color: #1e293b;">{property_size:,} sq ft</div>
         </div>
         <div style="margin-bottom: 12px;">
-            <div style="color: #64748b; font-size: 13px; margin-bottom: 4px;">📅 Frequency</div>
+            <div style="color: #64748b; font-size: 13px; margin-bottom: 4px;">{icon('calendar', '#00C4B4', 18)} Frequency</div>
             <div style="font-size: 15px; color: #1e293b;">{frequency}</div>
         </div>
         <div>
-            <div style="color: #64748b; font-size: 13px; margin-bottom: 4px;">🎥 Video Duration</div>
+            <div style="color: #64748b; font-size: 13px; margin-bottom: 4px;">{icon('video', '#00C4B4', 18)} Video Duration</div>
             <div style="font-size: 15px; color: #1e293b;">{int(video_duration)} seconds</div>
         </div>
     </div>
     
     <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
         <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
-            🎬 Video walkthrough uploaded and ready for review
+            {icon('video', '#22c55e', 18)} Video walkthrough uploaded and ready for review
         </p>
     </div>
     
     <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;">
         <p style="margin: 0; color: #92400e; font-size: 14px; font-weight: 600;">
-            ⏳ Action Required: Watch the video and submit your custom quote
+            {icon('clock', '#f59e0b', 18)} Action Required: Watch the video and submit your custom quote
         </p>
     </div>
     
@@ -1959,26 +1986,26 @@ async def send_custom_quote_ready_notification(
     <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0;">
         <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #1e293b;">Your Custom Quote</h3>
         <div style="margin-bottom: 20px;">
-            <div style="color: #64748b; font-size: 13px; margin-bottom: 6px;">💰 Total Amount</div>
+            <div style="color: #64748b; font-size: 13px; margin-bottom: 6px;">{icon('money', '#00C4B4', 18)} Total Amount</div>
             <div style="font-size: 28px; color: #00C4B4; font-weight: 700;">${quote_amount:.2f}</div>
         </div>
-        {f'<div style="margin-bottom: 16px;"><div style="color: #64748b; font-size: 13px; margin-bottom: 6px;">📋 Service Description</div><div style="font-size: 15px; color: #1e293b; line-height: 1.6;">{quote_description}</div></div>' if quote_description else ''}
-        {f'<div><div style="color: #64748b; font-size: 13px; margin-bottom: 6px;">📝 Additional Notes</div><div style="font-size: 15px; color: #1e293b; line-height: 1.6;">{quote_notes}</div></div>' if quote_notes else ''}
+        {f'<div style="margin-bottom: 16px;"><div style="color: #64748b; font-size: 13px; margin-bottom: 6px;">{icon("document", "#00C4B4", 18)} Service Description</div><div style="font-size: 15px; color: #1e293b; line-height: 1.6;">{quote_description}</div></div>' if quote_description else ''}
+        {f'<div><div style="color: #64748b; font-size: 13px; margin-bottom: 6px;">{icon("document", "#00C4B4", 18)} Additional Notes</div><div style="font-size: 15px; color: #1e293b; line-height: 1.6;">{quote_notes}</div></div>' if quote_notes else ''}
     </div>
     
     <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
         <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
-            ✨ Your custom quote is ready! Review and approve to schedule your service.
+            {icon('sparkles', '#22c55e', 18)} Your custom quote is ready! Review and approve to schedule your service.
         </p>
     </div>
     
     <div style="background: #f8fafc; border-radius: 12px; padding: 20px; margin: 20px 0;">
         <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #1e293b;">What's Next:</h3>
         <div style="font-size: 14px; color: #1e293b; line-height: 1.8;">
-            <div style="margin-bottom: 8px;">✓ Review the quote details above</div>
-            <div style="margin-bottom: 8px;">✓ Click "Approve & Schedule" to proceed</div>
-            <div style="margin-bottom: 8px;">✓ Complete scheduling and contract signing</div>
-            <div>✓ Receive your first cleaning service!</div>
+            <div style="margin-bottom: 8px;">{icon('check', '#22c55e', 16)} Review the quote details above</div>
+            <div style="margin-bottom: 8px;">{icon('check', '#22c55e', 16)} Click "Approve & Schedule" to proceed</div>
+            <div style="margin-bottom: 8px;">{icon('check', '#22c55e', 16)} Complete scheduling and contract signing</div>
+            <div>{icon('check', '#22c55e', 16)} Receive your first cleaning service!</div>
         </div>
     </div>
     
@@ -2019,7 +2046,7 @@ async def send_custom_quote_approved_notification(
     <p>Great news! <strong>{client_name}</strong> has approved your custom quote.</p>
     
     <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 20px; margin: 24px 0; text-align: center;">
-        <div style="font-size: 48px; margin-bottom: 8px;">🎉</div>
+        <div style="font-size: 48px; margin-bottom: 8px;">{icon('sparkles', '#22c55e', 48)}</div>
         <div style="font-size: 18px; color: #166534; font-weight: 700; margin-bottom: 8px;">Quote Approved!</div>
         <div style="font-size: 24px; color: #00C4B4; font-weight: 700;">${quote_amount:.2f}</div>
     </div>
@@ -2027,30 +2054,30 @@ async def send_custom_quote_approved_notification(
     <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0;">
         <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #1e293b;">Client Information</h3>
         <div style="margin-bottom: 12px;">
-            <div style="color: #64748b; font-size: 13px; margin-bottom: 4px;">👤 Client Name</div>
+            <div style="color: #64748b; font-size: 13px; margin-bottom: 4px;">{icon('user', '#00C4B4', 18)} Client Name</div>
             <div style="font-size: 15px; color: #1e293b; font-weight: 600;">{client_name}</div>
         </div>
         <div style="margin-bottom: 12px;">
-            <div style="color: #64748b; font-size: 13px; margin-bottom: 4px;">📧 Email</div>
+            <div style="color: #64748b; font-size: 13px; margin-bottom: 4px;">{icon('chat', '#00C4B4', 18)} Email</div>
             <div style="font-size: 15px; color: #1e293b;">{client_email}</div>
         </div>
-        {f'<div><div style="color: #64748b; font-size: 13px; margin-bottom: 4px;">💬 Client Notes</div><div style="font-size: 15px; color: #1e293b; line-height: 1.6;">{client_response_notes}</div></div>' if client_response_notes else ''}
+        {f'<div><div style="color: #64748b; font-size: 13px; margin-bottom: 4px;">{icon("chat", "#00C4B4", 18)} Client Notes</div><div style="font-size: 15px; color: #1e293b; line-height: 1.6;">{client_response_notes}</div></div>' if client_response_notes else ''}
     </div>
     
     <div style="background: #f8fafc; border-radius: 12px; padding: 20px; margin: 20px 0;">
         <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #1e293b;">Next Steps:</h3>
         <div style="font-size: 14px; color: #1e293b; line-height: 1.8;">
-            <div style="margin-bottom: 8px;">✓ Contract has been automatically generated</div>
-            <div style="margin-bottom: 8px;">✓ Client will complete scheduling and sign the contract</div>
-            <div style="margin-bottom: 8px;">✓ Review and sign the contract when ready</div>
-            <div style="margin-bottom: 8px;">✓ Confirm the client's proposed schedule</div>
-            <div>✓ Invoice will be sent automatically (if Square is integrated)</div>
+            <div style="margin-bottom: 8px;">{icon('check', '#22c55e', 16)} Contract has been automatically generated</div>
+            <div style="margin-bottom: 8px;">{icon('check', '#22c55e', 16)} Client will complete scheduling and sign the contract</div>
+            <div style="margin-bottom: 8px;">{icon('check', '#22c55e', 16)} Review and sign the contract when ready</div>
+            <div style="margin-bottom: 8px;">{icon('check', '#22c55e', 16)} Confirm the client's proposed schedule</div>
+            <div>{icon('check', '#22c55e', 16)} Invoice will be sent automatically (if Square is integrated)</div>
         </div>
     </div>
     
     <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;">
         <p style="margin: 0; color: #92400e; font-size: 14px; font-weight: 600;">
-            📋 Action Required: Review the contract and confirm the schedule when the client completes their part
+            {icon('document', '#f59e0b', 18)} Action Required: Review the contract and confirm the schedule when the client completes their part
         </p>
     </div>
     
