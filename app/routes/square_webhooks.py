@@ -230,28 +230,117 @@ async def handle_invoice_payment(event_data: dict, db: Session):
 async def handle_payment_event(event_data: dict, db: Session):
     """
     Handle payment.created and payment.updated events
-    Alternative payment tracking method
+    Tracks payment status and triggers confirmation flow
     """
     try:
         payment_data = event_data.get("object", {}).get("payment", {})
         payment_id = payment_data.get("id")
-        status = payment_data.get("status", "").lower()
+        status = payment_data.get("status", "").upper()
         order_id = payment_data.get("order_id")
+        invoice_id = payment_data.get("invoice_id")
         
         logger.info(f"💳 Payment event: {payment_id} - Status: {status}")
         
-        # Find contract by order/invoice reference
-        # This is a fallback if invoice webhook doesn't fire
-        if order_id:
+        # Only process COMPLETED payments
+        if status != "COMPLETED":
+            logger.info(f"ℹ️ Payment {payment_id} status is {status}, not COMPLETED. Skipping.")
+            return
+        
+        # Find contract by invoice ID or order ID
+        contract = None
+        if invoice_id:
             contract = db.query(Contract).filter(
-                Contract.square_invoice_id.contains(order_id)
+                Contract.square_invoice_id == invoice_id
             ).first()
+        elif order_id:
+            contract = db.query(Contract).filter(
+                Contract.square_invoice_id == order_id
+            ).first()
+        
+        if not contract:
+            logger.warning(f"⚠️ No contract found for payment {payment_id} (invoice: {invoice_id}, order: {order_id})")
+            return
+        
+        # Get related data
+        client = db.query(Client).filter(Client.id == contract.client_id).first()
+        user = db.query(User).filter(User.id == contract.user_id).first()
+        
+        if not client or not user:
+            logger.error(f"❌ Missing client or user for contract {contract.id}")
+            return
+        
+        # Update payment status
+        old_status = contract.square_payment_status
+        contract.square_payment_status = "paid"
+        contract.square_payment_received_at = datetime.utcnow()
+        
+        # Update contract status to active if not already
+        if contract.status == "signed":
+            contract.status = "active"
+        
+        # Store payment confirmation state for frontend redirect
+        # This allows the frontend to detect successful payment and redirect
+        contract.payment_confirmation_pending = True
+        contract.payment_confirmed_at = datetime.utcnow()
+        
+        db.commit()
+        db.refresh(contract)
+        
+        logger.info(f"✅ Contract {contract.id} payment status updated: {old_status} → paid")
+        logger.info(f"✅ Payment confirmation state stored for frontend redirect")
+        
+        # Send payment confirmation email to service provider
+        await send_provider_payment_notification(
+            client=client,
+            contract=contract,
+            user=user,
+            payment_id=payment_id
+        )
+        
+        # Create subscription for recurring services
+        if contract.frequency and contract.frequency.lower() not in ["one-time", "per-turnover", "on-demand", "as-needed"]:
+            logger.info(f"🔄 Creating subscription for recurring service: {contract.frequency}")
             
-            if contract and status == "completed":
-                await handle_invoice_payment({"object": {"invoice": {"id": contract.square_invoice_id, "status": "paid"}}}, db)
+            subscription_result = await create_square_subscription(
+                contract=contract,
+                client=client,
+                user=user,
+                db=db,
+                card_id=None  # Square will use the card from the payment
+            )
+            
+            if subscription_result.get("success"):
+                subscription_id = subscription_result["subscription_id"]
+                logger.info(f"✅ Subscription created: {subscription_id}")
+                
+                # Send subscription confirmation email to CLIENT
+                await send_subscription_confirmation_email(
+                    client=client,
+                    contract=contract,
+                    subscription_id=subscription_id,
+                    user=user
+                )
+                
+                # Send subscription notification to OWNER
+                await send_subscription_notification_to_owner(
+                    client=client,
+                    contract=contract,
+                    subscription_id=subscription_id,
+                    user=user
+                )
+            else:
+                logger.error(f"❌ Subscription creation failed: {subscription_result.get('message')}")
+        
+        # Send payment confirmation email to client
+        await send_payment_confirmation_email(
+            client=client,
+            contract=contract,
+            user=user
+        )
         
     except Exception as e:
         logger.error(f"❌ Error handling payment event: {str(e)}")
+        db.rollback()
 
 
 
@@ -776,3 +865,183 @@ async def send_subscription_notification_to_owner(
         
     except Exception as e:
         logger.error(f"❌ Failed to send subscription notification to owner: {str(e)}")
+
+
+
+async def send_provider_payment_notification(
+    client: Client,
+    contract: Contract,
+    user: User,
+    payment_id: str
+):
+    """Send paid invoice confirmation email to service provider"""
+    try:
+        from ..email_service import send_email
+        from ..models import BusinessConfig
+        from ..database import get_db
+        
+        db = next(get_db())
+        business_config = db.query(BusinessConfig).filter(
+            BusinessConfig.user_id == user.id
+        ).first()
+        
+        business_name = business_config.business_name if business_config else "CleanEnroll"
+        client_name = client.contact_name or client.business_name
+        
+        if user.email:
+            html = f"""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+                    <h1 style="color: white; margin: 0; font-size: 28px;">💰 Payment Received!</h1>
+                </div>
+                
+                <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
+                    <p style="font-size: 16px; color: #1e293b; margin-bottom: 20px;">
+                        Hi {user.full_name or 'there'},
+                    </p>
+                    
+                    <p style="font-size: 16px; color: #1e293b; margin-bottom: 25px;">
+                        Great news! You've received a payment from <strong>{client_name}</strong>.
+                    </p>
+                    
+                    <div style="background: #f0fdf4; padding: 20px; border-radius: 8px; margin-bottom: 25px; border-left: 4px solid #10b981;">
+                        <h2 style="color: #10b981; font-size: 20px; margin-top: 0; margin-bottom: 15px;">
+                            📋 Invoice Details
+                        </h2>
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                                <td style="padding: 8px 0; color: #64748b; font-weight: 600;">Invoice Number:</td>
+                                <td style="padding: 8px 0; color: #1e293b; text-align: right; font-family: monospace;">
+                                    INV-{contract.public_id[:8].upper() if contract.public_id else contract.id}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; color: #64748b; font-weight: 600;">Client Name:</td>
+                                <td style="padding: 8px 0; color: #1e293b; text-align: right; font-weight: 600;">
+                                    {client_name}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; color: #64748b; font-weight: 600;">Client Email:</td>
+                                <td style="padding: 8px 0; color: #1e293b; text-align: right;">{client.email or 'N/A'}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; color: #64748b; font-weight: 600;">Client Phone:</td>
+                                <td style="padding: 8px 0; color: #1e293b; text-align: right;">{client.phone or 'N/A'}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; color: #64748b; font-weight: 600;">Service:</td>
+                                <td style="padding: 8px 0; color: #1e293b; text-align: right;">{contract.title}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; color: #64748b; font-weight: 600;">Amount Paid:</td>
+                                <td style="padding: 8px 0; color: #10b981; font-weight: bold; font-size: 20px; text-align: right;">
+                                    ${contract.total_value:.2f}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; color: #64748b; font-weight: 600;">Payment Date:</td>
+                                <td style="padding: 8px 0; color: #1e293b; text-align: right;">
+                                    {datetime.utcnow().strftime('%B %d, %Y at %I:%M %p UTC')}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; color: #64748b; font-weight: 600;">Payment ID:</td>
+                                <td style="padding: 8px 0; color: #64748b; font-size: 11px; text-align: right; font-family: monospace;">
+                                    {payment_id}
+                                </td>
+                            </tr>
+                            {f'<tr><td style="padding: 8px 0; color: #64748b; font-weight: 600;">Service Frequency:</td><td style="padding: 8px 0; color: #1e293b; text-align: right;">{contract.frequency.title()}</td></tr>' if contract.frequency else ''}
+                        </table>
+                    </div>
+                    
+                    <div style="background: #dbeafe; border-left: 4px solid #3b82f6; padding: 15px; margin-bottom: 25px; border-radius: 4px;">
+                        <p style="margin: 0; color: #1e40af; font-size: 14px;">
+                            <strong>💳 Payment Status:</strong> Confirmed<br>
+                            <strong>📊 Contract Status:</strong> Active<br>
+                            <strong>💰 Payout:</strong> Funds will be deposited according to your Square payout schedule
+                        </p>
+                    </div>
+                    
+                    {f'<div style="background: #ecfdf5; border-left: 4px solid #10b981; padding: 15px; margin-bottom: 25px; border-radius: 4px;"><p style="margin: 0; color: #065f46; font-weight: 600;">🔄 Recurring Service Active</p><p style="margin: 8px 0 0 0; color: #1e293b; font-size: 14px;">This client is on a {contract.frequency} subscription. Future payments will be processed automatically.</p></div>' if contract.frequency and contract.frequency.lower() not in ["one-time", "per-turnover", "on-demand", "as-needed"] else ''}
+                    
+                    <div style="text-align: center; margin: 25px 0;">
+                        <a href="{FRONTEND_URL}/dashboard/contracts/{contract.id}" 
+                           style="display: inline-block; background: #10b981; color: white; padding: 14px 28px; 
+                                  text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px;">
+                            View Contract Details →
+                        </a>
+                    </div>
+                    
+                    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 25px 0;">
+                    
+                    <p style="font-size: 14px; color: #64748b; margin-bottom: 0;">
+                        This payment has been processed through Square. You can view the transaction details 
+                        in your Square dashboard.
+                    </p>
+                    
+                    <p style="font-size: 14px; color: #1e293b; margin-top: 20px; margin-bottom: 5px;">
+                        Best regards,<br>
+                        <strong>CleanEnroll</strong>
+                    </p>
+                </div>
+                
+                <div style="text-align: center; padding: 20px; color: #64748b; font-size: 12px;">
+                    <p style="margin: 0;">
+                        This is an automated payment notification. View details in your dashboard.
+                    </p>
+                </div>
+            </div>
+            """
+            
+            await send_email(
+                to=user.email,
+                subject=f"💰 Payment Received - ${contract.total_value:.2f} from {client_name}",
+                html_content=html,
+                business_config=business_config
+            )
+            
+            logger.info(f"✅ Provider payment notification sent to {user.email} for contract {contract.id}")
+        else:
+            logger.warning(f"⚠️ No email address for provider {user.id}")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to send provider payment notification: {str(e)}")
+
+
+@router.get("/payment-status/{contract_id}")
+async def check_payment_status(contract_id: int, db: Session = Depends(get_db)):
+    """
+    Public endpoint for frontend to check if payment was confirmed
+    Used to trigger redirect to payment confirmation page
+    """
+    try:
+        contract = db.query(Contract).filter(Contract.id == contract_id).first()
+        
+        if not contract:
+            raise HTTPException(status_code=404, detail="Contract not found")
+        
+        # Check if payment confirmation is pending
+        if hasattr(contract, 'payment_confirmation_pending') and contract.payment_confirmation_pending:
+            # Clear the pending flag
+            contract.payment_confirmation_pending = False
+            db.commit()
+            
+            return {
+                "payment_confirmed": True,
+                "confirmed_at": contract.payment_confirmed_at.isoformat() if contract.payment_confirmed_at else None,
+                "redirect_url": f"/payment-confirmation?contract_id={contract_id}",
+                "contract_id": contract_id,
+                "amount": float(contract.total_value) if contract.total_value else 0.0
+            }
+        
+        return {
+            "payment_confirmed": contract.square_payment_status == "paid",
+            "redirect_url": None
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error checking payment status: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to check payment status")

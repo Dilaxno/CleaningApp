@@ -444,6 +444,8 @@ class Contract(Base):
     
     # Payment tracking
     square_payment_received_at = Column(DateTime, nullable=True)  # When payment was received
+    payment_confirmation_pending = Column(Boolean, default=False)  # Frontend redirect flag
+    payment_confirmed_at = Column(DateTime, nullable=True)  # When payment was confirmed via webhook
     
     # Enhanced signature tracking
     provider_signed_at = Column(DateTime, nullable=True)  # When provider signed

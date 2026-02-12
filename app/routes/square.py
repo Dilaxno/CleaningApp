@@ -337,12 +337,17 @@ async def get_paid_invoices(
     # Format response
     invoices = []
     for contract in contracts:
+        # Get client name from the relationship
+        client_name = None
+        if contract.client:
+            client_name = contract.client.contact_name or contract.client.business_name
+        
         invoices.append({
             "id": contract.id,
             "invoice_id": contract.square_invoice_id,
             "invoice_url": contract.square_invoice_url,
             "client_id": contract.client_id,
-            "client_name": contract.client_name,
+            "client_name": client_name,
             "amount": float(contract.total_value) if contract.total_value else 0.0,
             "payment_status": contract.square_payment_status,
             "created_at": contract.square_invoice_created_at.isoformat() if contract.square_invoice_created_at else None,
