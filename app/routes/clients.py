@@ -1636,3 +1636,134 @@ async def handle_schedule_decision(
     except Exception as e:
         logger.error(f"❌ Error handling schedule decision: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class ClientScheduleSubmission(BaseModel):
+    scheduledDate: str  # YYYY-MM-DD format
+    scheduledTime: str  # HH:MM format (24-hour)
+    endTime: str  # HH:MM format (24-hour)
+    durationMinutes: int
+
+
+@router.post("/public/{client_id}/submit-schedule")
+async def submit_client_schedule(
+    client_id: int, data: ClientScheduleSubmission, db: Session = Depends(get_db)
+):
+    """
+    Public endpoint for client to submit their preferred schedule time.
+    This notifies the provider that the client has selected a time.
+    No authentication required - accessed via public form flow.
+    """
+    from ..email_service import send_email
+
+    try:
+        # Get client
+        client = db.query(Client).filter(Client.id == client_id).first()
+        if not client:
+            raise HTTPException(status_code=404, detail="Client not found")
+
+        # Get provider/user
+        provider = db.query(User).filter(User.id == client.user_id).first()
+        if not provider:
+            raise HTTPException(status_code=404, detail="Provider not found")
+
+        # Get business config for business name
+        config = (
+            db.query(BusinessConfig)
+            .filter(BusinessConfig.user_id == client.user_id)
+            .first()
+        )
+        business_name = config.business_name if config else "Your Business"
+
+        # Parse and store the scheduled time
+        try:
+            # Combine date and time into ISO format datetime strings
+            scheduled_start = f"{data.scheduledDate}T{data.scheduledTime}:00"
+            scheduled_end = f"{data.scheduledDate}T{data.endTime}:00"
+            
+            # Update client with scheduled time
+            client.scheduled_start_time = scheduled_start
+            client.scheduled_end_time = scheduled_end
+            client.scheduling_status = "pending_provider_confirmation"
+            
+            db.commit()
+            db.refresh(client)
+            
+            logger.info(f"✅ Client {client_id} submitted schedule: {scheduled_start} - {scheduled_end}")
+            
+        except Exception as parse_err:
+            logger.error(f"❌ Failed to parse schedule times: {parse_err}")
+            raise HTTPException(status_code=400, detail="Invalid date/time format")
+
+        # Send notification email to provider
+        try:
+            if provider.email:
+                # Parse times for email display
+                start_dt = datetime.fromisoformat(scheduled_start)
+                end_dt = datetime.fromisoformat(scheduled_end)
+                
+                provider_content = f"""
+                <p>Hi {provider.full_name or business_name},</p>
+                <p><strong>{client.contact_name or client.business_name}</strong> has selected their preferred cleaning time!</p>
+                
+                <div style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-radius: 16px; padding: 24px; margin: 24px 0; border-left: 4px solid #0ea5e9;">
+                  <p style="color: #0c4a6e; font-weight: 600; margin-bottom: 16px; font-size: 16px;">📅 Requested Cleaning Schedule</p>
+                  <div style="background: white; border-radius: 12px; padding: 16px; margin-bottom: 12px;">
+                    <p style="color: #0c4a6e; font-size: 15px; margin: 8px 0;">
+                      <strong>Date:</strong> {start_dt.strftime("%A, %B %d, %Y")}
+                    </p>
+                    <p style="color: #0c4a6e; font-size: 15px; margin: 8px 0;">
+                      <strong>Time:</strong> {start_dt.strftime("%I:%M %p")} - {end_dt.strftime("%I:%M %p")}
+                    </p>
+                    <p style="color: #64748b; font-size: 13px; margin: 8px 0;">
+                      Duration: {data.durationMinutes} minutes
+                    </p>
+                  </div>
+                </div>
+                
+                <div style="background: #fef3c7; border-radius: 12px; padding: 16px; margin: 20px 0; border-left: 4px solid #f59e0b;">
+                  <p style="color: #92400e; font-size: 14px; margin: 0;">
+                    ⏰ <strong>Action Required:</strong> Please review and confirm this schedule in your dashboard, or propose an alternative time if needed.
+                  </p>
+                </div>
+                
+                <p style="margin-top: 24px;">
+                  <a href="{config.custom_domain or 'https://cleanenroll.com'}/dashboard/clients" 
+                     style="display: inline-block; background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); color: white; padding: 14px 28px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 15px;">
+                    Review Schedule →
+                  </a>
+                </p>
+                
+                <p style="color: #64748b; font-size: 13px; margin-top: 20px;">
+                  Client: {client.contact_name or client.business_name}<br>
+                  {f"Email: {client.email}" if client.email else ""}<br>
+                  {f"Phone: {client.phone}" if client.phone else ""}
+                </p>
+                """
+                
+                await send_email(
+                    to=provider.email,
+                    subject=f"New Schedule Request from {client.contact_name or client.business_name}",
+                    title="Client Selected Cleaning Time! 📅",
+                    content_html=provider_content,
+                    is_user_email=True,
+                )
+                
+                logger.info(f"✅ Schedule notification sent to provider {provider.email}")
+                
+        except Exception as email_err:
+            logger.warning(f"⚠️ Failed to send schedule notification email: {email_err}")
+            # Don't fail the request if email fails
+
+        return {
+            "success": True,
+            "message": "Schedule submitted successfully. Provider will be notified.",
+            "scheduledStartTime": scheduled_start,
+            "scheduledEndTime": scheduled_end,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error submitting client schedule: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
