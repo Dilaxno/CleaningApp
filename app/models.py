@@ -451,6 +451,11 @@ class Contract(Base):
     provider_signed_at = Column(DateTime, nullable=True)  # When provider signed
     both_parties_signed_at = Column(DateTime, nullable=True)  # When both parties signed
     invoice_auto_generated = Column(Boolean, default=False)  # Whether invoice was auto-generated
+    
+    # Custom quote workflow
+    custom_quote_request_id = Column(Integer, ForeignKey("custom_quote_requests.id"), nullable=True)
+    invoice_auto_sent = Column(Boolean, default=False)  # Whether Square invoice was auto-sent
+    invoice_auto_sent_at = Column(DateTime, nullable=True)  # When invoice was auto-sent
 
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

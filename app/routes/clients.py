@@ -1061,6 +1061,7 @@ class SignContractRequest(BaseModel):
         None  # UUID for specific contract (optional for backwards compatibility)
     )
     signature: str
+    customQuoteRequestId: Optional[int] = None  # Link to custom quote request if applicable
 
 
 class GenerateContractRequest(BaseModel):
@@ -1222,7 +1223,8 @@ async def sign_contract(
             total_value=client.pending_contract_total_value,
             payment_terms=client.pending_contract_payment_terms,
             terms_conditions=client.pending_contract_terms_conditions,
-            status="new"
+            status="new",
+            custom_quote_request_id=data.customQuoteRequestId if hasattr(data, 'customQuoteRequestId') else None
         )
         db.add(contract)
         db.flush()  # Get the ID without committing

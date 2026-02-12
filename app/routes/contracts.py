@@ -730,3 +730,153 @@ async def send_square_invoice_email(
             detail=f"Failed to send invoice email: {str(e)}"
         )
 
+
+
+@router.post("/{contract_id}/provider-sign")
+async def provider_sign_contract(
+    contract_id: int,
+    signature_data: ProviderSignatureRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Provider signs the contract after client has signed and scheduled
+    This triggers Square invoice automation if configured
+    """
+    from ..services.square_invoice_automation import should_send_square_invoice, auto_send_square_invoice
+    
+    logger.info(f"📝 Provider signing contract {contract_id}")
+    
+    contract = db.query(Contract).filter(
+        Contract.id == contract_id,
+        Contract.user_id == current_user.id
+    ).first()
+    
+    if not contract:
+        raise HTTPException(status_code=404, detail="Contract not found")
+    
+    # Check if client has signed
+    if not contract.client_signature:
+        raise HTTPException(status_code=400, detail="Client must sign first")
+    
+    # Check if provider already signed
+    if contract.provider_signed_at:
+        raise HTTPException(status_code=400, detail="Contract already signed by provider")
+    
+    # Get signature data
+    if signature_data.use_default_signature:
+        # Use provider's default signature from business config
+        business_config = db.query(BusinessConfig).filter(
+            BusinessConfig.user_id == current_user.id
+        ).first()
+        
+        if not business_config or not business_config.signature_url:
+            raise HTTPException(status_code=400, detail="No default signature found")
+        
+        # Generate presigned URL for the signature
+        try:
+            signature_url = generate_presigned_url(business_config.signature_url, expires_in=3600)
+            contract.provider_signature = signature_url
+        except Exception as e:
+            logger.error(f"Failed to get default signature: {str(e)}")
+            raise HTTPException(status_code=500, detail="Failed to retrieve default signature")
+    else:
+        # Use provided signature
+        contract.provider_signature = signature_data.signature_data
+    
+    # Update provider signature timestamp
+    contract.provider_signed_at = datetime.utcnow()
+    
+    # Check if both parties signed
+    if contract.client_signature:
+        contract.both_parties_signed_at = datetime.utcnow()
+        contract.status = "signed"
+        
+        # Update client status to "new_lead" now that contract is fully signed
+        client = db.query(Client).filter(Client.id == contract.client_id).first()
+        if client and client.status == "pending_signature":
+            client.status = "new_lead"
+            logger.info(f"✅ Client {client.id} status updated to new_lead after provider signature")
+        
+        logger.info(f"✅ Contract {contract_id} fully signed by both parties")
+        
+        # Send confirmation emails
+        try:
+            await send_contract_fully_executed_email(contract, current_user, db)
+            await send_provider_contract_signed_confirmation(contract, current_user, db)
+        except Exception as e:
+            logger.error(f"Failed to send confirmation emails: {str(e)}")
+        
+        # Trigger Square invoice automation if configured
+        if await should_send_square_invoice(contract, current_user, db):
+            logger.info(f"🔄 Triggering Square invoice automation for contract {contract_id}")
+            await auto_send_square_invoice(contract, current_user, db)
+    
+    db.commit()
+    db.refresh(contract)
+    
+    return {
+        "success": True,
+        "status": contract.status,
+        "both_parties_signed": contract.both_parties_signed_at is not None,
+        "invoice_auto_sent": contract.invoice_auto_sent
+    }
+
+
+@router.get("/{contract_id}/download")
+async def download_contract(
+    contract_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Download signed contract PDF
+    Public endpoint - accessible with contract ID
+    """
+    from fastapi.responses import RedirectResponse
+    
+    contract = db.query(Contract).filter(Contract.id == contract_id).first()
+    
+    if not contract:
+        raise HTTPException(status_code=404, detail="Contract not found")
+    
+    if not contract.pdf_key:
+        raise HTTPException(status_code=404, detail="Contract PDF not available")
+    
+    # Generate presigned URL for PDF download
+    try:
+        pdf_url = generate_presigned_url(contract.pdf_key, expires_in=3600)
+        return RedirectResponse(url=pdf_url)
+    except Exception as e:
+        logger.error(f"Failed to generate PDF download URL: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to generate download link")
+
+
+@router.get("/public/{public_id}/download")
+async def download_contract_by_public_id(
+    public_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Download signed contract PDF by public ID
+    Public endpoint - accessible with contract public ID (UUID)
+    """
+    from fastapi.responses import RedirectResponse
+    
+    if not validate_uuid(public_id):
+        raise HTTPException(status_code=400, detail="Invalid contract identifier")
+    
+    contract = db.query(Contract).filter(Contract.public_id == public_id).first()
+    
+    if not contract:
+        raise HTTPException(status_code=404, detail="Contract not found")
+    
+    if not contract.pdf_key:
+        raise HTTPException(status_code=404, detail="Contract PDF not available")
+    
+    # Generate presigned URL for PDF download
+    try:
+        pdf_url = generate_presigned_url(contract.pdf_key, expires_in=3600)
+        return RedirectResponse(url=pdf_url)
+    except Exception as e:
+        logger.error(f"Failed to generate PDF download URL: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to generate download link")
