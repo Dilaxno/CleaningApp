@@ -1759,7 +1759,7 @@ async def submit_client_schedule(
                 </div>
                 
                 <p style="margin-top: 24px;">
-                  <a href="{config.custom_domain or 'https://cleanenroll.com'}/schedule" 
+                  <a href="{config.custom_forms_domain or 'https://cleanenroll.com'}/schedule" 
                      style="display: inline-block; background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); color: white; padding: 14px 28px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 15px;">
                     Review Schedule →
                   </a>
