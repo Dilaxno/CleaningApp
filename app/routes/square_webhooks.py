@@ -448,7 +448,7 @@ async def send_payment_confirmation_email(client: Client, contract: Contract, us
             await send_email(
                 to=client.email,
                 subject=f"✅ Payment Received - {contract.title}",
-                html_content=client_html,
+                content_html=client_html,
                 business_config=business_config,
             )
 
@@ -533,7 +533,7 @@ async def send_payment_confirmation_email(client: Client, contract: Contract, us
             await send_email(
                 to=user.email,
                 subject=f"💰 Payment Received - {client.business_name}",
-                html_content=owner_html,
+                content_html=owner_html,
                 business_config=business_config,
             )
 
@@ -675,7 +675,7 @@ async def send_subscription_confirmation_email(
             await send_email(
                 to=client.email,
                 subject=f"🎉 Subscription Activated - {contract.frequency.title()} {contract.title}",
-                html_content=html,
+                content_html=html,
                 business_config=business_config,
             )
 
@@ -834,7 +834,7 @@ async def send_subscription_notification_to_owner(
             await send_email(
                 to=user.email,
                 subject=f"🔄 Subscription Created - {client.business_name} - {contract.frequency.title()}",
-                html_content=html,
+                content_html=html,
                 business_config=business_config,
             )
 
@@ -974,7 +974,7 @@ async def send_provider_payment_notification(
             await send_email(
                 to=user.email,
                 subject=f"💰 Payment Received - ${contract.total_value:.2f} from {client_name}",
-                html_content=html,
+                content_html=html,
                 business_config=business_config,
             )
 
