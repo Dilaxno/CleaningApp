@@ -67,6 +67,7 @@ class ContractResponse(BaseModel):
     providerSignature: Optional[str]  # Base64 signature image
     signedAt: Optional[datetime]
     clientSignatureTimestamp: Optional[datetime]
+    providerSignedAt: Optional[datetime]  # When provider signed the contract
     createdAt: datetime
     defaultSignatureUrl: Optional[str] = None  # Provider's default signature from onboarding
 
@@ -146,6 +147,7 @@ async def get_contracts(
             providerSignature=c.provider_signature,
             signedAt=c.signed_at,
             clientSignatureTimestamp=c.client_signature_timestamp,
+            providerSignedAt=c.provider_signed_at,
             createdAt=c.created_at,
             defaultSignatureUrl=default_signature_url
         ))
@@ -246,6 +248,7 @@ async def create_contract(
         providerSignature=contract.provider_signature,
         signedAt=contract.signed_at,
         clientSignatureTimestamp=contract.client_signature_timestamp,
+        providerSignedAt=contract.provider_signed_at,
         createdAt=contract.created_at
     )
 
@@ -356,6 +359,7 @@ async def update_contract(
         providerSignature=contract.provider_signature,
         signedAt=contract.signed_at,
         clientSignatureTimestamp=contract.client_signature_timestamp,
+        providerSignedAt=contract.provider_signed_at,
         createdAt=contract.created_at
     )
 
@@ -546,6 +550,7 @@ async def sign_contract_as_provider(
         providerSignature=contract.provider_signature,
         signedAt=contract.signed_at,
         clientSignatureTimestamp=contract.client_signature_timestamp,
+        providerSignedAt=contract.provider_signed_at,
         createdAt=contract.created_at
     )
 
