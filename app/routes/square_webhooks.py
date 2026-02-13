@@ -354,95 +354,339 @@ async def send_payment_confirmation_email(client: Client, contract: Contract, us
             subscription_note = ""
             if is_recurring:
                 subscription_note = f"""
-                <div style="background: #ecfdf5; border-left: 4px solid #00C4B4; padding: 15px; margin: 20px 0; border-radius: 4px;">
-                    <p style="margin: 0; color: #00C4B4; font-weight: 600; margin-bottom: 8px;">
-                        🔄 Recurring Service Subscription
-                    </p>
-                    <p style="margin: 0; color: #1e293b; font-size: 14px;">
-                        Your {contract.frequency} subscription has been set up! You'll receive a separate email with
-                        subscription details and management options.
-                    </p>
+                <div style="background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border-radius: 16px; padding: 20px; margin: 24px 0; border: 1px solid #a7f3d0;">
+                    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                        <tr>
+                            <td style="width: 48px; vertical-align: top; padding-right: 16px;">
+                                <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                                    <span style="font-size: 24px;">🔄</span>
+                                </div>
+                            </td>
+                            <td style="vertical-align: top;">
+                                <h3 style="margin: 0 0 8px 0; color: #065f46; font-size: 18px; font-weight: 700;">
+                                    Recurring Service Active
+                                </h3>
+                                <p style="margin: 0; color: #047857; font-size: 15px; line-height: 1.6;">
+                                    Your {contract.frequency} subscription is now active! You'll receive automatic invoices and service reminders.
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
                 </div>
                 """
 
             client_html = f"""
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <div style="background: linear-gradient(135deg, #00C4B4 0%, #00A89A 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-                    <h1 style="color: white; margin: 0; font-size: 28px;">✅ Payment Received</h1>
-                </div>
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <meta http-equiv="X-UA-Compatible" content="IE=edge">
+                <title>Payment Received</title>
+                <!--[if mso]>
+                <style type="text/css">
+                    body, table, td {{font-family: Arial, Helvetica, sans-serif !important;}}
+                </style>
+                <![endif]-->
+            </head>
+            <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+                <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f8fafc; padding: 20px 0;">
+                    <tr>
+                        <td align="center">
+                            <!-- Main Container -->
+                            <table cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);">
+                                
+                                <!-- Header -->
+                                <tr>
+                                    <td style="background: linear-gradient(135deg, #00C4B4 0%, #00A89A 100%); padding: 40px 30px; text-align: center;">
+                                        <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                                            <tr>
+                                                <td align="center">
+                                                    <!-- Success Icon -->
+                                                    <div style="width: 80px; height: 80px; background-color: rgba(255, 255, 255, 0.2); border-radius: 50%; display: inline-flex; align-items: center; justify-center; margin-bottom: 20px; backdrop-filter: blur(10px);">
+                                                        <span style="font-size: 40px; line-height: 1;">✅</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td align="center">
+                                                    <h1 style="margin: 0; color: #ffffff; font-size: 32px; font-weight: 700; letter-spacing: -0.5px;">
+                                                        Payment Received!
+                                                    </h1>
+                                                    <p style="margin: 12px 0 0 0; color: rgba(255, 255, 255, 0.9); font-size: 16px; font-weight: 400;">
+                                                        Thank you for your payment
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
 
-                <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
-                    <p style="font-size: 16px; color: #1e293b; margin-bottom: 20px;">
-                        Hi {client.contact_name or client.business_name},
-                    </p>
+                                <!-- Body Content -->
+                                <tr>
+                                    <td style="padding: 40px 30px;">
+                                        <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                                            <!-- Greeting -->
+                                            <tr>
+                                                <td style="padding-bottom: 24px;">
+                                                    <p style="margin: 0; font-size: 17px; color: #1e293b; line-height: 1.6;">
+                                                        Hi <strong>{client.contact_name or client.business_name}</strong>,
+                                                    </p>
+                                                </td>
+                                            </tr>
 
-                    <p style="font-size: 16px; color: #1e293b; margin-bottom: 25px;">
-                        Thank you! We've successfully received your payment for <strong>{contract.title}</strong>.
-                    </p>
+                                            <!-- Message -->
+                                            <tr>
+                                                <td style="padding-bottom: 32px;">
+                                                    <p style="margin: 0; font-size: 16px; color: #475569; line-height: 1.7;">
+                                                        We've successfully received your payment for <strong style="color: #1e293b;">{contract.title}</strong>. Your service is now confirmed!
+                                                    </p>
+                                                </td>
+                                            </tr>
 
-                    <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
-                        <h2 style="color: #00C4B4; font-size: 20px; margin-top: 0; margin-bottom: 15px;">
-                            💰 Payment Details
-                        </h2>
-                        <table style="width: 100%; border-collapse: collapse;">
-                            <tr>
-                                <td style="padding: 8px 0; color: #64748b; font-weight: 600;">Invoice Number:</td>
-                                <td style="padding: 8px 0; color: #1e293b; text-align: right; font-family: monospace;">
-                                    INV-{contract.public_id[:8].upper() if contract.public_id else contract.id}
-                                </td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 8px 0; color: #64748b; font-weight: 600;">Service:</td>
-                                <td style="padding: 8px 0; color: #1e293b; text-align: right;">{contract.title}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 8px 0; color: #64748b; font-weight: 600;">Amount Paid:</td>
-                                <td style="padding: 8px 0; color: #00C4B4; font-weight: bold; font-size: 18px; text-align: right;">
-                                    ${contract.total_value:.2f}
-                                </td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 8px 0; color: #64748b; font-weight: 600;">Payment Date:</td>
-                                <td style="padding: 8px 0; color: #1e293b; text-align: right;">
-                                    {datetime.utcnow().strftime('%B %d, %Y at %I:%M %p')}
-                                </td>
-                            </tr>
-                            {f'<tr><td style="padding: 8px 0; color: #64748b; font-weight: 600;">Service Frequency:</td><td style="padding: 8px 0; color: #1e293b; text-align: right;">{contract.frequency.title()}</td></tr>' if contract.frequency else ''}
-                        </table>
-                    </div>
+                                            <!-- Payment Details Card -->
+                                            <tr>
+                                                <td style="padding-bottom: 32px;">
+                                                    <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden;">
+                                                        <!-- Card Header -->
+                                                        <tr>
+                                                            <td style="padding: 24px 24px 20px 24px;">
+                                                                <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                                                                    <tr>
+                                                                        <td style="width: 40px; vertical-align: middle; padding-right: 12px;">
+                                                                            <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #00C4B4 0%, #00A89A 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                                                                                <span style="font-size: 20px;">💳</span>
+                                                                            </div>
+                                                                        </td>
+                                                                        <td style="vertical-align: middle;">
+                                                                            <h2 style="margin: 0; color: #0f172a; font-size: 20px; font-weight: 700;">
+                                                                                Payment Details
+                                                                            </h2>
+                                                                        </td>
+                                                                    </tr>
+                                                                </table>
+                                                            </td>
+                                                        </tr>
 
-                    {subscription_note}
+                                                        <!-- Card Content -->
+                                                        <tr>
+                                                            <td style="padding: 0 24px 24px 24px;">
+                                                                <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                                                                    <!-- Invoice Number -->
+                                                                    <tr>
+                                                                        <td style="padding: 12px 0; border-bottom: 1px solid #e2e8f0;">
+                                                                            <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                                                                                <tr>
+                                                                                    <td style="color: #64748b; font-size: 14px; font-weight: 600;">
+                                                                                        Invoice Number
+                                                                                    </td>
+                                                                                    <td align="right" style="color: #1e293b; font-size: 14px; font-weight: 600; font-family: 'Courier New', monospace;">
+                                                                                        INV-{contract.public_id[:8].upper() if contract.public_id else contract.id}
+                                                                                    </td>
+                                                                                </tr>
+                                                                            </table>
+                                                                        </td>
+                                                                    </tr>
 
-                    <div style="background: #ecfdf5; border-left: 4px solid #00C4B4; padding: 15px; margin-bottom: 25px; border-radius: 4px;">
-                        <h3 style="color: #00C4B4; font-size: 16px; margin-top: 0; margin-bottom: 10px;">
-                            ✅ What's Next?
-                        </h3>
-                        <ul style="margin: 0; padding-left: 20px; color: #1e293b;">
-                            <li style="margin-bottom: 8px;">Your service is now confirmed and scheduled</li>
-                            <li style="margin-bottom: 8px;">You'll receive a reminder before your appointment</li>
-                            <li style="margin-bottom: 8px;">A receipt has been sent to your email</li>
-                            {f'<li style="margin-bottom: 8px;">Your subscription is active for {contract.frequency} service</li>' if is_recurring else ''}
-                        </ul>
-                    </div>
+                                                                    <!-- Service -->
+                                                                    <tr>
+                                                                        <td style="padding: 12px 0; border-bottom: 1px solid #e2e8f0;">
+                                                                            <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                                                                                <tr>
+                                                                                    <td style="color: #64748b; font-size: 14px; font-weight: 600;">
+                                                                                        Service
+                                                                                    </td>
+                                                                                    <td align="right" style="color: #1e293b; font-size: 14px; font-weight: 500;">
+                                                                                        {contract.title}
+                                                                                    </td>
+                                                                                </tr>
+                                                                            </table>
+                                                                        </td>
+                                                                    </tr>
 
-                    <p style="font-size: 16px; color: #1e293b; margin-bottom: 10px;">
-                        We look forward to serving you! If you have any questions, please don't hesitate to reach out.
-                    </p>
+                                                                    <!-- Amount Paid -->
+                                                                    <tr>
+                                                                        <td style="padding: 12px 0; border-bottom: 1px solid #e2e8f0;">
+                                                                            <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                                                                                <tr>
+                                                                                    <td style="color: #64748b; font-size: 14px; font-weight: 600;">
+                                                                                        Amount Paid
+                                                                                    </td>
+                                                                                    <td align="right" style="color: #00C4B4; font-size: 22px; font-weight: 700;">
+                                                                                        ${contract.total_value:.2f}
+                                                                                    </td>
+                                                                                </tr>
+                                                                            </table>
+                                                                        </td>
+                                                                    </tr>
 
-                    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 25px 0;">
+                                                                    <!-- Payment Date -->
+                                                                    <tr>
+                                                                        <td style="padding: 12px 0; border-bottom: 1px solid #e2e8f0;">
+                                                                            <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                                                                                <tr>
+                                                                                    <td style="color: #64748b; font-size: 14px; font-weight: 600;">
+                                                                                        Payment Date
+                                                                                    </td>
+                                                                                    <td align="right" style="color: #1e293b; font-size: 14px; font-weight: 500;">
+                                                                                        {datetime.utcnow().strftime('%B %d, %Y')}
+                                                                                    </td>
+                                                                                </tr>
+                                                                            </table>
+                                                                        </td>
+                                                                    </tr>
 
-                    <p style="font-size: 16px; color: #1e293b; margin-bottom: 5px;">
-                        Best regards,<br>
-                        <strong>{business_name}</strong>
-                    </p>
-                </div>
+                                                                    {f'''
+                                                                    <!-- Service Frequency -->
+                                                                    <tr>
+                                                                        <td style="padding: 12px 0;">
+                                                                            <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                                                                                <tr>
+                                                                                    <td style="color: #64748b; font-size: 14px; font-weight: 600;">
+                                                                                        Service Frequency
+                                                                                    </td>
+                                                                                    <td align="right" style="color: #1e293b; font-size: 14px; font-weight: 500;">
+                                                                                        {contract.frequency.title()}
+                                                                                    </td>
+                                                                                </tr>
+                                                                            </table>
+                                                                        </td>
+                                                                    </tr>
+                                                                    ''' if contract.frequency else ''}
+                                                                </table>
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+                                                </td>
+                                            </tr>
 
-                <div style="text-align: center; padding: 20px; color: #64748b; font-size: 12px;">
-                    <p style="margin: 0;">
-                        This is an automated confirmation email. Please do not reply to this message.
-                    </p>
-                </div>
-            </div>
+                                            <!-- Subscription Note -->
+                                            {subscription_note if is_recurring else ''}
+
+                                            <!-- What's Next Section -->
+                                            <tr>
+                                                <td style="padding-bottom: 32px;">
+                                                    <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border-radius: 16px; padding: 24px; border: 1px solid #a7f3d0;">
+                                                        <tr>
+                                                            <td>
+                                                                <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                                                                    <tr>
+                                                                        <td style="width: 40px; vertical-align: top; padding-right: 12px;">
+                                                                            <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                                                                                <span style="font-size: 20px;">✨</span>
+                                                                            </div>
+                                                                        </td>
+                                                                        <td style="vertical-align: top;">
+                                                                            <h3 style="margin: 0 0 16px 0; color: #065f46; font-size: 18px; font-weight: 700;">
+                                                                                What's Next?
+                                                                            </h3>
+                                                                            <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                                                                                <tr>
+                                                                                    <td style="padding: 6px 0;">
+                                                                                        <table cellpadding="0" cellspacing="0" border="0">
+                                                                                            <tr>
+                                                                                                <td style="width: 20px; vertical-align: top; padding-right: 8px;">
+                                                                                                    <span style="color: #10b981; font-size: 16px;">✓</span>
+                                                                                                </td>
+                                                                                                <td style="color: #047857; font-size: 15px; line-height: 1.6;">
+                                                                                                    Your service is confirmed and scheduled
+                                                                                                </td>
+                                                                                            </tr>
+                                                                                        </table>
+                                                                                    </td>
+                                                                                </tr>
+                                                                                <tr>
+                                                                                    <td style="padding: 6px 0;">
+                                                                                        <table cellpadding="0" cellspacing="0" border="0">
+                                                                                            <tr>
+                                                                                                <td style="width: 20px; vertical-align: top; padding-right: 8px;">
+                                                                                                    <span style="color: #10b981; font-size: 16px;">✓</span>
+                                                                                                </td>
+                                                                                                <td style="color: #047857; font-size: 15px; line-height: 1.6;">
+                                                                                                    You'll receive a reminder before your appointment
+                                                                                                </td>
+                                                                                            </tr>
+                                                                                        </table>
+                                                                                    </td>
+                                                                                </tr>
+                                                                                <tr>
+                                                                                    <td style="padding: 6px 0;">
+                                                                                        <table cellpadding="0" cellspacing="0" border="0">
+                                                                                            <tr>
+                                                                                                <td style="width: 20px; vertical-align: top; padding-right: 8px;">
+                                                                                                    <span style="color: #10b981; font-size: 16px;">✓</span>
+                                                                                                </td>
+                                                                                                <td style="color: #047857; font-size: 15px; line-height: 1.6;">
+                                                                                                    A receipt has been sent to your email
+                                                                                                </td>
+                                                                                            </tr>
+                                                                                        </table>
+                                                                                    </td>
+                                                                                </tr>
+                                                                                {f'''
+                                                                                <tr>
+                                                                                    <td style="padding: 6px 0;">
+                                                                                        <table cellpadding="0" cellspacing="0" border="0">
+                                                                                            <tr>
+                                                                                                <td style="width: 20px; vertical-align: top; padding-right: 8px;">
+                                                                                                    <span style="color: #10b981; font-size: 16px;">✓</span>
+                                                                                                </td>
+                                                                                                <td style="color: #047857; font-size: 15px; line-height: 1.6;">
+                                                                                                    Your {contract.frequency} subscription is active
+                                                                                                </td>
+                                                                                            </tr>
+                                                                                        </table>
+                                                                                    </td>
+                                                                                </tr>
+                                                                                ''' if is_recurring else ''}
+                                                                            </table>
+                                                                        </td>
+                                                                    </tr>
+                                                                </table>
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+                                                </td>
+                                            </tr>
+
+                                            <!-- Closing Message -->
+                                            <tr>
+                                                <td style="padding-bottom: 24px;">
+                                                    <p style="margin: 0; font-size: 16px; color: #475569; line-height: 1.7;">
+                                                        We look forward to serving you! If you have any questions, please don't hesitate to reach out.
+                                                    </p>
+                                                </td>
+                                            </tr>
+
+                                            <!-- Signature -->
+                                            <tr>
+                                                <td style="padding-top: 24px; border-top: 1px solid #e2e8f0;">
+                                                    <p style="margin: 0 0 4px 0; font-size: 16px; color: #64748b;">
+                                                        Best regards,
+                                                    </p>
+                                                    <p style="margin: 0; font-size: 18px; color: #1e293b; font-weight: 700;">
+                                                        {business_name}
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+
+                                <!-- Footer -->
+                                <tr>
+                                    <td style="background-color: #f8fafc; padding: 24px 30px; text-align: center; border-top: 1px solid #e2e8f0;">
+                                        <p style="margin: 0; color: #94a3b8; font-size: 13px; line-height: 1.6;">
+                                            This is an automated confirmation email. Please do not reply to this message.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </body>
+            </html>
             """
 
             await send_email(
