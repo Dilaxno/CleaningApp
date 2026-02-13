@@ -2,13 +2,17 @@
 Square Integration Models
 Database models for storing Square OAuth tokens and payment data
 """
-from sqlalchemy import Column, String, DateTime, Text, Boolean
+
 from datetime import datetime
+
+from sqlalchemy import Boolean, Column, DateTime, String, Text
+
 from .database import Base
 
 
 class SquareIntegration(Base):
     """Store Square OAuth tokens and merchant information"""
+
     __tablename__ = "square_integrations"
 
     user_id = Column(String, primary_key=True, index=True)

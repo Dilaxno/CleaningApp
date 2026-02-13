@@ -14,7 +14,7 @@ In production, consider running your own Nominatim/Photon/Pelias.
 
 import logging
 import os
-from typing import List, Optional
+from typing import Optional
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -34,9 +34,9 @@ rate_limit_autocomplete = create_rate_limiter(
     use_ip=True,
 )
 
-NOMINATIM_BASE_URL = os.getenv(
-    "NOMINATIM_BASE_URL", "https://nominatim.openstreetmap.org"
-).rstrip("/")
+NOMINATIM_BASE_URL = os.getenv("NOMINATIM_BASE_URL", "https://nominatim.openstreetmap.org").rstrip(
+    "/"
+)
 
 # Required by Nominatim policy (include a way to contact you)
 NOMINATIM_USER_AGENT = os.getenv(
@@ -53,7 +53,7 @@ class AutocompleteResponseItem(BaseModel):
 
 
 class AutocompleteResponse(BaseModel):
-    results: List[AutocompleteResponseItem]
+    results: list[AutocompleteResponseItem]
 
 
 @router.get("/autocomplete", response_model=AutocompleteResponse)
@@ -107,9 +107,7 @@ async def autocomplete(
         async with httpx.AsyncClient(timeout=8.0) as client:
             resp = await client.get(url, params=params, headers=headers)
             if resp.status_code >= 400:
-                logger.warning(
-                    f"Nominatim error {resp.status_code}: {resp.text[:200]}"
-                )
+                logger.warning(f"Nominatim error {resp.status_code}: {resp.text[:200]}")
                 raise HTTPException(status_code=502, detail="Geocoding provider error")
 
             raw = resp.json()
@@ -141,4 +139,4 @@ async def autocomplete(
         raise
     except Exception as e:
         logger.error(f"Autocomplete error: {e}")
-        raise HTTPException(status_code=500, detail="Autocomplete failed")
+        raise HTTPException(status_code=500, detail="Autocomplete failed") from e

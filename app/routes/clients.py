@@ -4,7 +4,7 @@ import re
 import uuid
 from datetime import datetime
 from io import StringIO
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
@@ -13,8 +13,8 @@ from sqlalchemy.orm import Session
 
 from ..auth import get_current_user
 from ..database import get_db
-from ..models import BusinessConfig, Client, User, Contract, Schedule
-from ..rate_limiter import create_rate_limiter, get_redis_client, rate_limit_dependency
+from ..models import BusinessConfig, Client, Contract, Schedule, User
+from ..rate_limiter import create_rate_limiter
 from ..utils.sanitization import sanitize_string
 
 logger = logging.getLogger(__name__)
@@ -123,7 +123,7 @@ class ClientResponse(BaseModel):
         from_attributes = True
 
 
-@router.get("", response_model=List[ClientResponse])
+@router.get("", response_model=list[ClientResponse])
 async def get_clients(
     current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
@@ -164,16 +164,15 @@ async def export_clients_csv(
 ):
     """
     Export clients as CSV with optional filters.
-    
+
     Requires authentication via Bearer token in Authorization header.
     """
     try:
         logger.info(f"📊 CSV Export requested by user {current_user.id} ({current_user.email})")
-        
+
         # Base query - exclude pending_signature clients
         query = db.query(Client).filter(
-            Client.user_id == current_user.id, 
-            Client.status != "pending_signature"
+            Client.user_id == current_user.id, Client.status != "pending_signature"
         )
 
         # Apply status filter
@@ -247,16 +246,14 @@ async def export_clients_csv(
                     client.frequency or "",
                     client.status or "",
                     client.notes or "",
-                    client.created_at.strftime("%Y-%m-%d %H:%M:%S")
-                    if client.created_at
-                    else "",
+                    client.created_at.strftime("%Y-%m-%d %H:%M:%S") if client.created_at else "",
                 ]
             )
 
         # Prepare response
         output.seek(0)
         filename = f"clients_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-        
+
         logger.info(f"✅ CSV export successful: {filename} ({len(clients)} clients)")
 
         return StreamingResponse(
@@ -267,7 +264,7 @@ async def export_clients_csv(
                 "Cache-Control": "no-cache",
             },
         )
-        
+
     except HTTPException:
         # Re-raise HTTP exceptions (like auth errors)
         raise
@@ -275,9 +272,8 @@ async def export_clients_csv(
         logger.error(f"❌ CSV export failed for user {current_user.id}: {str(e)}")
         logger.exception(e)
         raise HTTPException(
-            status_code=500,
-            detail="Failed to export clients. Please try again."
-        )
+            status_code=500, detail="Failed to export clients. Please try again."
+        ) from e
 
 
 @router.get("/{client_id}", response_model=ClientResponse)
@@ -288,9 +284,7 @@ async def get_client(
 ):
     """Get a specific client with detailed information including form_data"""
     client = (
-        db.query(Client)
-        .filter(Client.id == client_id, Client.user_id == current_user.id)
-        .first()
+        db.query(Client).filter(Client.id == client_id, Client.user_id == current_user.id).first()
     )
 
     if not client:
@@ -328,9 +322,7 @@ async def create_client(
     can_add, error_message = can_add_client(current_user, db)
 
     if not can_add:
-        logger.warning(
-            f"⚠️ User {current_user.id} reached client limit: {error_message}"
-        )
+        logger.warning(f"⚠️ User {current_user.id} reached client limit: {error_message}")
         raise HTTPException(status_code=403, detail=error_message)
 
     client = Client(
@@ -374,9 +366,7 @@ async def update_client(
 ):
     """Update a client"""
     client = (
-        db.query(Client)
-        .filter(Client.id == client_id, Client.user_id == current_user.id)
-        .first()
+        db.query(Client).filter(Client.id == client_id, Client.user_id == current_user.id).first()
     )
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -428,9 +418,7 @@ async def delete_client(
     from ..plan_limits import decrement_client_count
 
     client = (
-        db.query(Client)
-        .filter(Client.id == client_id, Client.user_id == current_user.id)
-        .first()
+        db.query(Client).filter(Client.id == client_id, Client.user_id == current_user.id).first()
     )
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -451,7 +439,7 @@ async def delete_client(
 
 
 class BatchDeleteRequest(BaseModel):
-    clientIds: List[int]
+    clientIds: list[int]
 
 
 @router.post("/batch-delete")
@@ -509,8 +497,6 @@ async def batch_delete_clients(
     }
 
 
-
-
 class PublicClientCreate(BaseModel):
     """Schema for public form submission - uses owner's Firebase UID"""
 
@@ -546,6 +532,7 @@ class QuotePreviewRequest(BaseModel):
 
 class AddonDetail(BaseModel):
     """Schema for addon detail in quote"""
+
     name: str
     quantity: int
     unitPrice: float
@@ -563,7 +550,7 @@ class QuotePreviewResponse(BaseModel):
     firstCleaningDiscountValue: Optional[float] = None
     firstCleaningDiscountAmount: Optional[float] = 0
     addonAmount: float = 0
-    addonDetails: List[AddonDetail] = []
+    addonDetails: list[AddonDetail] = []
     finalPrice: float
     estimatedHours: float
     cleaners: int
@@ -597,22 +584,23 @@ async def get_quote_preview(
     )
     if client_ip and "," in client_ip:
         client_ip = client_ip.split(",")[0].strip()
-    
+
     # Custom domain security validation
-    if hasattr(request.state, 'is_custom_domain') and request.state.is_custom_domain:
+    if hasattr(request.state, "is_custom_domain") and request.state.is_custom_domain:
         # If this is a custom domain request, validate that the domain belongs to the requested user
-        if (not hasattr(request.state, 'custom_domain_user_uid') or 
-            request.state.custom_domain_user_uid != data.ownerUid):
+        if (
+            not hasattr(request.state, "custom_domain_user_uid")
+            or request.state.custom_domain_user_uid != data.ownerUid
+        ):
             logger.warning(
                 f"🚫 Custom domain security violation in quote preview: Domain user {getattr(request.state, 'custom_domain_user_uid', 'unknown')} "
                 f"does not match form owner {data.ownerUid} from IP {client_ip}"
             )
             raise HTTPException(
-                status_code=403,
-                detail="Access denied: Custom domain does not match form owner"
+                status_code=403, detail="Access denied: Custom domain does not match form owner"
             )
         logger.info(f"✅ Custom domain validation passed for quote preview {data.ownerUid}")
-    
+
     # Find the user by Firebase UID
     user = db.query(User).filter(User.firebase_uid == data.ownerUid).first()
     if not user:
@@ -639,35 +627,45 @@ async def get_quote_preview(
         )
 
     # Check if this IP has any signed contracts with this business (first cleaning detection)
-    existing_signed_contract = db.query(Contract).filter(
-        Contract.user_id == user.id,
-        Contract.client_signature_ip == client_ip,
-        Contract.client_signature.isnot(None)
-    ).first()
-    
+    existing_signed_contract = (
+        db.query(Contract)
+        .filter(
+            Contract.user_id == user.id,
+            Contract.client_signature_ip == client_ip,
+            Contract.client_signature.isnot(None),
+        )
+        .first()
+    )
+
     # Auto-set isFirstCleaning based on IP - if no signed contracts from this IP, it's their first cleaning
     # BUT: If frontend explicitly sent isFirstCleaning=true (for quote preview), respect that
     frontend_is_first = data.formData.get("isFirstCleaning", None)
     is_first_cleaning_by_ip = existing_signed_contract is None
-    
+
     # Use frontend value if provided, otherwise use IP-based detection
     if frontend_is_first is not None:
         is_first_cleaning = bool(frontend_is_first)
-        logger.info(f"🔍 Using frontend isFirstCleaning value: {is_first_cleaning} (IP check would be: {is_first_cleaning_by_ip})")
+        logger.info(
+            f"🔍 Using frontend isFirstCleaning value: {is_first_cleaning} (IP check would be: {is_first_cleaning_by_ip})"
+        )
     else:
         is_first_cleaning = is_first_cleaning_by_ip
-        logger.info(f"🔍 Using IP-based first cleaning check for IP {client_ip}: {is_first_cleaning} (existing signed contracts: {'none' if is_first_cleaning else 'found'})")
-    
+        logger.info(
+            f"🔍 Using IP-based first cleaning check for IP {client_ip}: {is_first_cleaning} (existing signed contracts: {'none' if is_first_cleaning else 'found'})"
+        )
+
     data.formData["isFirstCleaning"] = is_first_cleaning
 
     # Calculate quote
     quote = calculate_quote(config, data.formData)
-    
+
     # Log the discount calculation for debugging
-    logger.info(f"📊 Quote calculation - first_cleaning_discount_amount: ${quote.get('first_cleaning_discount_amount', 0):.2f}, "
-                f"first_cleaning_discount_type: {quote.get('first_cleaning_discount_type')}, "
-                f"first_cleaning_discount_value: {quote.get('first_cleaning_discount_value')}, "
-                f"isFirstCleaning: {is_first_cleaning}")
+    logger.info(
+        f"📊 Quote calculation - first_cleaning_discount_amount: ${quote.get('first_cleaning_discount_amount', 0):.2f}, "
+        f"first_cleaning_discount_type: {quote.get('first_cleaning_discount_type')}, "
+        f"first_cleaning_discount_value: {quote.get('first_cleaning_discount_value')}, "
+        f"isFirstCleaning: {is_first_cleaning}"
+    )
 
     # Convert addon details from snake_case to camelCase for API response
     addon_details_camel = [
@@ -676,7 +674,7 @@ async def get_quote_preview(
             quantity=addon["quantity"],
             unitPrice=addon["unit_price"],
             totalPrice=addon["total_price"],
-            pricingMetric=addon["pricing_metric"]
+            pricingMetric=addon["pricing_metric"],
         )
         for addon in quote.get("addon_details", [])
     ]
@@ -685,9 +683,7 @@ async def get_quote_preview(
     pricing_model = config.pricing_model or ""
     property_size = int(data.formData.get("squareFootage", 0) or 0)
     num_rooms = int(
-        data.formData.get("numberOfOffices", 0)
-        or data.formData.get("numberOfRooms", 0)
-        or 0
+        data.formData.get("numberOfOffices", 0) or data.formData.get("numberOfRooms", 0) or 0
     )
     frequency = data.formData.get("cleaningFrequency", "")
 
@@ -696,7 +692,9 @@ async def get_quote_preview(
     business_name = config.business_name or "This business"
 
     if quote.get("quote_pending"):
-        explanation = "Quote will be provided by the service provider after reviewing your requirements."
+        explanation = (
+            "Quote will be provided by the service provider after reviewing your requirements."
+        )
     else:
         # Base rate explanation - show business name and rate per metric with calculation
         if pricing_model == "sqft" and config.rate_per_sqft and property_size > 0:
@@ -724,11 +722,11 @@ async def get_quote_preview(
                     if package.get("id") == selected_package_id:
                         selected_package = package
                         break
-            
+
             if selected_package:
                 package_name = selected_package.get("name", "Selected package")
                 price_type = selected_package.get("priceType", "flat")
-                
+
                 if price_type == "flat" and selected_package.get("price"):
                     explanation_parts.append(
                         f"{package_name} package: ${selected_package['price']:,.2f}"
@@ -744,7 +742,7 @@ async def get_quote_preview(
                         explanation_parts.append(f"{package_name} package selected")
                 else:
                     explanation_parts.append(f"{package_name} package - quote required")
-                
+
                 # Add duration info if available
                 if selected_package.get("duration"):
                     duration_hours = selected_package["duration"] / 60.0
@@ -787,7 +785,7 @@ async def get_quote_preview(
             )
 
         explanation = " • ".join(explanation_parts)
-    
+
     return QuotePreviewResponse(
         basePrice=quote["base_price"],
         discountPercent=quote["discount_percent"],
@@ -823,17 +821,23 @@ async def check_email_availability(
     user = db.query(User).filter(User.firebase_uid == owner_uid).first()
     if not user:
         raise HTTPException(status_code=404, detail="Business not found")
-    
+
     # Check if email exists for this provider and template
-    existing_client = db.query(Client).filter(
-        Client.user_id == user.id,
-        Client.email == email,
-        Client.property_type == template_id
-    ).first()
-    
+    existing_client = (
+        db.query(Client)
+        .filter(
+            Client.user_id == user.id, Client.email == email, Client.property_type == template_id
+        )
+        .first()
+    )
+
     return {
         "available": existing_client is None,
-        "message": None if existing_client is None else "This email address has already been used to submit a request for this service."
+        "message": (
+            None
+            if existing_client is None
+            else "This email address has already been used to submit a request for this service."
+        ),
     }
 
 
@@ -853,12 +857,7 @@ async def submit_public_form(
     Supports custom domain validation for security.
     """
     from arq import create_pool
-    from arq.connections import RedisSettings
 
-    from ..email_service import (
-        send_form_submission_confirmation,
-        send_new_client_notification,
-    )
     from ..worker import get_redis_settings
 
     # Capture client info
@@ -869,22 +868,21 @@ async def submit_public_form(
         client_ip = client_ip.split(",")[0].strip()
     user_agent = request.headers.get("User-Agent", "unknown")
 
-    logger.info(
-        f"📥 Public form submission for owner UID: {data.ownerUid} from IP: {client_ip}"
-    )
+    logger.info(f"📥 Public form submission for owner UID: {data.ownerUid} from IP: {client_ip}")
 
     # Custom domain security validation
-    if hasattr(request.state, 'is_custom_domain') and request.state.is_custom_domain:
+    if hasattr(request.state, "is_custom_domain") and request.state.is_custom_domain:
         # If this is a custom domain request, validate that the domain belongs to the requested user
-        if (not hasattr(request.state, 'custom_domain_user_uid') or 
-            request.state.custom_domain_user_uid != data.ownerUid):
+        if (
+            not hasattr(request.state, "custom_domain_user_uid")
+            or request.state.custom_domain_user_uid != data.ownerUid
+        ):
             logger.warning(
                 f"🚫 Custom domain security violation: Domain user {getattr(request.state, 'custom_domain_user_uid', 'unknown')} "
                 f"does not match form owner {data.ownerUid} from IP {client_ip}"
             )
             raise HTTPException(
-                status_code=403,
-                detail="Access denied: Custom domain does not match form owner"
+                status_code=403, detail="Access denied: Custom domain does not match form owner"
             )
         logger.info(f"✅ Custom domain validation passed for {data.ownerUid}")
 
@@ -948,35 +946,47 @@ async def submit_public_form(
     if not user:
         logger.error(f"❌ User not found for Firebase UID: {data.ownerUid}")
         raise HTTPException(status_code=404, detail="Business not found")
-    
+
     # Check if email already exists for this provider and template
     if data.email:
-        existing_client = db.query(Client).filter(
-            Client.user_id == user.id,
-            Client.email == data.email,
-            Client.property_type == data.templateId
-        ).first()
-        
+        existing_client = (
+            db.query(Client)
+            .filter(
+                Client.user_id == user.id,
+                Client.email == data.email,
+                Client.property_type == data.templateId,
+            )
+            .first()
+        )
+
         if existing_client:
-            logger.warning(f"❌ Duplicate email submission blocked: {data.email} for provider {user.id}, template {data.templateId}")
+            logger.warning(
+                f"❌ Duplicate email submission blocked: {data.email} for provider {user.id}, template {data.templateId}"
+            )
             raise HTTPException(
                 status_code=409,
-                detail="This email address has already been used to submit a request for this service. If you need to make changes or submit a new request, please contact the service provider directly."
+                detail="This email address has already been used to submit a request for this service. If you need to make changes or submit a new request, please contact the service provider directly.",
             )
 
     # Check if this IP has any signed contracts with this business (first cleaning detection)
-    existing_signed_contract = db.query(Contract).filter(
-        Contract.user_id == user.id,
-        Contract.client_signature_ip == client_ip,
-        Contract.client_signature.isnot(None)
-    ).first()
-    
+    existing_signed_contract = (
+        db.query(Contract)
+        .filter(
+            Contract.user_id == user.id,
+            Contract.client_signature_ip == client_ip,
+            Contract.client_signature.isnot(None),
+        )
+        .first()
+    )
+
     # Auto-set isFirstCleaning based on IP - if no signed contracts from this IP, it's their first cleaning
     is_first_cleaning = existing_signed_contract is None
     if data.formData:
         data.formData["isFirstCleaning"] = is_first_cleaning
-    
-    logger.info(f"🔍 First cleaning check for IP {client_ip}: {is_first_cleaning} (existing signed contracts: {'none' if is_first_cleaning else 'found'})")
+
+    logger.info(
+        f"🔍 First cleaning check for IP {client_ip}: {is_first_cleaning} (existing signed contracts: {'none' if is_first_cleaning else 'found'})"
+    )
 
     # Extract frequency from formData if not provided directly
     frequency = data.frequency
@@ -988,10 +998,7 @@ async def submit_public_form(
         property_type_lower = data.propertyType.lower()
         if "move" in property_type_lower:
             frequency = "One-time"
-        elif (
-            "construction" in property_type_lower
-            or "post-construction" in property_type_lower
-        ):
+        elif "construction" in property_type_lower or "post-construction" in property_type_lower:
             frequency = "One-time"
         elif "event" in property_type_lower:
             frequency = "One-time"
@@ -1015,10 +1022,12 @@ async def submit_public_form(
     db.add(client)
     db.commit()
     db.refresh(client)
-    
+
     # If createOnly flag is set, skip contract generation and return client data immediately
     if data.createOnly:
-        logger.info(f"✅ Client created (ID: {client.id}) - skipping contract generation (createOnly=True)")
+        logger.info(
+            f"✅ Client created (ID: {client.id}) - skipping contract generation (createOnly=True)"
+        )
         return PublicSubmitResponse(
             client=ClientResponse(
                 id=client.id,
@@ -1038,17 +1047,13 @@ async def submit_public_form(
             jobId=None,
             message="Client created successfully - ready for scheduling",
         )
-    
+
     # Queue contract PDF generation as background job (async to prevent timeout)
     job_id = None
     if data.formData:
         try:
             # Get business config to check if it exists
-            config = (
-                db.query(BusinessConfig)
-                .filter(BusinessConfig.user_id == user.id)
-                .first()
-            )
+            config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
 
             if config:
                 # Enqueue contract generation job
@@ -1125,6 +1130,7 @@ class SignContractRequest(BaseModel):
 
 class GenerateContractRequest(BaseModel):
     """Schema for generating contract for existing client"""
+
     formData: dict
 
 
@@ -1146,6 +1152,7 @@ async def generate_contract_for_client(
     No authentication required - accessed via public form flow.
     """
     from arq import create_pool
+
     from ..worker import get_redis_settings
 
     logger.info(f"📋 Generating contract for client ID: {client_id}")
@@ -1154,7 +1161,7 @@ async def generate_contract_for_client(
     client = db.query(Client).filter(Client.id == client_id).first()
     if not client:
         logger.error(f"❌ Client not found: {client_id}")
-        raise HTTPException(status_code=404, detail="Client not found")
+        raise HTTPException(status_code=404, detail="Client not found") from queue_err
 
     # Get the user/business owner
     user = db.query(User).filter(User.id == client.user_id).first()
@@ -1198,10 +1205,7 @@ async def generate_contract_for_client(
 
     except Exception as e:
         logger.error(f"❌ Failed to queue contract generation for client {client_id}: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to start contract generation"
-        )
+        raise HTTPException(status_code=500, detail="Failed to start contract generation") from e
 
 
 @router.post("/public/sign-contract")
@@ -1220,7 +1224,10 @@ async def sign_contract(
     import hashlib
     from datetime import datetime
 
-    from ..email_service import send_contract_signed_notification, send_client_signature_confirmation
+    from ..email_service import (
+        send_client_signature_confirmation,
+        send_contract_signed_notification,
+    )
     from ..models import Contract
     from .contracts_pdf import generate_contract_html, html_to_pdf
     from .upload import R2_BUCKET_NAME, generate_presigned_url, get_r2_client
@@ -1264,12 +1271,14 @@ async def sign_contract(
             .order_by(Contract.created_at.desc())
             .first()
         )
-    
+
     # If no contract exists, create one from pending contract data
     if not contract:
         if not client.pending_contract_title:
-            raise HTTPException(status_code=404, detail="No contract or pending contract data found")
-        
+            raise HTTPException(
+                status_code=404, detail="No contract or pending contract data found"
+            )
+
         # Create contract from pending data
         contract = Contract(
             user_id=client.user_id,
@@ -1283,11 +1292,13 @@ async def sign_contract(
             payment_terms=client.pending_contract_payment_terms,
             terms_conditions=client.pending_contract_terms_conditions,
             status="new",
-            custom_quote_request_id=data.customQuoteRequestId if hasattr(data, 'customQuoteRequestId') else None
+            custom_quote_request_id=(
+                data.customQuoteRequestId if hasattr(data, "customQuoteRequestId") else None
+            ),
         )
         db.add(contract)
         db.flush()  # Get the ID without committing
-        
+
         # Clear pending contract data
         client.pending_contract_title = None
         client.pending_contract_description = None
@@ -1316,13 +1327,14 @@ async def sign_contract(
     # DO NOT update client status here - client should only appear in provider's list
     # after BOTH parties sign the contract (when provider signs)
     # Client status will be updated to "new_lead" when provider signs in contracts.py
-    
+
     # Increment client count when client signs (commits to the service)
     # This counts the client for plan limits and statistics
     from ..plan_limits import increment_client_count
+
     increment_client_count(user, db)
     logger.info(f"✅ Client count incremented for user {user.id} after client signature")
-    
+
     # Upload client signature to R2 for PDF rendering
     client_signature_url = None
     if data.signature and data.signature.startswith("data:image"):
@@ -1353,9 +1365,7 @@ async def sign_contract(
 
     # Regenerate PDF with client signature
     try:
-        config = (
-            db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
-        )
+        config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
 
         if config and client.form_data:
             form_data = client.form_data
@@ -1367,9 +1377,7 @@ async def sign_contract(
 
             # Get provider signature URL if exists
             provider_signature_url = None
-            if contract.provider_signature and contract.provider_signature.startswith(
-                "data:image"
-            ):
+            if contract.provider_signature and contract.provider_signature.startswith("data:image"):
                 # Provider signature is base64, need to upload it too if not already done
                 provider_signature_url = contract.provider_signature
 
@@ -1380,11 +1388,10 @@ async def sign_contract(
                 form_data,
                 quote,
                 db,
-                client_signature=client_signature_url
-                or data.signature,  # Use URL if available
+                client_signature=client_signature_url or data.signature,  # Use URL if available
                 provider_signature=provider_signature_url,
                 contract_created_at=contract.created_at,
-                contract_public_id=contract.public_id
+                contract_public_id=contract.public_id,
             )
 
             # Verify signature URL is in HTML
@@ -1415,9 +1422,7 @@ async def sign_contract(
 
                 contract.pdf_key = pdf_key
                 contract.pdf_hash = pdf_hash
-                logger.info(
-                    f"📝 Updated contract.pdf_key from {old_pdf_key} to {pdf_key}"
-                )
+                logger.info(f"📝 Updated contract.pdf_key from {old_pdf_key} to {pdf_key}")
             except Exception as upload_err:
                 logger.warning(f"⚠️ Failed to upload signed PDF: {upload_err}")
 
@@ -1434,9 +1439,9 @@ async def sign_contract(
 
             # Determine the backend base URL based on the frontend URL
             if "localhost" in FRONTEND_URL:
-                backend_base = FRONTEND_URL.replace(
-                    "localhost:5173", "localhost:8000"
-                ).replace("localhost:5174", "localhost:8000")
+                backend_base = FRONTEND_URL.replace("localhost:5173", "localhost:8000").replace(
+                    "localhost:5174", "localhost:8000"
+                )
             else:
                 backend_base = "https://api.cleanenroll.com"
 
@@ -1446,9 +1451,7 @@ async def sign_contract(
 
     # Send notification to business owner
     try:
-        config = (
-            db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
-        )
+        config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
         business_name = config.business_name if config else "Your Business"
 
         # Check notification preference before sending
@@ -1461,17 +1464,15 @@ async def sign_contract(
             )
             logger.info(f"✅ Contract signed notification sent to {user.email}")
         elif user.email and not user.notify_contract_signed:
-            logger.info(f"ℹ️ Contract signed notification skipped - user preference disabled")
+            logger.info("ℹ️ Contract signed notification skipped - user preference disabled")
     except Exception as email_err:
         logger.warning(f"⚠️ Failed to send contract signed notification: {email_err}")
 
     # Send confirmation to client
     try:
-        config = (
-            db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
-        )
+        config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
         business_name = config.business_name if config else "Your Business"
-        
+
         if client.email:
             await send_client_signature_confirmation(
                 to=client.email,
@@ -1514,14 +1515,10 @@ async def handle_schedule_decision(
         # Get client
         client = db.query(Client).filter(Client.id == client_id).first()
         if not client:
-            raise HTTPException(status_code=404, detail="Client not found")
+            raise HTTPException(status_code=404, detail="Client not found") from sig_err
 
         # Get business config for business name
-        config = (
-            db.query(BusinessConfig)
-            .filter(BusinessConfig.user_id == client.user_id)
-            .first()
-        )
+        config = db.query(BusinessConfig).filter(BusinessConfig.user_id == client.user_id).first()
         business_name = config.business_name if config else "Your Service Provider"
 
         if data.action == "confirm":
@@ -1593,9 +1590,7 @@ async def handle_schedule_decision(
         elif data.action == "request_change":
             # Provider requested a different time
             if not data.proposed_start_time or not data.proposed_end_time:
-                raise HTTPException(
-                    status_code=400, detail="Proposed times are required"
-                )
+                raise HTTPException(status_code=400, detail="Proposed times are required")
 
             # Update scheduling status
             client.scheduling_status = "provider_requested_change"
@@ -1618,12 +1613,8 @@ async def handle_schedule_decision(
                 original_start = None
                 original_end = None
 
-            proposed_start = datetime.fromisoformat(
-                data.proposed_start_time.replace("Z", "+00:00")
-            )
-            proposed_end = datetime.fromisoformat(
-                data.proposed_end_time.replace("Z", "+00:00")
-            )
+            proposed_start = datetime.fromisoformat(data.proposed_start_time.replace("Z", "+00:00"))
+            proposed_end = datetime.fromisoformat(data.proposed_end_time.replace("Z", "+00:00"))
 
             # Send notification to client with provider's proposed time
             if client.email:
@@ -1696,7 +1687,7 @@ async def handle_schedule_decision(
         raise
     except Exception as e:
         logger.error(f"❌ Error handling schedule decision: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 class ClientScheduleSubmission(BaseModel):
@@ -1729,11 +1720,7 @@ async def submit_client_schedule(
             raise HTTPException(status_code=404, detail="Provider not found")
 
         # Get business config for business name
-        config = (
-            db.query(BusinessConfig)
-            .filter(BusinessConfig.user_id == client.user_id)
-            .first()
-        )
+        config = db.query(BusinessConfig).filter(BusinessConfig.user_id == client.user_id).first()
         business_name = config.business_name if config else "Your Business"
 
         # Parse and store the scheduled time
@@ -1741,28 +1728,35 @@ async def submit_client_schedule(
             # Combine date and time into ISO format datetime strings
             scheduled_start = f"{data.scheduledDate}T{data.scheduledTime}:00"
             scheduled_end = f"{data.scheduledDate}T{data.endTime}:00"
-            
+
             # Parse datetime for duplicate check
             scheduled_datetime = datetime.fromisoformat(scheduled_start)
-            
+
             # Check if schedule already exists to prevent duplicates
             # Use FOR UPDATE to lock the row and prevent race conditions
-            existing_schedule = db.query(Schedule).filter(
-                Schedule.client_id == client.id,
-                Schedule.scheduled_date == scheduled_datetime.date(),
-                Schedule.start_time == data.scheduledTime,
-                Schedule.status == "scheduled"
-            ).with_for_update().first()
-            
+            existing_schedule = (
+                db.query(Schedule)
+                .filter(
+                    Schedule.client_id == client.id,
+                    Schedule.scheduled_date == scheduled_datetime.date(),
+                    Schedule.start_time == data.scheduledTime,
+                    Schedule.status == "scheduled",
+                )
+                .with_for_update()
+                .first()
+            )
+
             if existing_schedule:
-                logger.warning(f"⚠️ Schedule already exists for client {client_id} on {scheduled_datetime.date()} at {data.scheduledTime} - returning existing schedule")
+                logger.warning(
+                    f"⚠️ Schedule already exists for client {client_id} on {scheduled_datetime.date()} at {data.scheduledTime} - returning existing schedule"
+                )
                 # Update client with scheduled time (in case it wasn't set)
                 client.scheduled_start_time = scheduled_start
                 client.scheduled_end_time = scheduled_end
                 client.scheduling_status = "pending_provider_confirmation"
                 db.commit()
                 db.refresh(existing_schedule)
-                
+
                 # Use existing schedule for the rest of the function
                 new_schedule = existing_schedule
                 send_notification = False  # Don't send duplicate notification
@@ -1771,19 +1765,21 @@ async def submit_client_schedule(
                 client.scheduled_start_time = scheduled_start
                 client.scheduled_end_time = scheduled_end
                 client.scheduling_status = "pending_provider_confirmation"
-                
+
                 # Extract address from form_data if available
                 address = None
                 if client.form_data and isinstance(client.form_data, dict):
-                    address = client.form_data.get('address') or client.form_data.get('serviceAddress')
-                
+                    address = client.form_data.get("address") or client.form_data.get(
+                        "serviceAddress"
+                    )
+
                 # Create a Schedule record with pending approval status
                 # This ensures the provider sees it in their schedule view and gets a notification badge
                 new_schedule = Schedule(
                     user_id=client.user_id,
                     client_id=client.id,
                     title=f"Cleaning for {client.contact_name or client.business_name}",
-                    description=f"Client-requested cleaning appointment",
+                    description="Client-requested cleaning appointment",
                     service_type=client.property_type or "standard",
                     scheduled_date=scheduled_datetime,
                     start_time=data.scheduledTime,
@@ -1796,20 +1792,24 @@ async def submit_client_schedule(
                     is_recurring=False,
                     calendly_booking_method="client_selected",
                 )
-                
+
                 db.add(new_schedule)
                 db.commit()
                 db.refresh(client)
                 db.refresh(new_schedule)
-                
-                logger.info(f"✅ Client {client_id} submitted schedule: {scheduled_start} - {scheduled_end}")
-                logger.info(f"✅ Created new Schedule record {new_schedule.id} with approval_status='pending'")
+
+                logger.info(
+                    f"✅ Client {client_id} submitted schedule: {scheduled_start} - {scheduled_end}"
+                )
+                logger.info(
+                    f"✅ Created new Schedule record {new_schedule.id} with approval_status='pending'"
+                )
                 send_notification = True  # Send notification for new schedule
-            
+
         except Exception as parse_err:
             logger.error(f"❌ Failed to parse schedule times or create schedule: {parse_err}")
             db.rollback()
-            raise HTTPException(status_code=400, detail="Invalid date/time format")
+            raise HTTPException(status_code=400, detail="Invalid date/time format") from parse_err
 
         # Send notification email to provider (only for new schedules)
         try:
@@ -1817,11 +1817,11 @@ async def submit_client_schedule(
                 # Parse times for email display
                 start_dt = datetime.fromisoformat(scheduled_start)
                 end_dt = datetime.fromisoformat(scheduled_end)
-                
+
                 provider_content = f"""
                 <p>Hi {provider.full_name or business_name},</p>
                 <p><strong>{client.contact_name or client.business_name}</strong> has selected their preferred cleaning time!</p>
-                
+
                 <div style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-radius: 16px; padding: 24px; margin: 24px 0; border-left: 4px solid #0ea5e9;">
                   <p style="color: #0c4a6e; font-weight: 600; margin-bottom: 16px; font-size: 16px;">📅 Requested Cleaning Schedule</p>
                   <div style="background: white; border-radius: 12px; padding: 16px; margin-bottom: 12px;">
@@ -1836,27 +1836,27 @@ async def submit_client_schedule(
                     </p>
                   </div>
                 </div>
-                
+
                 <div style="background: #fef3c7; border-radius: 12px; padding: 16px; margin: 20px 0; border-left: 4px solid #f59e0b;">
                   <p style="color: #92400e; font-size: 14px; margin: 0;">
                     ⏰ <strong>Action Required:</strong> Please review and confirm this schedule in your dashboard, or propose an alternative time if needed.
                   </p>
                 </div>
-                
+
                 <p style="margin-top: 24px;">
-                  <a href="{config.custom_forms_domain or 'https://cleanenroll.com'}/schedule" 
+                  <a href="{config.custom_forms_domain or 'https://cleanenroll.com'}/schedule"
                      style="display: inline-block; background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); color: white; padding: 14px 28px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 15px;">
                     Review Schedule →
                   </a>
                 </p>
-                
+
                 <p style="color: #64748b; font-size: 13px; margin-top: 20px;">
                   Client: {client.contact_name or client.business_name}<br>
                   {f"Email: {client.email}" if client.email else ""}<br>
                   {f"Phone: {client.phone}" if client.phone else ""}
                 </p>
                 """
-                
+
                 await send_email(
                     to=provider.email,
                     subject=f"New Schedule Request from {client.contact_name or client.business_name}",
@@ -1864,9 +1864,9 @@ async def submit_client_schedule(
                     content_html=provider_content,
                     is_user_email=True,
                 )
-                
+
                 logger.info(f"✅ Schedule notification sent to provider {provider.email}")
-                
+
         except Exception as email_err:
             logger.warning(f"⚠️ Failed to send schedule notification email: {email_err}")
             # Don't fail the request if email fails
@@ -1884,4 +1884,4 @@ async def submit_client_schedule(
     except Exception as e:
         logger.error(f"❌ Error submitting client schedule: {str(e)}")
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from email_err

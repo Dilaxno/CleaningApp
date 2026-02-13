@@ -7,7 +7,7 @@ Provides secure API key handling and caching for better performance.
 
 import logging
 import os
-from typing import List, Optional
+from typing import Optional
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -44,7 +44,7 @@ class SmartyAddressSuggestion(BaseModel):
 
 
 class SmartyAutocompleteResponse(BaseModel):
-    suggestions: List[SmartyAddressSuggestion]
+    suggestions: list[SmartyAddressSuggestion]
 
 
 @router.get("/smarty-test")
@@ -53,10 +53,10 @@ async def smarty_test():
     Test endpoint to verify Smarty API configuration.
     Returns the configuration status without exposing sensitive data.
     """
-    
+
     has_auth_id = bool(SMARTY_AUTH_ID)
     has_auth_token = bool(SMARTY_AUTH_TOKEN)
-    
+
     return {
         "smarty_configured": has_auth_id and has_auth_token,
         "auth_id_present": has_auth_id,
@@ -75,23 +75,20 @@ async def smarty_autocomplete(
 ):
     """
     Smarty address autocomplete endpoint.
-    
+
     Args:
         search: The address search query
         max_results: Maximum number of results to return (1-10)
-    
+
     Returns:
         SmartyAutocompleteResponse with address suggestions
     """
-    
+
     # Validate API credentials
     if not SMARTY_AUTH_ID or not SMARTY_AUTH_TOKEN:
         logger.error("Smarty API credentials not configured")
-        raise HTTPException(
-            status_code=500, 
-            detail="Address autocomplete service not configured"
-        )
-    
+        raise HTTPException(status_code=500, detail="Address autocomplete service not configured")
+
     search = (search or "").strip()
     if len(search) < 3:
         return SmartyAutocompleteResponse(suggestions=[])
@@ -107,6 +104,7 @@ async def smarty_autocomplete(
         cached = redis.get(cache_key)
         if cached:
             import json
+
             data = json.loads(cached)
             return SmartyAutocompleteResponse(
                 suggestions=[SmartyAddressSuggestion(**x) for x in data]
@@ -136,29 +134,24 @@ async def smarty_autocomplete(
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(url, params=params, headers=headers)
-            
+
             if resp.status_code == 401:
                 logger.error("Smarty API authentication failed")
                 raise HTTPException(
-                    status_code=500, 
-                    detail="Address service authentication failed"
-                )
+                    status_code=500, detail="Address service authentication failed"
+                ) from e
             elif resp.status_code == 402:
                 logger.error("Smarty API payment required")
-                raise HTTPException(
-                    status_code=500, 
-                    detail="Address service quota exceeded"
-                )
+                raise HTTPException(status_code=500, detail="Address service quota exceeded")
             elif resp.status_code >= 400:
                 logger.warning(f"Smarty API error {resp.status_code}: {resp.text[:200]}")
                 raise HTTPException(
-                    status_code=502, 
-                    detail="Address service temporarily unavailable"
+                    status_code=502, detail="Address service temporarily unavailable"
                 )
 
             raw_data = resp.json()
             suggestions = []
-            
+
             # Parse Smarty response format
             for item in raw_data.get("suggestions", []):
                 suggestion = SmartyAddressSuggestion(
@@ -174,6 +167,7 @@ async def smarty_autocomplete(
         # Cache successful results
         try:
             import json
+
             redis = get_redis_client()
             cache_data = [s.dict() for s in suggestions]
             redis.setex(cache_key, CACHE_SECONDS, json.dumps(cache_data))
@@ -186,7 +180,4 @@ async def smarty_autocomplete(
         raise
     except Exception as e:
         logger.error(f"Smarty autocomplete error: {e}")
-        raise HTTPException(
-            status_code=500, 
-            detail="Address autocomplete service error"
-        )
+        raise HTTPException(status_code=500, detail="Address autocomplete service error") from e

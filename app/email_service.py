@@ -2,21 +2,24 @@
 Unified Email Service using Resend (fallback) or Custom SMTP
 Provides a consistent email template for all automated emails
 """
-import resend
+
+import io
+import logging
 import smtplib
 import ssl
-import logging
 import zipfile
-import io
-import aiohttp
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.mime.base import MIMEBase
+from datetime import date, datetime
 from email import encoders
-from datetime import datetime, date
-from typing import Optional, Union, List
+from email.mime.base import MIMEBase
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from typing import Optional, Union
+
+import aiohttp
+import resend
 from jinja2 import Template
-from .config import RESEND_API_KEY, EMAIL_FROM_ADDRESS, SMTP_ENCRYPTION_KEY, FRONTEND_URL
+
+from .config import EMAIL_FROM_ADDRESS, FRONTEND_URL, RESEND_API_KEY, SMTP_ENCRYPTION_KEY
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +29,7 @@ resend.api_key = RESEND_API_KEY
 # Initialize encryption for SMTP passwords
 try:
     from cryptography.fernet import Fernet
+
     fernet = Fernet(SMTP_ENCRYPTION_KEY) if SMTP_ENCRYPTION_KEY else None
 except Exception:
     fernet = None
@@ -48,37 +52,39 @@ def get_sender_email(business_config=None, business_name: str = "CleanEnroll") -
     1. Verified subdomain email (e.g., bookings@mail.preclean.com)
     2. Custom SMTP email if configured and live
     3. CleanEnroll default address
-    
+
     Args:
         business_config: BusinessConfig object with smtp and subdomain settings
         business_name: Business name for the sender display name
-    
+
     Returns:
         Formatted sender email string
     """
     # Check if verified subdomain is available
-    if (business_config and 
-        business_config.subdomain_verification_status == "verified" and 
-        business_config.email_subdomain):
+    if (
+        business_config
+        and business_config.subdomain_verification_status == "verified"
+        and business_config.email_subdomain
+    ):
         # Use subdomain for email address (e.g., bookings@mail.preclean.com)
         subdomain_email = f"bookings@{business_config.email_subdomain}"
         return f"{business_name} <{subdomain_email}>"
-    
+
     # Check if custom SMTP is configured and live
     if business_config and business_config.smtp_status == "live" and business_config.smtp_email:
         return f"{business_name} <{business_config.smtp_email}>"
-    
+
     # Fallback to default CleanEnroll address
     return EMAIL_FROM_ADDRESS
 
 
 def send_via_custom_smtp(
     business_config,
-    to: Union[str, List[str]],
+    to: Union[str, list[str]],
     subject: str,
     html_content: str,
     from_address: str,
-    attachments: Optional[List[dict]] = None
+    attachments: Optional[list[dict]] = None,
 ) -> dict:
     """
     Send email via user's custom SMTP server.
@@ -90,30 +96,29 @@ def send_via_custom_smtp(
         username = business_config.smtp_username
         password = decrypt_password(business_config.smtp_password)
         use_tls = business_config.smtp_use_tls if business_config.smtp_use_tls is not None else True
-        
+
         # Create message
         msg = MIMEMultipart("mixed")
         msg["Subject"] = subject
         msg["From"] = from_address
         msg["To"] = to if isinstance(to, str) else ", ".join(to)
-        
+
         # Add HTML content
         msg.attach(MIMEText(html_content, "html"))
-        
+
         # Add attachments if provided
         if attachments:
             for attachment in attachments:
-                part = MIMEBase('application', 'octet-stream')
-                part.set_payload(attachment['content'])
+                part = MIMEBase("application", "octet-stream")
+                part.set_payload(attachment["content"])
                 encoders.encode_base64(part)
                 part.add_header(
-                    'Content-Disposition',
-                    f'attachment; filename= {attachment["filename"]}'
+                    "Content-Disposition", f'attachment; filename= {attachment["filename"]}'
                 )
                 msg.attach(part)
-        
+
         recipients = [to] if isinstance(to, str) else to
-        
+
         # Connect and send
         if port == 465:
             context = ssl.create_default_context()
@@ -123,73 +128,79 @@ def send_via_custom_smtp(
             if use_tls:
                 context = ssl.create_default_context()
                 server.starttls(context=context)
-        
+
         server.login(username, password)
         server.sendmail(from_address.split("<")[-1].rstrip(">"), recipients, msg.as_string())
         server.quit()
-        
+
         logger.info(f"✅ Custom SMTP email sent successfully via {business_config.smtp_host}")
         return {"id": f"smtp-{datetime.utcnow().timestamp()}", "success": True}
-        
+
     except Exception as e:
         logger.error(f"❌ Custom SMTP send failed: {e}")
         raise Exception(f"Custom SMTP failed: {str(e)}")
 
 
-async def create_property_shots_zip(property_shots_keys: List[str], client_name: str) -> Optional[bytes]:
+async def create_property_shots_zip(
+    property_shots_keys: list[str], client_name: str
+) -> Optional[bytes]:
     """
     Create a zip file containing property shots from R2 storage.
-    
+
     Args:
         property_shots_keys: List of R2 object keys for property shots
         client_name: Client name for file naming
-        
+
     Returns:
         Zip file bytes or None if no images or error
     """
     if not property_shots_keys:
         return None
-        
+
     try:
         from .routes.upload import generate_presigned_url
-        
+
         zip_buffer = io.BytesIO()
-        
-        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
             for i, key in enumerate(property_shots_keys[:12]):  # Limit to 12 images
                 try:
                     # Generate presigned URL
                     presigned_url = generate_presigned_url(key, expiration=3600)
-                    
+
                     # Download image
                     async with aiohttp.ClientSession() as session:
                         async with session.get(presigned_url) as response:
                             if response.status == 200:
                                 image_data = await response.read()
-                                
+
                                 # Extract file extension from key
-                                file_ext = key.split('.')[-1] if '.' in key else 'jpg'
+                                file_ext = key.split(".")[-1] if "." in key else "jpg"
                                 filename = f"property_shot_{i+1:02d}.{file_ext}"
-                                
+
                                 # Add to zip
                                 zip_file.writestr(filename, image_data)
                             else:
-                                logger.warning(f"Failed to download property shot {key}: HTTP {response.status}")
-                                
+                                logger.warning(
+                                    f"Failed to download property shot {key}: HTTP {response.status}"
+                                )
+
                 except Exception as e:
                     logger.warning(f"Failed to process property shot {key}: {e}")
                     continue
-        
+
         zip_buffer.seek(0)
         zip_data = zip_buffer.getvalue()
-        
+
         if len(zip_data) > 0:
-            logger.info(f"Created property shots zip with {len(property_shots_keys)} images for {client_name}")
+            logger.info(
+                f"Created property shots zip with {len(property_shots_keys)} images for {client_name}"
+            )
             return zip_data
         else:
             logger.warning("Property shots zip is empty")
             return None
-            
+
     except Exception as e:
         logger.error(f"Failed to create property shots zip: {e}")
         return None
@@ -197,16 +208,16 @@ async def create_property_shots_zip(property_shots_keys: List[str], client_name:
 
 # App theme colors
 THEME = {
-    "primary": "#00C4B4",      # Teal - primary brand color
-    "primary_dark": "#00A89A", # Darker teal for hover
-    "background": "#f8f9fb",   # Light gray background
-    "card_bg": "#ffffff",      # White card background
-    "text_primary": "#1E293B", # Dark text
-    "text_muted": "#64748B",   # Muted gray text
-    "border": "#e2e8f0",       # Light border
-    "success": "#22c55e",      # Green
-    "warning": "#f59e0b",      # Amber
-    "danger": "#ef4444",       # Red
+    "primary": "#00C4B4",  # Teal - primary brand color
+    "primary_dark": "#00A89A",  # Darker teal for hover
+    "background": "#f8f9fb",  # Light gray background
+    "card_bg": "#ffffff",  # White card background
+    "text_primary": "#1E293B",  # Dark text
+    "text_muted": "#64748B",  # Muted gray text
+    "border": "#e2e8f0",  # Light border
+    "success": "#22c55e",  # Green
+    "warning": "#f59e0b",  # Amber
+    "danger": "#ef4444",  # Red
 }
 
 LOGO_URL = "https://cleanenroll.com/CleaningAPP%20logo%20black%20new.png"
@@ -229,14 +240,18 @@ ICONS = {
     "image": """<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><path d="M21 15l-5-5L5 21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>""",
 }
 
+
 def icon(name: str, color: str = "currentColor", size: int = 20) -> str:
     """Get an SVG icon with specified color and size"""
     svg = ICONS.get(name, ICONS["info"])
     # Replace currentColor with actual color and adjust size
     svg = svg.replace('width="24"', f'width="{size}"')
     svg = svg.replace('height="24"', f'height="{size}"')
-    svg = svg.replace('currentColor', color)
-    return f'<span style="display: inline-block; vertical-align: middle; line-height: 0;">{svg}</span>'
+    svg = svg.replace("currentColor", color)
+    return (
+        f'<span style="display: inline-block; vertical-align: middle; line-height: 0;">{svg}</span>'
+    )
+
 
 # Base HTML email template - Modern Akkio-style with clean top bar
 BASE_TEMPLATE = """
@@ -251,7 +266,7 @@ BASE_TEMPLATE = """
     <title>{{ subject }}</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <style>
-      body, table, td, a, h1, h2, h3, p, strong, em, span, div { 
+      body, table, td, a, h1, h2, h3, p, strong, em, span, div {
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
@@ -277,8 +292,8 @@ BASE_TEMPLATE = """
         mso-table-lspace: 0pt;
         mso-table-rspace: 0pt;
       }
-      .container { 
-        max-width: 600px; 
+      .container {
+        max-width: 600px;
         margin: 0 auto;
         width: 100%;
       }
@@ -287,10 +302,10 @@ BASE_TEMPLATE = """
         background: {{ theme.primary }};
         width: 100%;
       }
-      .card { 
-        background: {{ theme.card_bg }}; 
-        border-radius: 8px; 
-        padding: 40px; 
+      .card {
+        background: {{ theme.card_bg }};
+        border-radius: 8px;
+        padding: 40px;
         border: 1px solid {{ theme.border }};
         margin-top: 32px;
       }
@@ -307,30 +322,30 @@ BASE_TEMPLATE = """
         line-height: 1.5;
         text-align: center;
       }
-      .btn:hover { 
+      .btn:hover {
         background: {{ theme.primary_dark }};
         opacity: 0.9;
       }
-      
+
       /* Mobile Responsive Styles */
       @media only screen and (max-width: 600px) {
-        .container { 
+        .container {
           padding: 0 16px !important;
           width: 100% !important;
         }
-        .card { 
+        .card {
           padding: 28px 20px !important;
           border-radius: 6px !important;
           margin-top: 24px !important;
         }
-        .btn { 
+        .btn {
           display: block !important;
           width: 100% !important;
           padding: 14px 24px !important;
           font-size: 15px !important;
           box-sizing: border-box;
         }
-        img.logo { 
+        img.logo {
           max-width: 160px !important;
           height: auto !important;
         }
@@ -347,7 +362,7 @@ BASE_TEMPLATE = """
           line-height: 1.6 !important;
         }
       }
-      
+
       /* Dark Mode Support */
       @media (prefers-color-scheme: dark) {
         .card {
@@ -363,12 +378,12 @@ BASE_TEMPLATE = """
   <body style="margin:0; padding:0; background:{{ theme.background }}; color:{{ theme.text_primary }};">
     <!-- Top Colored Bar -->
     <div class="top-bar"></div>
-    
+
     <div class="container" style="padding: 32px 20px;">
       <!-- Logo -->
       <div style="text-align:center; margin-bottom:8px;">
         <a href="https://cleanenroll.com" target="_blank" style="text-decoration:none;">
-          <img class="logo" src="{{ logo_url }}" width="180" alt="CleanEnroll" 
+          <img class="logo" src="{{ logo_url }}" width="180" alt="CleanEnroll"
                style="display:block; height:auto; border:0; margin:0 auto;" />
         </a>
       </div>
@@ -393,8 +408,8 @@ BASE_TEMPLATE = """
         <!--[if mso]>
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 0 0;">
           <tr><td>
-            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="{{ cta_url }}" 
-                         style="height:44px; v-text-anchor:middle; width:180px;" arcsize="15%" 
+            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="{{ cta_url }}"
+                         style="height:44px; v-text-anchor:middle; width:180px;" arcsize="15%"
                          stroke="f" fillcolor="{{ theme.primary }}">
               <center style="color:#ffffff; font-family:Arial,sans-serif; font-size:15px; font-weight:600;">
                 {{ cta_label }}
@@ -459,7 +474,7 @@ def render_email(
 
 
 async def send_email(
-    to: Union[str, List[str]],
+    to: Union[str, list[str]],
     subject: str,
     title: str,
     content_html: str,
@@ -469,11 +484,11 @@ async def send_email(
     from_address: Optional[str] = None,
     business_config=None,
     is_user_email: bool = False,
-    attachments: Optional[List[dict]] = None,
+    attachments: Optional[list[dict]] = None,
 ) -> dict:
     """
     Send an email using custom SMTP (if configured) or Resend (fallback)
-    
+
     Args:
         to: Recipient email(s)
         subject: Email subject line
@@ -486,7 +501,7 @@ async def send_email(
         business_config: Optional BusinessConfig for custom SMTP
         is_user_email: Whether this email is to a CleanEnroll user (not a client)
         attachments: Optional list of attachments [{"filename": str, "content": bytes, "content_type": str}]
-    
+
     Returns:
         Send response dict
     """
@@ -499,11 +514,11 @@ async def send_email(
         cta_label=cta_label,
         is_user_email=is_user_email,
     )
-    
+
     # Ensure 'to' is a list
     recipients = [to] if isinstance(to, str) else to
     sender = from_address or EMAIL_FROM_ADDRESS
-    
+
     # Try custom SMTP first if configured and live
     if business_config and business_config.smtp_status == "live" and business_config.smtp_host:
         try:
@@ -514,18 +529,18 @@ async def send_email(
                 subject=subject,
                 html_content=html_content,
                 from_address=sender,
-                attachments=attachments
+                attachments=attachments,
             )
             return response
         except Exception as e:
             logger.warning(f"⚠️ Custom SMTP failed, falling back to Resend: {e}")
             # Fall through to Resend
-    
+
     # Fallback to Resend
     if not RESEND_API_KEY:
         logger.error("❌ No email service configured - RESEND_API_KEY missing and no custom SMTP")
         raise Exception("Email service not configured")
-    
+
     try:
         logger.info(f"📧 Sending email via Resend to: {to}")
         email_data = {
@@ -534,17 +549,14 @@ async def send_email(
             "subject": subject,
             "html": html_content,
         }
-        
+
         # Add attachments if provided (Resend format)
         if attachments:
             email_data["attachments"] = [
-                {
-                    "filename": attachment["filename"],
-                    "content": attachment["content"]
-                }
+                {"filename": attachment["filename"], "content": attachment["content"]}
                 for attachment in attachments
             ]
-        
+
         response = resend.Emails.send(email_data)
         logger.info(f"✅ Email sent successfully via Resend: {response}")
         return response
@@ -556,6 +568,7 @@ async def send_email(
 # ============================================
 # Pre-built Email Templates for Common Events
 # ============================================
+
 
 async def send_welcome_email(to: str, user_name: str) -> dict:
     """Send welcome email to new users"""
@@ -588,39 +601,39 @@ async def send_new_client_notification(
     client_name: str,
     client_email: str,
     property_type: str,
-    property_shots_keys: Optional[List[str]] = None,
+    property_shots_keys: Optional[list[str]] = None,
 ) -> dict:
     """Notify business owner of new client submission"""
-    
+
     # Create property shots zip if available
     attachments = None
     property_shots_info = ""
-    
+
     if property_shots_keys and len(property_shots_keys) > 0:
         try:
             zip_data = await create_property_shots_zip(property_shots_keys, client_name)
             if zip_data:
                 # Create safe filename
-                safe_client_name = "".join(c for c in client_name if c.isalnum() or c in (' ', '-', '_')).rstrip()
+                safe_client_name = "".join(
+                    c for c in client_name if c.isalnum() or c in (" ", "-", "_")
+                ).rstrip()
                 filename = f"property_shots_{safe_client_name.replace(' ', '_')}.zip"
-                
-                attachments = [{
-                    "filename": filename,
-                    "content": zip_data,
-                    "content_type": "application/zip"
-                }]
-                
+
+                attachments = [
+                    {"filename": filename, "content": zip_data, "content_type": "application/zip"}
+                ]
+
                 property_shots_info = f"<div style='background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;'><p style='margin: 0; color: #166534; font-size: 14px; font-weight: 600;'>{icon('image', '#22c55e', 18)} Property photos attached as ZIP file ({len(property_shots_keys)} images)</p></div>"
         except Exception as e:
             logger.warning(f"Failed to create property shots zip for {client_name}: {e}")
             property_shots_info = f"<div style='background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;'><p style='margin: 0; color: #92400e; font-size: 14px;'>{icon('warning', '#f59e0b', 18)} Property photos available in dashboard ({len(property_shots_keys)} images)</p></div>"
-    
+
     content = f"""
     <p>Hi {business_name},</p>
     <p>{client_name} ({client_email}) completed a {property_type} cleaning intake form for {business_name}.</p>
-    
+
     {property_shots_info}
-    
+
     <div style="background: {THEME['background']}; border-radius: 12px; padding: 20px; margin: 20px 0;">
       <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: {THEME['text_primary']};">{icon('building', THEME['primary'], 20)} Key Details Captured:</h3>
       <div style="margin-bottom: 12px;">
@@ -628,14 +641,14 @@ async def send_new_client_notification(
         <div style="font-size: 14px; color: {THEME['text_muted']};">Full intake details available in dashboard (sq ft, peak hours, security codes, fragile displays)</div>
       </div>
     </div>
-    
+
     <div style="background: {THEME['background']}; border-radius: 12px; padding: 20px; margin: 20px 0;">
       <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: {THEME['text_primary']};">{icon('sparkles', THEME['primary'], 20)} Next Steps:</h3>
       <p style="margin: 0; font-size: 14px; color: {THEME['text_primary']};">Review property specifics in dashboard → Wait for auto-generated contract to be reviewed and signed by client</p>
     </div>
-    
+
     <p style="font-size: 15px; color: {THEME['text_primary']}; font-weight: 600;">First booking awaits! {icon('check', THEME['success'], 20)}</p>
-    
+
     <p style="margin-top: 20px;">Best,<br/><strong>Cleanenroll Team</strong></p>
     """
     return await send_email(
@@ -775,7 +788,7 @@ async def send_form_submission_confirmation(
     <p>Hi {client_name},</p>
     <p>Thank you for completing your {property_type} cleaning intake form for {business_name}!</p>
     <p>Your property details (square footage, peak hours, security codes, fragile displays) and proposed schedule have been received and processed successfully.</p>
-    
+
     <div style="background: {THEME['background']}; border-radius: 12px; padding: 20px; margin: 20px 0;">
       <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: {THEME['text_primary']};">What's Next:</h3>
       <div style="font-size: 14px; color: {THEME['text_primary']};">
@@ -784,7 +797,7 @@ async def send_form_submission_confirmation(
         <div>{icon('check', THEME['success'], 18)} {business_name} will review your proposed schedule and confirm</div>
       </div>
     </div>
-    
+
     <div style="background: {THEME['background']}; border-radius: 12px; padding: 20px; margin: 20px 0;">
       <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: {THEME['text_primary']};">Quick Confirmation:</h3>
       <div style="font-size: 14px; color: {THEME['text_primary']};">
@@ -793,11 +806,11 @@ async def send_form_submission_confirmation(
         <div>{icon('check', THEME['success'], 18)} Ready for your review</div>
       </div>
     </div>
-    
+
     <p style="color: {THEME['text_muted']}; font-size: 14px;">
       Questions? Contact {business_name} directly. Excited to get your store sparkling! {icon('sparkles', THEME['primary'], 18)}
     </p>
-    
+
     <p style="margin-top: 20px;">Best,<br/><strong>Cleanenroll</strong></p>
     """
     return await send_email(
@@ -833,7 +846,7 @@ async def send_contract_signed_notification(
         </div>
       </div>
     </div>
-    
+
     <div style="background: #e0f2fe; border-left: 4px solid #0ea5e9; padding: 16px; margin: 20px 0; border-radius: 8px;">
       <p style="margin: 0; color: #0369a1; font-weight: 600; font-size: 14px;">{icon('calendar', '#0ea5e9', 18)} Next Steps:</p>
       <ul style="margin: 12px 0 0 0; padding-left: 20px; color: #0369a1;">
@@ -842,7 +855,7 @@ async def send_contract_signed_notification(
         <li style="margin-bottom: 8px;">Sign the contract to finalize the agreement</li>
       </ul>
     </div>
-    
+
     <p>The contract is now awaiting your signature to be fully executed. Review the client's proposed schedule and sign to complete the agreement.</p>
     """
     return await send_email(
@@ -867,7 +880,7 @@ async def send_client_signature_confirmation(
     """Notify client after they sign the contract (awaiting provider signature)"""
     content = f"""
     <p>Thank you for signing your contract with <strong>{business_name}</strong>!</p>
-    
+
     <div style="background: {THEME['background']}; border-radius: 12px; padding: 20px; margin: 20px 0;">
       <div style="margin-bottom: 12px;">
         <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 4px;">Contract</div>
@@ -880,9 +893,9 @@ async def send_client_signature_confirmation(
         </div>
       </div>
     </div>
-    
+
     <p>Your signature has been recorded successfully. The service provider will review and sign the contract shortly.</p>
-    
+
     <div style="background: #f0fdf4; border-left: 4px solid #22c55e; padding: 16px; margin: 20px 0; border-radius: 8px;">
       <p style="margin: 0; color: #166534; font-weight: 600; font-size: 14px;">{icon('check', '#22c55e', 18)} What happens next?</p>
       <ul style="margin: 12px 0 0 0; padding-left: 20px; color: #166534;">
@@ -891,15 +904,15 @@ async def send_client_signature_confirmation(
         <li style="margin-bottom: 8px;">Once they sign, you'll receive a confirmation email</li>
       </ul>
     </div>
-    
+
     <p style="color: {THEME['text_muted']}; font-size: 14px;">
       We'll notify you as soon as the contract is fully executed and your schedule is confirmed. If you have any questions, please contact {business_name} directly.
     </p>
     """
-    
+
     cta_url = contract_pdf_url if contract_pdf_url else None
     cta_label = "View Signed Contract" if contract_pdf_url else None
-    
+
     return await send_email(
         to=to,
         subject=f"✅ Contract Signed - Awaiting {business_name}",
@@ -930,13 +943,13 @@ async def send_contract_fully_executed_email(
 ) -> dict:
     """Notify client when contract is fully signed by both parties"""
     from .config import FRONTEND_URL
-    
+
     # Build scheduling link
     scheduling_url = None
     if contract_public_id:
         frontend_base = FRONTEND_URL or "http://localhost:5173"
         scheduling_url = f"{frontend_base}/scheduling/{contract_public_id}"
-    
+
     # Build scheduled time section if applicable
     schedule_section = ""
     if scheduled_time_confirmed and scheduled_start_time:
@@ -966,11 +979,11 @@ async def send_contract_fully_executed_email(
           </p>
         </div>
         """
-    
+
     content = f"""
     <p>Hi {client_name},</p>
     <p>Perfect! <strong>{business_name}</strong> has reviewed and signed your service agreement{f' for {property_address}' if property_address else ''}.</p>
-    
+
     <div style="background: {THEME['background']}; border-radius: 12px; padding: 20px; margin: 24px 0;">
       <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: {THEME['text_primary']};">Quick Details:</h3>
       <div style="space-y: 12px;">
@@ -985,9 +998,9 @@ async def send_contract_fully_executed_email(
         {f'<div style="margin-bottom: 12px;"><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 4px;">Total</div><div style="font-weight: 600; font-size: 16px; color: {THEME["primary"]};">${total_value:,.2f}</div></div>' if total_value else ''}
       </div>
     </div>
-    
+
     {schedule_section}
-    
+
     <p style="color: {THEME['text_muted']}; font-size: 14px;">
       Questions? Reply here{f' or call {business_phone}' if business_phone else ''}.
     </p>
@@ -1016,7 +1029,7 @@ async def send_provider_contract_signed_confirmation(
     content = f"""
     <p>Hi {provider_name},</p>
     <p>Contract <strong>{contract_id}</strong> for {client_name}{f' ({property_address})' if property_address else ''} is fully executed. Client has been notified.</p>
-    
+
     <div style="background: {THEME['background']}; border-radius: 12px; padding: 20px; margin: 24px 0;">
       <div style="margin-bottom: 12px;">
         <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 4px;">Contract ID</div>
@@ -1028,13 +1041,13 @@ async def send_provider_contract_signed_confirmation(
       </div>
       {f'<div><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 4px;">Property</div><div style="font-size: 15px; color: {THEME["text_primary"]};">{property_address}</div></div>' if property_address else ''}
     </div>
-    
+
     <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
       <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
         {icon('check', '#22c55e', 18)} Schedule confirmed - Ready to start service
       </p>
     </div>
-    
+
     <p style="color: {THEME['text_muted']}; font-size: 14px;">The client's proposed schedule has been reviewed and confirmed. Signed PDF attached.</p>
     """
     return await send_email(
@@ -1055,13 +1068,17 @@ async def send_scheduling_proposal_email(
     provider_name: str,
     contract_id: int,
     time_slots: list,
-    expires_at: str
+    expires_at: str,
 ) -> dict:
     """Send scheduling proposal to client with available time slots"""
     # Format time slots for display
     slots_html = ""
     for i, slot in enumerate(time_slots, 1):
-        recommended = " <span style='color: #00C4B4; font-weight: 600;'>⭐ Recommended</span>" if slot.get('recommended') else ""
+        recommended = (
+            " <span style='color: #00C4B4; font-weight: 600;'>⭐ Recommended</span>"
+            if slot.get("recommended")
+            else ""
+        )
         slots_html += f"""
         <div style="background: {THEME['background']}; border-radius: 8px; padding: 16px; margin-bottom: 12px;">
             <div style="font-weight: 600; color: {THEME['text_primary']}; margin-bottom: 4px;">Option {i}{recommended}</div>
@@ -1070,27 +1087,27 @@ async def send_scheduling_proposal_email(
             </div>
         </div>
         """
-    
+
     # Generate scheduling response URL
     scheduling_url = f"http://localhost:5173/scheduling/{contract_id}"
-    
+
     content = f"""
     <p>Hi {client_name},</p>
     <p>{provider_name} has proposed the following time slots for your service. Please review and select your preferred time:</p>
-    
+
     <div style="margin: 24px 0;">
         {slots_html}
     </div>
-    
+
     <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
         <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
             {icon('info', '#22c55e', 18)} Tip: Click the button below to select a time slot or suggest your own preferred times!
         </p>
     </div>
-    
+
     <p style="color: {THEME['text_muted']}; font-size: 14px;">This proposal expires on {expires_at}. Please respond before then.</p>
     """
-    
+
     return await send_email(
         to=client_email,
         subject=f"Scheduling Proposal for Contract {contract_id}",
@@ -1098,7 +1115,7 @@ async def send_scheduling_proposal_email(
         intro="Please select your preferred time slot.",
         content_html=content,
         cta_url=scheduling_url,
-        cta_label="Select Time Slot"
+        cta_label="Select Time Slot",
     )
 
 
@@ -1110,13 +1127,13 @@ async def send_scheduling_accepted_email(
     selected_date: str,
     start_time: str,
     end_time: str,
-    property_address: Optional[str] = None
+    property_address: Optional[str] = None,
 ) -> dict:
     """Notify provider when client accepts a time slot"""
     content = f"""
     <p>Hi {provider_name},</p>
     <p>{client_name} has accepted a time slot for Contract {contract_id}:</p>
-    
+
     <div style="background: {THEME['background']}; border-radius: 12px; padding: 20px; margin: 24px 0;">
         <div style="margin-bottom: 16px;">
             <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">{icon('calendar', THEME['primary'], 18)} Scheduled Date</div>
@@ -1128,14 +1145,14 @@ async def send_scheduling_accepted_email(
         </div>
         {f'<div><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 4px;">Location</div><div style="font-size: 15px; color: {THEME["text_primary"]};">{property_address}</div></div>' if property_address else ''}
     </div>
-    
+
     <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
         <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
             {icon('check', '#22c55e', 18)} Appointment confirmed
         </p>
     </div>
     """
-    
+
     return await send_email(
         to=provider_email,
         subject=f"Time Slot Accepted for Contract {contract_id}",
@@ -1153,26 +1170,26 @@ async def send_scheduling_counter_proposal_email(
     contract_id: int,
     preferred_days: Optional[str] = None,
     time_window: Optional[str] = None,
-    client_notes: Optional[str] = None
+    client_notes: Optional[str] = None,
 ) -> dict:
     """Notify provider when client proposes alternative times"""
     content = f"""
     <p>Hi {provider_name},</p>
     <p>{client_name} has suggested alternative scheduling preferences for Contract {contract_id}:</p>
-    
+
     <div style="background: {THEME['background']}; border-radius: 12px; padding: 20px; margin: 24px 0;">
         {f'<div style="margin-bottom: 12px;"><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 4px;">{icon("calendar", THEME["primary"], 18)} Preferred Days</div><div style="font-size: 15px; color: {THEME["text_primary"]};">{preferred_days}</div></div>' if preferred_days else ''}
         {f'<div style="margin-bottom: 12px;"><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 4px;">{icon("clock", THEME["primary"], 18)} Time Window</div><div style="font-size: 15px; color: {THEME["text_primary"]};">{time_window}</div></div>' if time_window else ''}
         {f'<div><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 4px;">{icon("chat", THEME["primary"], 18)} Client Notes</div><div style="font-size: 15px; color: {THEME["text_primary"]}; font-style: italic;">"{client_notes}"</div></div>' if client_notes else ''}
     </div>
-    
+
     <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;">
         <p style="margin: 0; color: #92400e; font-size: 14px; font-weight: 600;">
             {icon('clock', '#f59e0b', 18)} Counter-proposal received - Please review and respond
         </p>
     </div>
     """
-    
+
     return await send_email(
         to=provider_email,
         subject=f"Alternative Times Proposed for Contract {contract_id}",
@@ -1188,7 +1205,7 @@ async def send_email_verification_otp(to: str, user_name: str, otp: str) -> dict
     content = f"""
     <p>Hi {user_name},</p>
     <p>To verify your email address, please use the verification code below:</p>
-    
+
     <div style="background: {THEME['background']}; border-radius: 16px; padding: 32px; margin: 32px 0; text-align: center;">
         <div style="color: {THEME['text_muted']}; font-size: 14px; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Your Verification Code</div>
         <div style="font-size: 42px; font-weight: 700; letter-spacing: 8px; color: {THEME['primary']}; font-family: 'Courier New', monospace; text-align: center;">
@@ -1196,11 +1213,11 @@ async def send_email_verification_otp(to: str, user_name: str, otp: str) -> dict
         </div>
         <div style="color: {THEME['text_muted']}; font-size: 13px; margin-top: 12px;">This code expires in 10 minutes</div>
     </div>
-    
+
     <p style="color: {THEME['text_muted']}; font-size: 14px;">
         Enter this code in the verification page to confirm your email address.
     </p>
-    
+
     <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;">
         <p style="margin: 0; color: #92400e; font-size: 13px;">
             {icon('warning', '#f59e0b', 18)} If you didn't request this code, you can safely ignore this email.
@@ -1223,15 +1240,15 @@ async def send_appointment_notification(
     client_name: str,
     appointment_time: datetime,
     location: Optional[str] = None,
-    event_link: Optional[str] = None
+    event_link: Optional[str] = None,
 ) -> dict:
     """Notify provider when client schedules an appointment (pending approval)"""
     formatted_time = appointment_time.strftime("%A, %B %d, %Y at %I:%M %p")
-    
+
     content = f"""
     <p>Hi {provider_name},</p>
     <p><strong>{client_name}</strong> has requested their first cleaning appointment.</p>
-    
+
     <div style="background: {THEME['background']}; border-radius: 12px; padding: 24px; margin: 24px 0;">
         <div style="margin-bottom: 16px;">
             <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">{icon('calendar', THEME['primary'], 18)} Requested Date & Time</div>
@@ -1243,18 +1260,18 @@ async def send_appointment_notification(
             <div style="font-size: 15px; color: {THEME['text_primary']};">{client_name}</div>
         </div>
     </div>
-    
+
     <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;">
         <p style="margin: 0; color: #92400e; font-size: 14px; font-weight: 600;">
             {icon('clock', '#f59e0b', 18)} Action Required: Please review and accept or request a different time
         </p>
     </div>
-    
+
     <p style="color: {THEME['text_muted']}; font-size: 14px;">
         Visit your Schedule page to accept this appointment or propose an alternative time to the client.
     </p>
     """
-    
+
     return await send_email(
         to=provider_email,
         subject=f"Pending Appointment Request: {client_name} - {appointment_time.strftime('%b %d, %Y')}",
@@ -1271,15 +1288,15 @@ async def send_appointment_confirmation(
     provider_name: str,
     appointment_time: datetime,
     location: Optional[str] = None,
-    event_link: Optional[str] = None
+    event_link: Optional[str] = None,
 ) -> dict:
     """Confirm appointment to client after provider accepts"""
     formatted_time = appointment_time.strftime("%A, %B %d, %Y at %I:%M %p")
-    
+
     content = f"""
     <p>Hi {client_name},</p>
     <p>Great news! <strong>{provider_name}</strong> has confirmed your cleaning appointment.</p>
-    
+
     <div style="background: {THEME['background']}; border-radius: 12px; padding: 24px; margin: 24px 0;">
         <div style="margin-bottom: 16px;">
             <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">{icon('calendar', THEME['primary'], 18)} Confirmed Date & Time</div>
@@ -1291,22 +1308,22 @@ async def send_appointment_confirmation(
             <div style="font-size: 15px; color: {THEME['text_primary']};">{provider_name}</div>
         </div>
     </div>
-    
+
     <div style="background: #d1fae5; border: 1px solid #10b981; border-radius: 12px; padding: 16px; margin: 20px 0;">
         <p style="margin: 0; color: #065f46; font-size: 14px; font-weight: 600;">
             {icon('check', '#10b981', 18)} Your appointment is confirmed and has been added to your calendar
         </p>
     </div>
-    
+
     {f'<p style="text-align: center; margin: 24px 0;"><a href="{event_link}" style="display: inline-block; background: {THEME["primary"]}; color: white; padding: 14px 28px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 15px;">Add to Calendar →</a></p>' if event_link else ''}
     """
-    
+
     return await send_email(
         to=client_email,
         subject=f"Appointment Confirmed - {appointment_time.strftime('%b %d, %Y')}",
         title="Appointment Confirmed!",
         intro=f"Your cleaning appointment with {provider_name} is confirmed.",
-        content_html=content
+        content_html=content,
     )
 
 
@@ -1319,14 +1336,14 @@ async def send_schedule_change_request(
     proposed_start: str,
     proposed_end: str,
     schedule_id: int,
-    client_id: int = None
+    client_id: int = None,
 ) -> dict:
     """Notify client when provider requests alternative time"""
     import hashlib
-    
+
     original_formatted = original_time.strftime("%A, %B %d, %Y at %I:%M %p")
     proposed_formatted = proposed_time.strftime("%A, %B %d, %Y")
-    
+
     # Generate secure token for the response link
     token = ""
     response_url = ""
@@ -1334,11 +1351,11 @@ async def send_schedule_change_request(
         data = f"{schedule_id}:{client_id}:cleanenroll_schedule_secret"
         token = hashlib.sha256(data.encode()).hexdigest()[:32]
         response_url = f"{FRONTEND_URL}/schedule-response/{schedule_id}?token={token}"
-    
+
     content = f"""
     <p>Hi {client_name},</p>
     <p><strong>{provider_name}</strong> has reviewed your appointment request and would like to propose an alternative time.</p>
-    
+
     <div style="background: {THEME['background']}; border-radius: 12px; padding: 24px; margin: 24px 0;">
         <div style="margin-bottom: 20px;">
             <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">{icon('calendar', THEME['muted'], 18)} Your Requested Time</div>
@@ -1349,18 +1366,18 @@ async def send_schedule_change_request(
             <div style="font-size: 16px; color: {THEME['text_primary']}; font-weight: 600;">{proposed_formatted} from {proposed_start} to {proposed_end}</div>
         </div>
     </div>
-    
+
     <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;">
         <p style="margin: 0; color: #92400e; font-size: 14px; font-weight: 600;">
             {icon('clock', '#f59e0b', 18)} Response Needed: Please confirm or suggest another time
         </p>
     </div>
     """
-    
+
     # Add CTA button if we have a response URL
     cta_url = response_url if response_url else None
     cta_label = "Respond to Proposal" if response_url else None
-    
+
     return await send_email(
         to=client_email,
         subject=f"Alternative Time Proposed by {provider_name}",
@@ -1368,7 +1385,7 @@ async def send_schedule_change_request(
         intro=f"{provider_name} has suggested a different appointment time.",
         content_html=content,
         cta_url=cta_url,
-        cta_label=cta_label
+        cta_label=cta_label,
     )
 
 
@@ -1379,26 +1396,26 @@ async def send_client_accepted_proposal(
     accepted_date: datetime,
     accepted_start_time: str,
     accepted_end_time: str,
-    schedule_id: int
+    schedule_id: int,
 ) -> dict:
     """Notify provider when client accepts their proposed alternative time"""
     date_formatted = accepted_date.strftime("%A, %B %d, %Y")
-    
+
     content = f"""
     <p>Hi {provider_name},</p>
     <p>Great news! <strong>{client_name}</strong> has accepted your proposed appointment time.</p>
-    
+
     <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 24px; margin: 24px 0;">
         <div style="color: #166534; font-size: 13px; margin-bottom: 6px;">{icon('check', '#22c55e', 18)} Confirmed Appointment</div>
         <div style="font-size: 18px; color: #166534; font-weight: 600;">{date_formatted}</div>
         <div style="font-size: 15px; color: #166534; margin-top: 4px;">{accepted_start_time} - {accepted_end_time}</div>
     </div>
-    
+
     <p style="color: {THEME['text_muted']}; font-size: 14px;">
         The appointment has been confirmed and added to your schedule. You can view the details in your dashboard.
     </p>
     """
-    
+
     return await send_email(
         to=provider_email,
         subject=f"✅ {client_name} Accepted Your Proposed Time",
@@ -1407,7 +1424,7 @@ async def send_client_accepted_proposal(
         content_html=content,
         cta_url=f"{FRONTEND_URL}/dashboard/schedule",
         cta_label="View Schedule",
-        is_user_email=True
+        is_user_email=True,
     )
 
 
@@ -1417,32 +1434,32 @@ async def send_appointment_confirmed_to_client(
     provider_name: str,
     confirmed_date: datetime,
     confirmed_start_time: str,
-    confirmed_end_time: str
+    confirmed_end_time: str,
 ) -> dict:
     """Send confirmation email to client after they accept a proposed time"""
     date_formatted = confirmed_date.strftime("%A, %B %d, %Y")
-    
+
     content = f"""
     <p>Hi {client_name},</p>
     <p>Your appointment with <strong>{provider_name}</strong> has been confirmed!</p>
-    
+
     <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 24px; margin: 24px 0;">
         <div style="color: #166534; font-size: 13px; margin-bottom: 6px;">{icon('check', '#22c55e', 18)} Confirmed Appointment</div>
         <div style="font-size: 18px; color: #166534; font-weight: 600;">{date_formatted}</div>
         <div style="font-size: 15px; color: #166534; margin-top: 4px;">{confirmed_start_time} - {confirmed_end_time}</div>
     </div>
-    
+
     <p style="color: {THEME['text_muted']}; font-size: 14px;">
         {provider_name} will arrive at the scheduled time. If you need to make any changes, please contact them directly.
     </p>
     """
-    
+
     return await send_email(
         to=client_email,
         subject=f"✅ Appointment Confirmed with {provider_name}",
         title="Appointment Confirmed!",
-        intro=f"Your appointment has been scheduled.",
-        content_html=content
+        intro="Your appointment has been scheduled.",
+        content_html=content,
     )
 
 
@@ -1457,11 +1474,11 @@ async def send_schedule_accepted_confirmation_to_provider(
 ) -> dict:
     """Notify provider after they accept a schedule"""
     formatted_date = confirmed_date.strftime("%A, %B %d, %Y")
-    
+
     content = f"""
     <p>Hi {provider_name},</p>
     <p>You've successfully confirmed the appointment for <strong>{client_name}</strong>. The client has been notified.</p>
-    
+
     <div style="background: {THEME['background']}; border-radius: 12px; padding: 24px; margin: 24px 0;">
         <div style="margin-bottom: 16px;">
             <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">{icon('calendar', THEME['primary'], 18)} Appointment Date</div>
@@ -1477,18 +1494,18 @@ async def send_schedule_accepted_confirmation_to_provider(
         </div>
         {f'<div><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 6px;">{icon("location", THEME["primary"], 18)} Location</div><div style="font-size: 15px; color: {THEME["text_primary"]};">{client_address}</div></div>' if client_address else ''}
     </div>
-    
+
     <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
         <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
             {icon('check', '#22c55e', 18)} Appointment confirmed and client notified
         </p>
     </div>
-    
+
     <p style="color: {THEME['text_muted']}; font-size: 14px;">
         The appointment has been added to your schedule. You can view all your appointments in the Schedule page.
     </p>
     """
-    
+
     return await send_email(
         to=provider_email,
         subject=f"✅ Appointment Confirmed - {client_name} on {formatted_date}",
@@ -1510,16 +1527,16 @@ async def send_client_counter_proposal(
     client_preferred_start: str,
     client_preferred_end: str,
     client_reason: str,
-    schedule_id: int
+    schedule_id: int,
 ) -> dict:
     """Notify provider when client suggests an alternative time"""
     original_formatted = original_proposed_date.strftime("%A, %B %d, %Y")
     preferred_formatted = client_preferred_date.strftime("%A, %B %d, %Y")
-    
+
     content = f"""
     <p>Hi {provider_name},</p>
     <p><strong>{client_name}</strong> has reviewed your proposed time and would like to suggest an alternative.</p>
-    
+
     <div style="background: {THEME['background']}; border-radius: 12px; padding: 24px; margin: 24px 0;">
         <div style="margin-bottom: 20px;">
             <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">{icon('calendar', THEME['muted'], 18)} Your Proposed Time</div>
@@ -1531,17 +1548,17 @@ async def send_client_counter_proposal(
             <div style="font-size: 14px; color: {THEME['text_primary']}; margin-top: 4px;">{client_preferred_start} - {client_preferred_end}</div>
         </div>
     </div>
-    
+
     <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;">
         <p style="margin: 0 0 8px 0; color: #92400e; font-size: 13px; font-weight: 600;">{icon('chat', '#f59e0b', 18)} Client's Reason:</p>
         <p style="margin: 0; color: #92400e; font-size: 14px; font-style: italic;">"{client_reason}"</p>
     </div>
-    
+
     <p style="color: {THEME['text_muted']}; font-size: 14px;">
         Please review the client's suggestion and respond through your dashboard.
     </p>
     """
-    
+
     return await send_email(
         to=provider_email,
         subject=f"📅 {client_name} Suggested an Alternative Time",
@@ -1550,7 +1567,7 @@ async def send_client_counter_proposal(
         content_html=content,
         cta_url=f"{FRONTEND_URL}/dashboard/schedule",
         cta_label="Review in Dashboard",
-        is_user_email=True
+        is_user_email=True,
     )
 
 
@@ -1565,10 +1582,10 @@ async def send_invoice_payment_link_email(
     due_date: Optional[str] = None,
     payment_link: Optional[str] = None,
     is_recurring: bool = False,
-    recurrence_pattern: Optional[str] = None
+    recurrence_pattern: Optional[str] = None,
 ) -> dict:
     """Send invoice with payment link to client"""
-    
+
     # Format recurring info
     recurring_info = ""
     if is_recurring and recurrence_pattern:
@@ -1579,11 +1596,11 @@ async def send_invoice_payment_link_email(
             </p>
         </div>
         """
-    
+
     content = f"""
     <p>Hi {client_name},</p>
     <p>Your invoice from <strong>{business_name}</strong> is ready for payment.</p>
-    
+
     <div style="background: {THEME['background']}; border-radius: 12px; padding: 24px; margin: 24px 0;">
         <div style="margin-bottom: 16px;">
             <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">Invoice Number</div>
@@ -1599,20 +1616,20 @@ async def send_invoice_payment_link_email(
         </div>
         {f'<div><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 6px;">Due Date</div><div style="font-size: 15px; color: {THEME["text_primary"]};">{due_date}</div></div>' if due_date else ''}
     </div>
-    
+
     {recurring_info}
-    
+
     <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
         <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
             {icon('money', '#22c55e', 18)} Click the button below to pay securely online
         </p>
     </div>
-    
+
     <p style="color: {THEME['text_muted']}; font-size: 14px;">
         Questions about this invoice? Contact {business_name} directly.
     </p>
     """
-    
+
     return await send_email(
         to=to,
         subject=f"Invoice {invoice_number} from {business_name} - Payment Ready",
@@ -1620,7 +1637,7 @@ async def send_invoice_payment_link_email(
         intro=f"Please review and pay your invoice from {business_name}.",
         content_html=content,
         cta_url=payment_link,
-        cta_label="Pay Now"
+        cta_label="Pay Now",
     )
 
 
@@ -1631,14 +1648,14 @@ async def send_payment_received_notification(
     invoice_number: str,
     amount: float,
     currency: str = "USD",
-    payment_date: Optional[str] = None
+    payment_date: Optional[str] = None,
 ) -> dict:
     """Notify provider when client payment is received"""
-    
+
     content = f"""
     <p>Hi {provider_name},</p>
     <p>{icon('sparkles', THEME['primary'], 20)} <strong>Excellent news!</strong> <strong>{client_name}</strong> has just paid their invoice.</p>
-    
+
     <div style="background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); border: 2px solid #22c55e; border-radius: 16px; padding: 28px; margin: 24px 0; box-shadow: 0 4px 12px rgba(34, 197, 94, 0.15);">
         <div style="text-align: center; margin-bottom: 20px;">
             <div style="display: inline-block; background: #22c55e; color: white; padding: 12px; border-radius: 50%; margin-bottom: 12px;">
@@ -1649,7 +1666,7 @@ async def send_payment_received_notification(
             <div style="font-size: 32px; color: #22c55e; font-weight: 800; margin-bottom: 8px;">${amount:,.2f} {currency}</div>
             <div style="color: #166534; font-size: 16px; font-weight: 600;">Payment Received!</div>
         </div>
-        
+
         <div style="background: rgba(255, 255, 255, 0.8); border-radius: 12px; padding: 20px;">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                 <div>
@@ -1664,7 +1681,7 @@ async def send_payment_received_notification(
             {f'<div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(34, 197, 94, 0.2);"><div style="color: #166534; font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 4px;">Payment Date</div><div style="font-size: 15px; color: #166534; font-weight: 600;">{payment_date}</div></div>' if payment_date else ''}
         </div>
     </div>
-    
+
     <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 2px solid #f59e0b; border-radius: 12px; padding: 20px; margin: 20px 0;">
         <div style="display: flex; align-items: center; gap: 12px;">
             <div style="background: #f59e0b; color: white; padding: 8px; border-radius: 50%; flex-shrink: 0;">
@@ -1678,12 +1695,12 @@ async def send_payment_received_notification(
             </div>
         </div>
     </div>
-    
+
     <p style="color: {THEME['text_muted']}; font-size: 14px; text-align: center; margin-top: 24px;">
         {icon('sparkles', THEME['primary'], 18)} <strong>Ready to withdraw?</strong> Visit your payouts dashboard to request a withdrawal to your bank account.
     </p>
     """
-    
+
     return await send_email(
         to=provider_email,
         subject=f"💰 Payment Received: ${amount:,.2f} from {client_name}",
@@ -1703,14 +1720,14 @@ async def send_payment_thank_you_email(
     invoice_number: str,
     amount: float,
     currency: str = "USD",
-    service_date: Optional[str] = None
+    service_date: Optional[str] = None,
 ) -> dict:
     """Send thank you email to client after successful payment"""
-    
+
     content = f"""
     <p>Hi {client_name},</p>
     <p>Thank you for your payment to <strong>{business_name}</strong>!</p>
-    
+
     <div style="background: {THEME['background']}; border-radius: 12px; padding: 24px; margin: 24px 0;">
         <div style="margin-bottom: 16px;">
             <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 6px;">Invoice Number</div>
@@ -1722,26 +1739,26 @@ async def send_payment_thank_you_email(
         </div>
         {f'<div><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 6px;">Service Date</div><div style="font-size: 15px; color: {THEME["text_primary"]};">{service_date}</div></div>' if service_date else ''}
     </div>
-    
+
     <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
         <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
             {icon('check', '#22c55e', 18)} Your payment has been processed successfully
         </p>
     </div>
-    
+
     <p style="color: {THEME['text_muted']}; font-size: 14px;">
         We look forward to providing you with excellent service. If you have any questions, please contact {business_name} directly.
     </p>
-    
+
     <p style="margin-top: 24px;">Thank you for your business! {icon('sparkles', THEME['primary'], 18)}</p>
     """
-    
+
     return await send_email(
         to=client_email,
         subject=f"Payment Confirmed - Thank You! - {business_name}",
         title="Thank You for Your Payment!",
         intro=f"Your payment to {business_name} has been received.",
-        content_html=content
+        content_html=content,
     )
 
 
@@ -1750,12 +1767,12 @@ async def send_contract_cancelled_email(
     client_name: str,
     contract_title: str,
     business_name: str,
-    business_config=None
+    business_config=None,
 ) -> dict:
     """Send contract cancellation notification to client"""
-    
+
     subject = f"Contract Cancelled - {contract_title}"
-    
+
     content = f"""
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9fafb;">
         <div style="background-color: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
@@ -1766,34 +1783,34 @@ async def send_contract_cancelled_email(
                 </div>
                 <h1 style="color: #1f2937; margin: 0; font-size: 24px; font-weight: 600;">Contract Cancelled</h1>
             </div>
-            
+
             <!-- Content -->
             <div style="margin-bottom: 30px;">
                 <p style="color: #374151; font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
                     Dear {client_name},
                 </p>
-                
+
                 <p style="color: #374151; font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
                     We're writing to inform you that your service contract has been cancelled:
                 </p>
-                
+
                 <div style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 20px; margin: 20px 0;">
                     <h3 style="color: #dc2626; margin: 0 0 10px 0; font-size: 18px;">Contract Details</h3>
                     <p style="color: #7f1d1d; margin: 5px 0;"><strong>Contract:</strong> {contract_title}</p>
                     <p style="color: #7f1d1d; margin: 5px 0;"><strong>Service Provider:</strong> {business_name}</p>
                     <p style="color: #7f1d1d; margin: 5px 0;"><strong>Status:</strong> Cancelled</p>
                 </div>
-                
+
                 <p style="color: #374151; font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
-                    If you have any questions about this cancellation or would like to discuss future services, 
+                    If you have any questions about this cancellation or would like to discuss future services,
                     please don't hesitate to contact us.
                 </p>
-                
+
                 <p style="color: #374151; font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
                     Thank you for your understanding.
                 </p>
             </div>
-            
+
             <!-- Footer -->
             <div style="border-top: 1px solid #e5e7eb; padding-top: 20px; text-align: center;">
                 <p style="color: #6b7280; font-size: 14px; margin: 0;">
@@ -1802,7 +1819,7 @@ async def send_contract_cancelled_email(
                 </p>
             </div>
         </div>
-        
+
         <!-- Footer -->
         <div style="text-align: center; margin-top: 20px;">
             <p style="color: #9ca3af; font-size: 12px; margin: 0;">
@@ -1811,12 +1828,9 @@ async def send_contract_cancelled_email(
         </div>
     </div>
     """
-    
+
     return await send_email(
-        to=client_email,
-        subject=subject,
-        html_content=content,
-        business_config=business_config
+        to=client_email, subject=subject, html_content=content, business_config=business_config
     )
 
 
@@ -1828,14 +1842,14 @@ async def send_pending_booking_notification(
     start_time: str,
     end_time: str,
     property_address: Optional[str] = None,
-    schedule_id: Optional[int] = None
+    schedule_id: Optional[int] = None,
 ) -> dict:
     """Notify provider when client books an appointment (pending approval)"""
-    
+
     content = f"""
     <p>Hi {provider_name},</p>
     <p><strong>{client_name}</strong> has requested a cleaning appointment and is awaiting your approval.</p>
-    
+
     <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0;">
         <div style="margin-bottom: 16px;">
             <div style="color: #64748b; font-size: 13px; margin-bottom: 6px;">{icon('calendar', '#00C4B4', 18)} Requested Date</div>
@@ -1851,18 +1865,18 @@ async def send_pending_booking_notification(
             <div style="font-size: 15px; color: #1e293b;">{client_name}</div>
         </div>
     </div>
-    
+
     <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;">
         <p style="margin: 0; color: #92400e; font-size: 14px; font-weight: 600;">
             {icon('clock', '#f59e0b', 18)} Action Required: Accept this appointment or propose an alternative time
         </p>
     </div>
-    
+
     <p style="color: #64748b; font-size: 14px;">
         Visit your Schedule page to review and respond to this booking request.
     </p>
     """
-    
+
     return await send_email(
         to=provider_email,
         subject=f"🗓️ New Booking Request from {client_name} - Action Needed",
@@ -1872,13 +1886,14 @@ async def send_pending_booking_notification(
         cta_url=f"{FRONTEND_URL}/dashboard/schedule",
         cta_label="Review Request",
         is_user_email=True,
-        business_config=None
+        business_config=None,
     )
 
 
 # ============================================
 # Custom Quote Request Email Templates
 # ============================================
+
 
 async def send_custom_quote_request_notification(
     provider_email: str,
@@ -1891,19 +1906,19 @@ async def send_custom_quote_request_notification(
     frequency: str,
     video_duration: float,
     request_public_id: str,
-    business_config=None
+    business_config=None,
 ) -> dict:
     """
     Notify provider when client uploads a video for custom quote request.
-    
+
     Email 1: New Custom Quote Request (to Provider)
     """
-    
+
     content = f"""
     <p>Hi {provider_name},</p>
     <p>You have received a new custom quote request from <strong>{client_name}</strong>.</p>
     <p>The client has uploaded a video walkthrough of their property and is waiting for your custom quote.</p>
-    
+
     <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0;">
         <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #1e293b;">Client Details</h3>
         <div style="margin-bottom: 12px;">
@@ -1932,24 +1947,24 @@ async def send_custom_quote_request_notification(
             <div style="font-size: 15px; color: #1e293b;">{int(video_duration)} seconds</div>
         </div>
     </div>
-    
+
     <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
         <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
             {icon('video', '#22c55e', 18)} Video walkthrough uploaded and ready for review
         </p>
     </div>
-    
+
     <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;">
         <p style="margin: 0; color: #92400e; font-size: 14px; font-weight: 600;">
             {icon('clock', '#f59e0b', 18)} Action Required: Watch the video and submit your custom quote
         </p>
     </div>
-    
+
     <p style="color: #64748b; font-size: 14px;">
         Click the button below to view the video walkthrough and submit your custom quote.
     </p>
     """
-    
+
     return await send_email(
         to=provider_email,
         subject=f"🎥 New Custom Quote Request from {client_name}",
@@ -1959,7 +1974,7 @@ async def send_custom_quote_request_notification(
         cta_url=f"{FRONTEND_URL}/dashboard/custom-quotes/{request_public_id}",
         cta_label="View Request & Submit Quote",
         is_user_email=True,
-        business_config=business_config
+        business_config=business_config,
     )
 
 
@@ -1971,18 +1986,18 @@ async def send_custom_quote_ready_notification(
     quote_description: Optional[str],
     quote_notes: Optional[str],
     request_public_id: str,
-    business_config=None
+    business_config=None,
 ) -> dict:
     """
     Notify client when provider submits a custom quote.
-    
+
     Email 2: Custom Quote Ready (to Client)
     """
-    
+
     content = f"""
     <p>Hi {client_name},</p>
     <p><strong>{business_name}</strong> has reviewed your property video and prepared a custom quote for you.</p>
-    
+
     <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0;">
         <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #1e293b;">Your Custom Quote</h3>
         <div style="margin-bottom: 20px;">
@@ -1992,13 +2007,13 @@ async def send_custom_quote_ready_notification(
         {f'<div style="margin-bottom: 16px;"><div style="color: #64748b; font-size: 13px; margin-bottom: 6px;">{icon("document", "#00C4B4", 18)} Service Description</div><div style="font-size: 15px; color: #1e293b; line-height: 1.6;">{quote_description}</div></div>' if quote_description else ''}
         {f'<div><div style="color: #64748b; font-size: 13px; margin-bottom: 6px;">{icon("document", "#00C4B4", 18)} Additional Notes</div><div style="font-size: 15px; color: #1e293b; line-height: 1.6;">{quote_notes}</div></div>' if quote_notes else ''}
     </div>
-    
+
     <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
         <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
             {icon('sparkles', '#22c55e', 18)} Your custom quote is ready! Review and approve to schedule your service.
         </p>
     </div>
-    
+
     <div style="background: #f8fafc; border-radius: 12px; padding: 20px; margin: 20px 0;">
         <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #1e293b;">What's Next:</h3>
         <div style="font-size: 14px; color: #1e293b; line-height: 1.8;">
@@ -2008,12 +2023,12 @@ async def send_custom_quote_ready_notification(
             <div>{icon('check', '#22c55e', 16)} Receive your first cleaning service!</div>
         </div>
     </div>
-    
+
     <p style="color: #64748b; font-size: 14px;">
         If you have any questions about the quote, please don't hesitate to reach out to {business_name} directly.
     </p>
     """
-    
+
     return await send_email(
         to=client_email,
         subject=f"Your Custom Quote from {business_name} is Ready! 💰",
@@ -2022,7 +2037,7 @@ async def send_custom_quote_ready_notification(
         content_html=content,
         cta_url=f"{FRONTEND_URL}/quote/{request_public_id}/approve",
         cta_label="Approve & Schedule",
-        business_config=business_config
+        business_config=business_config,
     )
 
 
@@ -2033,24 +2048,24 @@ async def send_custom_quote_approved_notification(
     client_email: str,
     quote_amount: float,
     client_response_notes: Optional[str],
-    business_config=None
+    business_config=None,
 ) -> dict:
     """
     Notify provider when client approves the custom quote.
-    
+
     Email 3: Quote Approved (to Provider)
     """
-    
+
     content = f"""
     <p>Hi {provider_name},</p>
     <p>Great news! <strong>{client_name}</strong> has approved your custom quote.</p>
-    
+
     <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 20px; margin: 24px 0; text-align: center;">
         <div style="font-size: 48px; margin-bottom: 8px;">{icon('sparkles', '#22c55e', 48)}</div>
         <div style="font-size: 18px; color: #166534; font-weight: 700; margin-bottom: 8px;">Quote Approved!</div>
         <div style="font-size: 24px; color: #00C4B4; font-weight: 700;">${quote_amount:.2f}</div>
     </div>
-    
+
     <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0;">
         <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #1e293b;">Client Information</h3>
         <div style="margin-bottom: 12px;">
@@ -2063,7 +2078,7 @@ async def send_custom_quote_approved_notification(
         </div>
         {f'<div><div style="color: #64748b; font-size: 13px; margin-bottom: 4px;">{icon("chat", "#00C4B4", 18)} Client Notes</div><div style="font-size: 15px; color: #1e293b; line-height: 1.6;">{client_response_notes}</div></div>' if client_response_notes else ''}
     </div>
-    
+
     <div style="background: #f8fafc; border-radius: 12px; padding: 20px; margin: 20px 0;">
         <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #1e293b;">Next Steps:</h3>
         <div style="font-size: 14px; color: #1e293b; line-height: 1.8;">
@@ -2074,18 +2089,18 @@ async def send_custom_quote_approved_notification(
             <div>{icon('check', '#22c55e', 16)} Invoice will be sent automatically (if Square is integrated)</div>
         </div>
     </div>
-    
+
     <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;">
         <p style="margin: 0; color: #92400e; font-size: 14px; font-weight: 600;">
             {icon('document', '#f59e0b', 18)} Action Required: Review the contract and confirm the schedule when the client completes their part
         </p>
     </div>
-    
+
     <p style="color: #64748b; font-size: 14px;">
         Visit your Contracts page to track the progress and complete the next steps.
     </p>
     """
-    
+
     return await send_email(
         to=provider_email,
         subject=f"🎉 {client_name} Approved Your Custom Quote (${quote_amount:.2f})",
@@ -2095,5 +2110,5 @@ async def send_custom_quote_approved_notification(
         cta_url=f"{FRONTEND_URL}/dashboard/contracts",
         cta_label="View Contracts",
         is_user_email=True,
-        business_config=business_config
+        business_config=business_config,
     )

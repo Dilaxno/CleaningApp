@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, List, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
@@ -26,22 +26,20 @@ class BusinessConfigCreate(BaseModel):
     # White-label public form links
     customFormsDomain: Optional[str] = None  # e.g., forms.cleaningco.com
     # Service Areas
-    serviceAreas: Optional[List[Dict]] = None  # Service area configuration
+    serviceAreas: Optional[list[Dict]] = None  # Service area configuration
     # Pricing
     pricingModel: Optional[str] = None
     meetingsRequired: Optional[bool] = None
     paymentHandling: Optional[str] = None  # "manual" or "automatic"
     cancellationWindow: Optional[str] = None  # Hours notice required for cancellation
-    workingDays: Optional[List[str]] = None
-    workingHours: Optional[Dict[str, str]] = None
-    breakTimes: Optional[List[str]] = None
+    workingDays: Optional[list[str]] = None
+    workingHours: Optional[dict[str, str]] = None
+    breakTimes: Optional[list[str]] = None
     daySchedules: Optional[Dict] = None  # Per-day working hours
-    offWorkPeriods: Optional[List[Dict]] = (
-        None  # Off-work periods (vacations, holidays)
-    )
-    customAddons: Optional[List[Dict]] = None  # Custom add-on services
+    offWorkPeriods: Optional[list[Dict]] = None  # Off-work periods (vacations, holidays)
+    customAddons: Optional[list[Dict]] = None  # Custom add-on services
     suppliesProvided: Optional[str] = None  # "provider" or "client"
-    availableSupplies: Optional[List[str]] = None  # List of supply IDs
+    availableSupplies: Optional[list[str]] = None  # List of supply IDs
     ratePerSqft: Optional[str] = None
     hourlyRate: Optional[str] = None
     flatRate: Optional[str] = None
@@ -76,22 +74,22 @@ class BusinessConfigCreate(BaseModel):
     addonCarpetLarge: Optional[str] = None
     paymentDueDays: Optional[str] = None
     lateFeePercent: Optional[str] = None
-    standardInclusions: Optional[List[str]] = None
-    standardExclusions: Optional[List[str]] = None
-    customInclusions: Optional[List[str]] = None
-    customExclusions: Optional[List[str]] = None
+    standardInclusions: Optional[list[str]] = None
+    standardExclusions: Optional[list[str]] = None
+    customInclusions: Optional[list[str]] = None
+    customExclusions: Optional[list[str]] = None
     preferredUnits: Optional[str] = None
-    
+
     # Custom packages for "packages" pricing model
-    customPackages: Optional[List[Dict]] = None
-    
+    customPackages: Optional[list[Dict]] = None
+
     # Active templates - list of template IDs that the business owner has selected to work with
-    activeTemplates: Optional[List[str]] = None
-    
+    activeTemplates: Optional[list[str]] = None
+
     # Accepted frequencies and payment methods
-    acceptedFrequencies: Optional[List[str]] = None  # Array of accepted cleaning frequencies
-    acceptedPaymentMethods: Optional[List[str]] = None  # Array of accepted payment methods
-    
+    acceptedFrequencies: Optional[list[str]] = None  # Array of accepted cleaning frequencies
+    acceptedPaymentMethods: Optional[list[str]] = None  # Array of accepted payment methods
+
     # Brand color
     brandColor: Optional[str] = None  # Hex color code for branding (e.g., #00C4B4)
 
@@ -128,26 +126,23 @@ def is_provided(val) -> bool:
 
 
 @router.get("/public/{firebase_uid}")
-def get_public_business_info(
-    firebase_uid: str, 
-    request: Request,
-    db: Session = Depends(get_db)
-):
+def get_public_business_info(firebase_uid: str, request: Request, db: Session = Depends(get_db)):
     """Get public business info for embedding (no authentication required)"""
     logger.info(f"📥 Getting public business info for firebase_uid: {firebase_uid}")
 
     # Custom domain security validation
-    if hasattr(request.state, 'is_custom_domain') and request.state.is_custom_domain:
+    if hasattr(request.state, "is_custom_domain") and request.state.is_custom_domain:
         # If this is a custom domain request, validate that the domain belongs to the requested user
-        if (not hasattr(request.state, 'custom_domain_user_uid') or 
-            request.state.custom_domain_user_uid != firebase_uid):
+        if (
+            not hasattr(request.state, "custom_domain_user_uid")
+            or request.state.custom_domain_user_uid != firebase_uid
+        ):
             logger.warning(
                 f"🚫 Custom domain security violation in business info: Domain user {getattr(request.state, 'custom_domain_user_uid', 'unknown')} "
                 f"does not match requested user {firebase_uid}"
             )
             raise HTTPException(
-                status_code=403,
-                detail="Access denied: Custom domain does not match requested user"
+                status_code=403, detail="Access denied: Custom domain does not match requested user"
             )
         logger.info(f"✅ Custom domain validation passed for business info {firebase_uid}")
 
@@ -177,17 +172,15 @@ def get_current_user_business_config(
     """Get business config for the currently authenticated user"""
     logger.info(f"📥 Getting business config for current user: {current_user.id}")
 
-    config = (
-        db.query(BusinessConfig)
-        .filter(BusinessConfig.user_id == current_user.id)
-        .first()
-    )
-    
+    config = db.query(BusinessConfig).filter(BusinessConfig.user_id == current_user.id).first()
+
     # CRITICAL FIX: If BusinessConfig doesn't exist, check User.onboarding_completed
     # This prevents users from losing onboarding progress when switching devices
     if not config:
-        logger.info(f"📋 BusinessConfig not found for user {current_user.id}, checking User.onboarding_completed")
-        
+        logger.info(
+            f"📋 BusinessConfig not found for user {current_user.id}, checking User.onboarding_completed"
+        )
+
         # If user has completed onboarding (stored in User table), return minimal config
         if current_user.onboarding_completed:
             logger.info(f"✅ User {current_user.id} has completed onboarding (from User table)")
@@ -236,12 +229,22 @@ def get_current_user_business_config(
                 "standardTimeEstimate": None,
                 "deepTimeEstimate": None,
                 "activeTemplates": [],
-                "acceptedFrequencies": ["one-time", "daily", "2x-per-week", "3x-per-week", "weekly", "bi-weekly", "monthly"],
+                "acceptedFrequencies": [
+                    "one-time",
+                    "daily",
+                    "2x-per-week",
+                    "3x-per-week",
+                    "weekly",
+                    "bi-weekly",
+                    "monthly",
+                ],
                 "acceptedPaymentMethods": [],
             }
         else:
             # User hasn't completed onboarding, return 404 as before
-            logger.warning(f"⚠️ Business config not found and onboarding not completed for user_id: {current_user.id}")
+            logger.warning(
+                f"⚠️ Business config not found and onboarding not completed for user_id: {current_user.id}"
+            )
             raise HTTPException(status_code=404, detail="Business config not found")
 
     # Generate presigned URLs for logo and signature if they exist
@@ -263,7 +266,7 @@ def get_current_user_business_config(
     # CRITICAL FIX: Always check both BusinessConfig.onboarding_complete AND User.onboarding_completed
     # Return true if EITHER is true (prevents losing onboarding status)
     onboarding_complete = config.onboarding_complete or current_user.onboarding_completed
-    
+
     logger.info(f"🔄 Onboarding status check for user {current_user.id}:")
     logger.info(f"   - BusinessConfig.onboarding_complete: {config.onboarding_complete}")
     logger.info(f"   - User.onboarding_completed: {current_user.onboarding_completed}")
@@ -336,9 +339,7 @@ def get_current_user_business_config(
 @router.post("")
 def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get_db)):
     logger.info(f"📥 Creating business config for firebase_uid: {data.firebaseUid}")
-    logger.info(
-        f"📋 Data received: pricingModel={data.pricingModel}, logoUrl={data.logoUrl}"
-    )
+    logger.info(f"📋 Data received: pricingModel={data.pricingModel}, logoUrl={data.logoUrl}")
     logger.info(
         f"📋 Pricing data: ratePerSqft={data.ratePerSqft}, hourlyRate={data.hourlyRate}, flatRate={data.flatRate}"
     )
@@ -349,11 +350,9 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
         user = db.query(User).filter(User.firebase_uid == data.firebaseUid).first()
         if not user:
             logger.error(f"❌ User not found for firebase_uid: {data.firebaseUid}")
-            raise HTTPException(status_code=404, detail="User not found")
+            raise HTTPException(status_code=404, detail="User not found") from e
 
-        existing = (
-            db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
-        )
+        existing = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
 
         if existing:
             logger.info(
@@ -371,7 +370,9 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 existing.onboarding_complete = data.onboardingComplete
                 # CRITICAL FIX: Also update User.onboarding_completed to keep them synchronized
                 user.onboarding_completed = data.onboardingComplete
-                logger.info(f"🔄 Synchronized onboarding status to {data.onboardingComplete} for user {user.id} (existing config)")
+                logger.info(
+                    f"🔄 Synchronized onboarding status to {data.onboardingComplete} for user {user.id} (existing config)"
+                )
             if data.formEmbeddingEnabled is not None:
                 existing.form_embedding_enabled = data.formEmbeddingEnabled
             if is_provided(data.customFormsDomain):
@@ -450,9 +451,7 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
             if is_provided(data.firstCleaningDiscountType):
                 existing.first_cleaning_discount_type = data.firstCleaningDiscountType
             if is_provided(data.firstCleaningDiscountValue):
-                existing.first_cleaning_discount_value = to_float(
-                    data.firstCleaningDiscountValue
-                )
+                existing.first_cleaning_discount_value = to_float(data.firstCleaningDiscountValue)
 
             if is_provided(data.addonWindows):
                 existing.addon_windows = to_float(data.addonWindows)
@@ -483,13 +482,15 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
             if data.customPackages is not None:
                 existing.custom_packages = data.customPackages
             if data.activeTemplates is not None:
-                logger.info(f"📝 Updating active_templates from {existing.active_templates} to {data.activeTemplates}")
+                logger.info(
+                    f"📝 Updating active_templates from {existing.active_templates} to {data.activeTemplates}"
+                )
                 existing.active_templates = data.activeTemplates
             if data.acceptedFrequencies is not None:
                 existing.accepted_frequencies = data.acceptedFrequencies
             if data.acceptedPaymentMethods is not None:
                 existing.accepted_payment_methods = data.acceptedPaymentMethods
-            
+
             # Brand color synchronization
             if is_provided(data.brandColor):
                 existing.brand_color = data.brandColor
@@ -559,18 +560,29 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 preferred_units=data.preferredUnits,
                 custom_packages=data.customPackages,
                 active_templates=data.activeTemplates,
-                accepted_frequencies=data.acceptedFrequencies or ["one-time", "daily", "2x-per-week", "3x-per-week", "weekly", "bi-weekly", "monthly"],
+                accepted_frequencies=data.acceptedFrequencies
+                or [
+                    "one-time",
+                    "daily",
+                    "2x-per-week",
+                    "3x-per-week",
+                    "weekly",
+                    "bi-weekly",
+                    "monthly",
+                ],
                 accepted_payment_methods=data.acceptedPaymentMethods or [],
                 brand_color=data.brandColor or "#00C4B4",  # Default brand color
             )
-            
+
             logger.info(f"📝 Creating new config with active_templates: {data.activeTemplates}")
-            
+
             # Also update the user's default brand color to keep them synchronized
             if is_provided(data.brandColor):
                 user.default_brand_color = data.brandColor
-                logger.info(f"🎨 Set brand color to {data.brandColor} for new config user {user.id}")
-            
+                logger.info(
+                    f"🎨 Set brand color to {data.brandColor} for new config user {user.id}"
+                )
+
             db.add(config)
             db.commit()
 
@@ -581,8 +593,10 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
             # Also ensure BusinessConfig is updated if it exists
             if config:
                 config.onboarding_complete = data.onboardingComplete
-            logger.info(f"🔄 Synchronized onboarding status to {data.onboardingComplete} for user {user.id}")
-        
+            logger.info(
+                f"🔄 Synchronized onboarding status to {data.onboardingComplete} for user {user.id}"
+            )
+
         db.commit()
 
         return {"message": "Business configuration saved", "id": config.id}
@@ -592,7 +606,7 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
     except Exception as e:
         logger.error(f"❌ Error creating business config: {str(e)}")
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get("/{firebase_uid}")
@@ -683,17 +697,14 @@ def get_business_config(firebase_uid: str, db: Session = Depends(get_db)):
         "addonCarpetLarge": config.addon_carpet_large,
         "customPackages": config.custom_packages,
         "brandColor": config.brand_color,  # Brand color for business settings
-        "acceptedFrequencies": config.accepted_frequencies or ["one-time", "daily", "2x-per-week", "3x-per-week", "weekly", "bi-weekly", "monthly"],
+        "acceptedFrequencies": config.accepted_frequencies
+        or ["one-time", "daily", "2x-per-week", "3x-per-week", "weekly", "bi-weekly", "monthly"],
         "acceptedPaymentMethods": config.accepted_payment_methods or [],
     }
 
 
 @router.get("/public/branding/{firebase_uid}")
-def get_public_branding(
-    firebase_uid: str, 
-    request: Request,
-    db: Session = Depends(get_db)
-):
+def get_public_branding(firebase_uid: str, request: Request, db: Session = Depends(get_db)):
     """
     Public endpoint to get business branding (logo, name) for client-facing forms.
     No authentication required - accessed via shareable form links.
@@ -702,18 +713,19 @@ def get_public_branding(
     logger.info(f"📥 Getting public branding for firebase_uid: {firebase_uid}")
 
     # Custom domain security validation
-    if hasattr(request.state, 'is_custom_domain') and request.state.is_custom_domain:
+    if hasattr(request.state, "is_custom_domain") and request.state.is_custom_domain:
         # If this is a custom domain request, validate that the domain belongs to the requested user
-        if (not hasattr(request.state, 'custom_domain_user_uid') or 
-            request.state.custom_domain_user_uid != firebase_uid):
+        if (
+            not hasattr(request.state, "custom_domain_user_uid")
+            or request.state.custom_domain_user_uid != firebase_uid
+        ):
             logger.warning(
                 f"🚫 Custom domain security violation in branding: Domain user {getattr(request.state, 'custom_domain_user_uid', 'unknown')} "
                 f"does not match requested user {firebase_uid}"
             )
             raise HTTPException(
-                status_code=403,
-                detail="Access denied: Custom domain does not match requested user"
-            )
+                status_code=403, detail="Access denied: Custom domain does not match requested user"
+            ) from e
         logger.info(f"✅ Custom domain validation passed for branding {firebase_uid}")
 
     # Validate firebase_uid format to prevent injection
@@ -754,11 +766,7 @@ def get_public_branding(
 
 
 @router.get("/public/addons/{firebase_uid}")
-def get_public_addons(
-    firebase_uid: str, 
-    request: Request,
-    db: Session = Depends(get_db)
-):
+def get_public_addons(firebase_uid: str, request: Request, db: Session = Depends(get_db)):
     """
     Public endpoint to get business addon services for client-facing forms.
     No authentication required - accessed via shareable form links.
@@ -767,18 +775,19 @@ def get_public_addons(
     logger.info(f"📥 Getting public addons for firebase_uid: {firebase_uid}")
 
     # Custom domain security validation
-    if hasattr(request.state, 'is_custom_domain') and request.state.is_custom_domain:
+    if hasattr(request.state, "is_custom_domain") and request.state.is_custom_domain:
         # If this is a custom domain request, validate that the domain belongs to the requested user
-        if (not hasattr(request.state, 'custom_domain_user_uid') or 
-            request.state.custom_domain_user_uid != firebase_uid):
+        if (
+            not hasattr(request.state, "custom_domain_user_uid")
+            or request.state.custom_domain_user_uid != firebase_uid
+        ):
             logger.warning(
                 f"🚫 Custom domain security violation in addons: Domain user {getattr(request.state, 'custom_domain_user_uid', 'unknown')} "
                 f"does not match requested user {firebase_uid}"
             )
             raise HTTPException(
-                status_code=403,
-                detail="Access denied: Custom domain does not match requested user"
-            )
+                status_code=403, detail="Access denied: Custom domain does not match requested user"
+            ) from e
         logger.info(f"✅ Custom domain validation passed for addons {firebase_uid}")
 
     # Validate firebase_uid format to prevent injection
@@ -819,16 +828,13 @@ def get_public_addons(
         "discountWeekly": config.discount_weekly,
         "discountBiweekly": config.discount_biweekly,
         "discountMonthly": config.discount_monthly,
-        "acceptedFrequencies": config.accepted_frequencies or ["one-time", "daily", "2x-per-week", "3x-per-week", "weekly", "bi-weekly", "monthly"],
+        "acceptedFrequencies": config.accepted_frequencies
+        or ["one-time", "daily", "2x-per-week", "3x-per-week", "weekly", "bi-weekly", "monthly"],
     }
 
 
 @router.get("/{firebase_uid}/public-info")
-def get_public_business_info(
-    firebase_uid: str, 
-    request: Request,
-    db: Session = Depends(get_db)
-):
+def get_public_business_info(firebase_uid: str, request: Request, db: Session = Depends(get_db)):
     """
     Get public business information including working hours and schedules (for business-aware calendar)
     No authentication required - accessed via client forms and scheduling components.
@@ -837,17 +843,18 @@ def get_public_business_info(
     logger.info(f"📥 Getting public business info for firebase_uid: {firebase_uid}")
 
     # Custom domain security validation
-    if hasattr(request.state, 'is_custom_domain') and request.state.is_custom_domain:
+    if hasattr(request.state, "is_custom_domain") and request.state.is_custom_domain:
         # If this is a custom domain request, validate that the domain belongs to the requested user
-        if (not hasattr(request.state, 'custom_domain_user_uid') or 
-            request.state.custom_domain_user_uid != firebase_uid):
+        if (
+            not hasattr(request.state, "custom_domain_user_uid")
+            or request.state.custom_domain_user_uid != firebase_uid
+        ):
             logger.warning(
                 f"🚫 Custom domain security violation in public info: Domain user {getattr(request.state, 'custom_domain_user_uid', 'unknown')} "
                 f"does not match requested user {firebase_uid}"
             )
             raise HTTPException(
-                status_code=403,
-                detail="Access denied: Custom domain does not match requested user"
+                status_code=403, detail="Access denied: Custom domain does not match requested user"
             )
         logger.info(f"✅ Custom domain validation passed for public info {firebase_uid}")
 
@@ -937,4 +944,3 @@ def get_public_business_info(
         "day_schedules": day_schedules,
         "off_work_periods": off_work_periods,
     }
-

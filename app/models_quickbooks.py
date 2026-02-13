@@ -2,7 +2,8 @@
 QuickBooks Integration Models
 Database models for storing QuickBooks OAuth tokens and sync data
 """
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, JSON
+
+from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -11,6 +12,7 @@ from .database import Base
 
 class QuickBooksIntegration(Base):
     """Store QuickBooks OAuth tokens and company information"""
+
     __tablename__ = "quickbooks_integrations"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -30,7 +32,7 @@ class QuickBooksIntegration(Base):
     sync_invoices = Column(Boolean, default=True)
     sync_payments = Column(Boolean, default=True)
     sync_customers = Column(Boolean, default=True)
-    
+
     # Last sync tracking
     last_invoice_sync = Column(DateTime, nullable=True)
     last_payment_sync = Column(DateTime, nullable=True)
@@ -48,23 +50,24 @@ class QuickBooksIntegration(Base):
 
 class QuickBooksSyncLog(Base):
     """Track QuickBooks sync operations"""
+
     __tablename__ = "quickbooks_sync_logs"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     integration_id = Column(Integer, ForeignKey("quickbooks_integrations.id"), nullable=False)
-    
+
     sync_type = Column(String(50), nullable=False)  # invoice, payment, customer
     entity_type = Column(String(50), nullable=False)  # Contract, Invoice, Client
     entity_id = Column(Integer, nullable=False)
-    
+
     quickbooks_id = Column(String(255), nullable=True)  # QuickBooks entity ID
-    
+
     status = Column(String(50), nullable=False)  # success, failed, pending
     error_message = Column(Text, nullable=True)
-    
+
     sync_data = Column(JSON, nullable=True)  # Store sync details
-    
+
     created_at = Column(DateTime, server_default=func.now())
 
     # Relationships

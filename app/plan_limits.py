@@ -1,17 +1,17 @@
 """
 Plan limits and utilities for subscription-based client restrictions.
 """
+
 from datetime import datetime, timedelta
 from typing import Optional
+
 from sqlalchemy.orm import Session
+
 from .models import User
 
 # Plan limits configuration (no free plan - all users must have paid plans)
-PLAN_LIMITS = {
-    "solo": 10,
-    "team": 50,
-    "enterprise": None  # None means unlimited
-}
+PLAN_LIMITS = {"solo": 10, "team": 50, "enterprise": None}  # None means unlimited
+
 
 def get_plan_limit(plan: Optional[str]) -> Optional[int]:
     """Get the client limit for a given plan. Returns None for unlimited, 0 for no plan."""
@@ -39,10 +39,10 @@ def check_and_reset_monthly_counter(user: User, db: Session) -> None:
     Reset happens 30 days after the subscription start date, not on the first of the month.
     """
     now = datetime.utcnow()
-    
+
     # Use subscription_start_date if available, otherwise fall back to created_at
     subscription_start = user.subscription_start_date or user.created_at or now
-    
+
     # If no reset date set, initialize it based on subscription start
     if user.month_reset_date is None:
         next_reset = _calculate_next_reset_date(subscription_start, now)
@@ -50,16 +50,17 @@ def check_and_reset_monthly_counter(user: User, db: Session) -> None:
         user.clients_this_month = 0
         db.commit()
         return
-    
+
     # Check if we've passed the reset date
     if now >= user.month_reset_date:
         # Reset counter
         user.clients_this_month = 0
-        
+
         # Calculate next reset date (30 days from subscription anniversary)
         next_reset = _calculate_next_reset_date(subscription_start, now)
         user.month_reset_date = next_reset
         db.commit()
+
 
 def can_add_client(user: User, db: Session) -> tuple:
     """
@@ -69,23 +70,27 @@ def can_add_client(user: User, db: Session) -> tuple:
     # Check if user has a plan
     if not user.plan:
         return (False, "Please select a plan to start adding clients.")
-    
+
     # Reset counter if needed
     check_and_reset_monthly_counter(user, db)
-    
+
     # Get plan limit
     limit = get_plan_limit(user.plan)
-    
+
     # Unlimited plan
     if limit is None:
         return (True, None)
-    
+
     # Check if under limit
     if user.clients_this_month < limit:
         return (True, None)
-    
+
     # Limit reached
-    return (False, f"You've reached your plan limit of {limit} clients per month. Please upgrade to add more clients.")
+    return (
+        False,
+        f"You've reached your plan limit of {limit} clients per month. Please upgrade to add more clients.",
+    )
+
 
 def increment_client_count(user: User, db: Session) -> None:
     """
@@ -96,6 +101,7 @@ def increment_client_count(user: User, db: Session) -> None:
     check_and_reset_monthly_counter(user, db)
     user.clients_this_month += 1
     db.commit()
+
 
 def decrement_client_count(user: User, db: Session) -> None:
     """
@@ -108,20 +114,21 @@ def decrement_client_count(user: User, db: Session) -> None:
         user.clients_this_month -= 1
         db.commit()
 
+
 def get_usage_stats(user: User, db: Session) -> dict:
     """
     Get current usage statistics for the user.
     Returns dict with limit, current, remaining, and reset_date.
     """
     check_and_reset_monthly_counter(user, db)
-    
+
     limit = get_plan_limit(user.plan)
     current = user.clients_this_month
-    
+
     return {
         "plan": user.plan,
         "limit": limit,  # None for unlimited
         "current": current,
         "remaining": None if limit is None else max(0, limit - current),
-        "reset_date": user.month_reset_date.isoformat() if user.month_reset_date else None
+        "reset_date": user.month_reset_date.isoformat() if user.month_reset_date else None,
     }

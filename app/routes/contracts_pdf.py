@@ -2,21 +2,23 @@
 PDF Contract Generation using Playwright (Chromium)
 Generates professional contracts from HTML templates and stores them privately in R2
 """
+
 import logging
 import os
-import uuid
 from datetime import datetime, timedelta
 from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
-from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from ..database import get_db
-from ..models import User, BusinessConfig, Client, Contract
+from sqlalchemy.orm import Session
+
 from ..auth import get_current_user
-from .upload import generate_presigned_url, get_r2_client
-from ..config import R2_BUCKET_NAME, FRONTEND_URL
+from ..config import FRONTEND_URL, R2_BUCKET_NAME
+from ..database import get_db
+from ..models import BusinessConfig, Client, Contract, User
 from ..rate_limiter import create_rate_limiter, rate_limit_dependency
+from .upload import generate_presigned_url, get_r2_client
 
 logger = logging.getLogger(__name__)
 
@@ -24,11 +26,9 @@ router = APIRouter(prefix="/contracts", tags=["Contracts PDF"])
 
 # Rate limiters for contract download
 rate_limit_download_per_ip = create_rate_limiter(
-    limit=5,
-    window_seconds=60,
-    key_prefix="contract_download_ip",
-    use_ip=True
+    limit=5, window_seconds=60, key_prefix="contract_download_ip", use_ip=True
 )
+
 
 async def rate_limit_per_contract(request: Request, contract_id: int):
     """Rate limit by contract ID - 3 downloads per minute per contract"""
@@ -37,14 +37,16 @@ async def rate_limit_per_contract(request: Request, contract_id: int):
         limit=3,
         window_seconds=60,
         key_prefix=f"contract_download_id_{contract_id}",
-        use_ip=False
+        use_ip=False,
     )
+
 
 class ContractGenerateRequest(BaseModel):
     clientId: int
     ownerUid: str
     formData: dict
     clientSignature: Optional[str] = None  # Base64 signature from client
+
 
 def calculate_estimated_hours(config: BusinessConfig, property_size: int) -> float:
     """Calculate estimated hours using the new three-category system or fallback to legacy"""
@@ -63,11 +65,17 @@ def calculate_estimated_hours(config: BusinessConfig, property_size: int) -> flo
         else:
             # Fallback if specific category not configured
             if property_size < 1500:
-                return config.time_small_job or config.time_medium_job or config.time_large_job or 1.5
+                return (
+                    config.time_small_job or config.time_medium_job or config.time_large_job or 1.5
+                )
             elif property_size > 2500:
-                return config.time_large_job or config.time_medium_job or config.time_small_job or 4.0
+                return (
+                    config.time_large_job or config.time_medium_job or config.time_small_job or 4.0
+                )
             else:  # 1500-2500 range
-                return config.time_medium_job or config.time_large_job or config.time_small_job or 2.5
+                return (
+                    config.time_medium_job or config.time_large_job or config.time_small_job or 2.5
+                )
 
     # Fallback to legacy system
     elif config.cleaning_time_per_sqft and property_size:
@@ -84,12 +92,13 @@ def calculate_estimated_hours(config: BusinessConfig, property_size: int) -> flo
         else:
             return 4.0  # Very large home: max 4 hours
 
+
 def _get_selected_package_details(config: BusinessConfig, form_data: dict) -> dict:
     """Get details of the selected package for quote display"""
     selected_package_id = form_data.get("selectedPackage")
     if not selected_package_id or not config.custom_packages:
         return None
-    
+
     for package in config.custom_packages:
         if package.get("id") == selected_package_id:
             return {
@@ -103,20 +112,26 @@ def _get_selected_package_details(config: BusinessConfig, form_data: dict) -> di
                 "priceMin": package.get("priceMin"),
                 "priceMax": package.get("priceMax"),
             }
-    
+
     return None
+
 
 def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
     """Calculate quote based on business config and form data"""
     import logging
+
     logger = logging.getLogger(__name__)
 
     pricing_model = config.pricing_model
     property_size = int(form_data.get("squareFootage", 0) or 0)
     num_rooms = int(form_data.get("numberOfOffices", 0) or form_data.get("numberOfRooms", 0) or 0)
     frequency = form_data.get("cleaningFrequency", "Weekly")
-    logger.info(f"📊 Config rates - sqft: {config.rate_per_sqft}, hourly: {config.hourly_rate}, flat: {config.flat_rate}")
-    logger.info(f"📊 Pricing model: {pricing_model}, property_size: {property_size}, num_rooms: {num_rooms}, frequency: {frequency}")
+    logger.info(
+        f"📊 Config rates - sqft: {config.rate_per_sqft}, hourly: {config.hourly_rate}, flat: {config.flat_rate}"
+    )
+    logger.info(
+        f"📊 Pricing model: {pricing_model}, property_size: {property_size}, num_rooms: {num_rooms}, frequency: {frequency}"
+    )
 
     base_price = 0.0
     estimated_hours = 0.0
@@ -140,7 +155,7 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
                 if package.get("id") == selected_package_id:
                     selected_package = package
                     break
-            
+
             if selected_package:
                 # Calculate price based on package pricing type
                 if selected_package.get("priceType") == "flat" and selected_package.get("price"):
@@ -159,19 +174,25 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
                 else:
                     # Quote-based pricing - set flag for manual quote
                     base_price = 0.0
-                
+
                 # Use package duration for time estimation
                 if selected_package.get("duration"):
-                    estimated_hours = float(selected_package["duration"]) / 60.0  # Convert minutes to hours
+                    estimated_hours = (
+                        float(selected_package["duration"]) / 60.0
+                    )  # Convert minutes to hours
                 else:
                     # Fallback to standard time estimation
                     estimated_hours = calculate_estimated_hours(config, property_size)
-                
-                logger.info(f"📦 Package pricing - selected: {selected_package.get('name')}, price: ${base_price}, duration: {estimated_hours}h")
+
+                logger.info(
+                    f"📦 Package pricing - selected: {selected_package.get('name')}, price: ${base_price}, duration: {estimated_hours}h"
+                )
             else:
                 logger.warning(f"⚠️ Selected package {selected_package_id} not found in config")
         else:
-            logger.warning(f"⚠️ No package selected or no packages configured for packages pricing model")
+            logger.warning(
+                "⚠️ No package selected or no packages configured for packages pricing model"
+            )
     elif pricing_model == "flat":
         # Flat-fee pricing can be configured either as a single legacy flat_rate
         # or as 3 size-based rates (small/medium/large).
@@ -185,8 +206,15 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
                 return config.flat_rate_large or 0.0
             # Gap ranges: choose the closest configured value.
             if property_size < 1500:
-                return config.flat_rate_small or config.flat_rate_medium or config.flat_rate_large or 0.0
-            return config.flat_rate_medium or config.flat_rate_large or config.flat_rate_small or 0.0
+                return (
+                    config.flat_rate_small
+                    or config.flat_rate_medium
+                    or config.flat_rate_large
+                    or 0.0
+                )
+            return (
+                config.flat_rate_medium or config.flat_rate_large or config.flat_rate_small or 0.0
+            )
 
         base_price = _pick_size_flat_rate() or (config.flat_rate or 0.0)
         if base_price:
@@ -195,9 +223,13 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
 
     # If no pricing model matched or base_price is still 0, try fallbacks
     if base_price == 0:
-        logger.warning(f"⚠️ Base price is 0 after initial calculation - pricing_model: {pricing_model}, trying fallback rates")
+        logger.warning(
+            f"⚠️ Base price is 0 after initial calculation - pricing_model: {pricing_model}, trying fallback rates"
+        )
         # Try each rate type as fallback
-        if (config.flat_rate_small or config.flat_rate_medium or config.flat_rate_large) and property_size > 0:
+        if (
+            config.flat_rate_small or config.flat_rate_medium or config.flat_rate_large
+        ) and property_size > 0:
             # Use size-based flat rates as first fallback when property size is known
             if property_size < 1000:
                 base_price = config.flat_rate_small or 0.0
@@ -206,8 +238,15 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
             elif property_size > 2500:
                 base_price = config.flat_rate_large or 0.0
             else:
-                base_price = config.flat_rate_small or config.flat_rate_medium or config.flat_rate_large or 0.0
-            estimated_hours = calculate_estimated_hours(config, property_size) if base_price else 0.0
+                base_price = (
+                    config.flat_rate_small
+                    or config.flat_rate_medium
+                    or config.flat_rate_large
+                    or 0.0
+                )
+            estimated_hours = (
+                calculate_estimated_hours(config, property_size) if base_price else 0.0
+            )
         elif config.flat_rate and config.flat_rate > 0:
             base_price = config.flat_rate
             estimated_hours = 2
@@ -240,8 +279,10 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
     if config.minimum_charge and base_price < config.minimum_charge:
         logger.info(f"📊 Applying minimum charge: ${config.minimum_charge} (was ${base_price})")
         base_price = config.minimum_charge
-    
-    logger.info(f"📊 Base price after all calculations: ${base_price}, estimated_hours: {estimated_hours}")
+
+    logger.info(
+        f"📊 Base price after all calculations: ${base_price}, estimated_hours: {estimated_hours}"
+    )
     # Calculate add-ons
     addon_total = 0.0
     addon_details = []
@@ -253,59 +294,69 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
             quantity = addon_quantities.get("addon_windows", 1)
             addon_price = config.addon_windows * quantity
             addon_total += addon_price
-            addon_details.append({
-                "name": "Window Cleaning",
-                "quantity": quantity,
-                "unit_price": config.addon_windows,
-                "total_price": addon_price,
-                "pricing_metric": "per window"
-            })
+            addon_details.append(
+                {
+                    "name": "Window Cleaning",
+                    "quantity": quantity,
+                    "unit_price": config.addon_windows,
+                    "total_price": addon_price,
+                    "pricing_metric": "per window",
+                }
+            )
         # Size-based carpet cleaning addons
         if "addon_carpet_small" in selected_addons and config.addon_carpet_small:
             quantity = addon_quantities.get("addon_carpet_small", 1)
             addon_price = config.addon_carpet_small * quantity
             addon_total += addon_price
-            addon_details.append({
-                "name": "Small Carpet Cleaning",
-                "quantity": quantity,
-                "unit_price": config.addon_carpet_small,
-                "total_price": addon_price,
-                "pricing_metric": "per carpet"
-            })
+            addon_details.append(
+                {
+                    "name": "Small Carpet Cleaning",
+                    "quantity": quantity,
+                    "unit_price": config.addon_carpet_small,
+                    "total_price": addon_price,
+                    "pricing_metric": "per carpet",
+                }
+            )
         if "addon_carpet_medium" in selected_addons and config.addon_carpet_medium:
             quantity = addon_quantities.get("addon_carpet_medium", 1)
             addon_price = config.addon_carpet_medium * quantity
             addon_total += addon_price
-            addon_details.append({
-                "name": "Medium Carpet Cleaning",
-                "quantity": quantity,
-                "unit_price": config.addon_carpet_medium,
-                "total_price": addon_price,
-                "pricing_metric": "per carpet"
-            })
+            addon_details.append(
+                {
+                    "name": "Medium Carpet Cleaning",
+                    "quantity": quantity,
+                    "unit_price": config.addon_carpet_medium,
+                    "total_price": addon_price,
+                    "pricing_metric": "per carpet",
+                }
+            )
         if "addon_carpet_large" in selected_addons and config.addon_carpet_large:
             quantity = addon_quantities.get("addon_carpet_large", 1)
             addon_price = config.addon_carpet_large * quantity
             addon_total += addon_price
-            addon_details.append({
-                "name": "Large Carpet Cleaning",
-                "quantity": quantity,
-                "unit_price": config.addon_carpet_large,
-                "total_price": addon_price,
-                "pricing_metric": "per carpet"
-            })
+            addon_details.append(
+                {
+                    "name": "Large Carpet Cleaning",
+                    "quantity": quantity,
+                    "unit_price": config.addon_carpet_large,
+                    "total_price": addon_price,
+                    "pricing_metric": "per carpet",
+                }
+            )
         # Legacy carpet addon for backward compatibility
         if "addon_carpets" in selected_addons and config.addon_carpets:
             quantity = addon_quantities.get("addon_carpets", 1)
             addon_price = config.addon_carpets * quantity
             addon_total += addon_price
-            addon_details.append({
-                "name": "Carpet Cleaning",
-                "quantity": quantity,
-                "unit_price": config.addon_carpets,
-                "total_price": addon_price,
-                "pricing_metric": "per sq ft"
-            })
+            addon_details.append(
+                {
+                    "name": "Carpet Cleaning",
+                    "quantity": quantity,
+                    "unit_price": config.addon_carpets,
+                    "total_price": addon_price,
+                    "pricing_metric": "per sq ft",
+                }
+            )
         # Process custom add-ons
         if config.custom_addons:
             for custom_addon in config.custom_addons:
@@ -322,13 +373,15 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
 
                     addon_price = unit_price * quantity
                     addon_total += addon_price
-                    addon_details.append({
-                        "name": custom_addon.get("name", "Custom Add-on"),
-                        "quantity": quantity,
-                        "unit_price": unit_price,
-                        "total_price": addon_price,
-                        "pricing_metric": pricing_metric
-                    })
+                    addon_details.append(
+                        {
+                            "name": custom_addon.get("name", "Custom Add-on"),
+                            "quantity": quantity,
+                            "unit_price": unit_price,
+                            "total_price": addon_price,
+                            "pricing_metric": pricing_metric,
+                        }
+                    )
     logger.info(f"📊 Total add-ons: ${addon_total}")
 
     # Apply frequency discount to base price only (not add-ons)
@@ -352,21 +405,31 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
     first_cleaning_discount_type = None
     first_cleaning_discount_value = None
 
-    logger.info(f"🔍 First cleaning discount check - isFirstCleaning: {is_first_cleaning}, "
-                f"config.first_cleaning_discount_value: {getattr(config, 'first_cleaning_discount_value', None)}, "
-                f"config.first_cleaning_discount_type: {getattr(config, 'first_cleaning_discount_type', None)}")
+    logger.info(
+        f"🔍 First cleaning discount check - isFirstCleaning: {is_first_cleaning}, "
+        f"config.first_cleaning_discount_value: {getattr(config, 'first_cleaning_discount_value', None)}, "
+        f"config.first_cleaning_discount_type: {getattr(config, 'first_cleaning_discount_type', None)}"
+    )
 
     if is_first_cleaning and getattr(config, "first_cleaning_discount_value", None):
-        first_cleaning_discount_type = getattr(config, "first_cleaning_discount_type", None) or "percent"
-        first_cleaning_discount_value = float(getattr(config, "first_cleaning_discount_value") or 0)
+        first_cleaning_discount_type = (
+            getattr(config, "first_cleaning_discount_type", None) or "percent"
+        )
+        first_cleaning_discount_value = float(config.first_cleaning_discount_value or 0)
 
-        logger.info(f"💰 Applying first cleaning discount - type: {first_cleaning_discount_type}, value: {first_cleaning_discount_value}, discounted_base_price: ${discounted_base_price:.2f}")
+        logger.info(
+            f"💰 Applying first cleaning discount - type: {first_cleaning_discount_type}, value: {first_cleaning_discount_value}, discounted_base_price: ${discounted_base_price:.2f}"
+        )
 
         if first_cleaning_discount_type == "fixed":
-            first_cleaning_discount_amount = min(first_cleaning_discount_value, discounted_base_price)
+            first_cleaning_discount_amount = min(
+                first_cleaning_discount_value, discounted_base_price
+            )
         else:
             # Default to percent
-            first_cleaning_discount_amount = discounted_base_price * (first_cleaning_discount_value / 100.0)
+            first_cleaning_discount_amount = discounted_base_price * (
+                first_cleaning_discount_value / 100.0
+            )
 
         logger.info(f"💰 First cleaning discount calculated: ${first_cleaning_discount_amount:.2f}")
 
@@ -386,7 +449,13 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
     service_occurrences = None
 
     # Check if this is a one-time service (no contract duration needed)
-    one_time_frequencies = ["One-time", "One-time deep clean", "Per turnover", "On-demand", "As needed"]
+    one_time_frequencies = [
+        "One-time",
+        "One-time deep clean",
+        "Per turnover",
+        "On-demand",
+        "As needed",
+    ]
     is_one_time = frequency in one_time_frequencies
 
     if term_duration and not is_one_time:
@@ -426,9 +495,11 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
 
     # If still no price, set a flag for "quote pending"
     quote_pending = base_price == 0 and final_price == 0
-    
-    logger.info(f"📊 Final quote calculation - base_price: ${base_price}, discount_amount: ${discount_amount}, addon_total: ${addon_total}, final_price: ${final_price}, quote_pending: {quote_pending}")
-    
+
+    logger.info(
+        f"📊 Final quote calculation - base_price: ${base_price}, discount_amount: ${discount_amount}, addon_total: ${addon_total}, final_price: ${final_price}, quote_pending: {quote_pending}"
+    )
+
     # Special handling for packages pricing model
     if pricing_model == "packages":
         selected_package_id = form_data.get("selectedPackage")
@@ -448,7 +519,11 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
         "discount_percent": discount_percent,
         "discount_amount": round(discount_amount, 2),
         "first_cleaning_discount_type": first_cleaning_discount_type,
-        "first_cleaning_discount_value": round(first_cleaning_discount_value, 2) if first_cleaning_discount_value is not None else None,
+        "first_cleaning_discount_value": (
+            round(first_cleaning_discount_value, 2)
+            if first_cleaning_discount_value is not None
+            else None
+        ),
         "first_cleaning_discount_amount": round(first_cleaning_discount_amount, 2),
         "addon_amount": round(addon_total, 2),
         "addon_details": addon_details,
@@ -462,8 +537,13 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
         "total_term_rate": round(total_term_rate, 2) if total_term_rate else None,
         "service_occurrences": service_occurrences,
         "quote_pending": quote_pending,
-        "selected_package": _get_selected_package_details(config, form_data) if pricing_model == "packages" else None,
+        "selected_package": (
+            _get_selected_package_details(config, form_data)
+            if pricing_model == "packages"
+            else None
+        ),
     }
+
 
 async def generate_contract_html(
     business_config: BusinessConfig,
@@ -474,16 +554,22 @@ async def generate_contract_html(
     client_signature: Optional[str] = None,
     provider_signature: Optional[str] = None,
     contract_created_at: Optional[datetime] = None,
-    contract_public_id: Optional[str] = None
+    contract_public_id: Optional[str] = None,
 ) -> str:
     """Generate HTML for the contract"""
 
     # Debug logging for business config pricing
-    logger.info(f"🖼️ Business config branding - name: {business_config.business_name}, logo: {business_config.logo_url}")
+    logger.info(
+        f"🖼️ Business config branding - name: {business_config.business_name}, logo: {business_config.logo_url}"
+    )
 
     # Warn if all pricing fields are NULL
-    if not any([business_config.rate_per_sqft, business_config.hourly_rate, business_config.flat_rate]):
-        logger.warning(f"⚠️ ALL PRICING FIELDS ARE NULL for user_id: {business_config.user_id} - user needs to update pricing in Settings")
+    if not any(
+        [business_config.rate_per_sqft, business_config.hourly_rate, business_config.flat_rate]
+    ):
+        logger.warning(
+            f"⚠️ ALL PRICING FIELDS ARE NULL for user_id: {business_config.user_id} - user needs to update pricing in Settings"
+        )
 
     # Debug logging for signatures - INPUT
     if client_signature:
@@ -495,13 +581,15 @@ async def generate_contract_html(
     logo_url = None
     signature_url = None
 
-    logger.info(f"🏢 Business config - name: {business_name}, logo_url key: {business_config.logo_url}")
+    logger.info(
+        f"🏢 Business config - name: {business_name}, logo_url key: {business_config.logo_url}"
+    )
 
     # Download and convert logo to base64 for Playwright
     if business_config.logo_url:
         try:
             # Check if logo_url is already a full URL (shouldn't be, but handle it)
-            if business_config.logo_url.startswith('http'):
+            if business_config.logo_url.startswith("http"):
                 presigned_logo_url = business_config.logo_url
             else:
                 presigned_logo_url = generate_presigned_url(business_config.logo_url)
@@ -509,10 +597,13 @@ async def generate_contract_html(
             if logo_url:
                 pass  # Logo successfully downloaded
             else:
-                logger.warning(f"⚠️ Logo download returned None for URL: {presigned_logo_url[:100]}...")
+                logger.warning(
+                    f"⚠️ Logo download returned None for URL: {presigned_logo_url[:100]}..."
+                )
         except Exception as e:
             logger.error(f"❌ Failed to generate/download logo: {type(e).__name__}: {e}")
             import traceback
+
             logger.error(f"❌ Traceback: {traceback.format_exc()}")
     else:
         pass  # No logo URL configured
@@ -555,15 +646,26 @@ async def generate_contract_html(
     # Contract details - use passed date or current date for new contracts
     base_date = contract_created_at or datetime.now()
     contract_date = base_date.strftime("%B %d, %Y")
-    
+
     # Use secure random contract ID instead of sequential numbering
     # Format: CLN-{first 8 chars of UUID} (e.g., CLN-A7B3C9D2)
     # This prevents enumeration attacks and provides collision-resistant IDs
-    contract_number = f"CLN-{contract_public_id[:8].upper()}" if contract_public_id else f"CLN-DRAFT-{base_date.strftime('%Y%m%d')}"
+    contract_number = (
+        f"CLN-{contract_public_id[:8].upper()}"
+        if contract_public_id
+        else f"CLN-DRAFT-{base_date.strftime('%Y%m%d')}"
+    )
 
     # Smart start date logic based on service type
     frequency = quote["frequency"]
-    one_time_frequencies = ["One-time", "One-time deep clean", "Per turnover", "On-demand", "As needed", "one-time"]
+    one_time_frequencies = [
+        "One-time",
+        "One-time deep clean",
+        "Per turnover",
+        "On-demand",
+        "As needed",
+        "one-time",
+    ]
     is_recurring = frequency not in one_time_frequencies
 
     if is_recurring:
@@ -600,7 +702,9 @@ async def generate_contract_html(
     property_shots_b64 = []
 
     # Special requests from client form
-    special_requests = form_data.get("specialRequests", "").strip() if form_data.get("specialRequests") else None
+    special_requests = (
+        form_data.get("specialRequests", "").strip() if form_data.get("specialRequests") else None
+    )
     if special_requests == "":
         special_requests = None
 
@@ -615,13 +719,27 @@ async def generate_contract_html(
     exclusions = standard_exclusions + custom_exclusions
 
     # Build inclusions/exclusions HTML
-    inclusions_html = "".join([f"<li>{item}</li>" for item in inclusions]) if inclusions else "<li>Standard cleaning services</li>"
-    exclusions_html = "".join([f"<li>{item}</li>" for item in exclusions]) if exclusions else "<li>None specified</li>"
-    logger.info(f"🖊️ [BEFORE TEMPLATE] Client client_signature: {'SET (' + str(len(client_signature)) + ' chars)' if client_signature else 'NOT SET (None)'}")
+    inclusions_html = (
+        "".join([f"<li>{item}</li>" for item in inclusions])
+        if inclusions
+        else "<li>Standard cleaning services</li>"
+    )
+    exclusions_html = (
+        "".join([f"<li>{item}</li>" for item in exclusions])
+        if exclusions
+        else "<li>None specified</li>"
+    )
+    logger.info(
+        f"🖊️ [BEFORE TEMPLATE] Client client_signature: {'SET (' + str(len(client_signature)) + ' chars)' if client_signature else 'NOT SET (None)'}"
+    )
     if signature_url:
-        logger.info(f"🖊️ [BEFORE TEMPLATE] Provider sig is base64: {signature_url.startswith('data:image')}")
+        logger.info(
+            f"🖊️ [BEFORE TEMPLATE] Provider sig is base64: {signature_url.startswith('data:image')}"
+        )
     if client_signature:
-        logger.info(f"🖊️ [BEFORE TEMPLATE] Client sig is base64: {client_signature.startswith('data:image')}")
+        logger.info(
+            f"🖊️ [BEFORE TEMPLATE] Client sig is base64: {client_signature.startswith('data:image')}"
+        )
 
     # Prepare signature HTML fragments
     provider_signature_html = ""
@@ -629,16 +747,19 @@ async def generate_contract_html(
         provider_signature_html = f"<img src='{signature_url}' alt='Provider Signature'>"
     else:
         provider_signature_html = ""
-    
+
     client_signature_html = ""
     if client_signature:
         client_signature_html = f"<img src='{client_signature}' alt='Client Signature'>"
     else:
         client_signature_html = ""
-    
+
     # Format accepted payment methods
     accepted_methods = "check, bank transfer, or other agreed-upon methods"  # Default
-    if business_config.accepted_payment_methods and len(business_config.accepted_payment_methods) > 0:
+    if (
+        business_config.accepted_payment_methods
+        and len(business_config.accepted_payment_methods) > 0
+    ):
         # Map internal payment method IDs to display names
         payment_method_names = {
             "cash": "Cash",
@@ -648,15 +769,15 @@ async def generate_contract_html(
             "paypal": "PayPal",
             "zelle": "Zelle",
             "bank-transfer": "Bank Transfer",
-            "square": "Square"
+            "square": "Square",
         }
-        
+
         # Convert payment method IDs to display names
         method_list = [
             payment_method_names.get(method, method.title())
             for method in business_config.accepted_payment_methods
         ]
-        
+
         # Format as comma-separated list with "and" before last item
         if len(method_list) == 1:
             accepted_methods = method_list[0]
@@ -664,7 +785,7 @@ async def generate_contract_html(
             accepted_methods = f"{method_list[0]} and {method_list[1]}"
         else:
             accepted_methods = ", ".join(method_list[:-1]) + f", and {method_list[-1]}"
-    
+
     html = f"""
 <!DOCTYPE html>
 <html lang="en">
@@ -1149,13 +1270,15 @@ async def generate_contract_html(
 """
     return html
 
+
 async def download_image_as_base64(url: str) -> str:
     """
     Download an image from a URL and return it as a base64 data URL.
     This is needed because Playwright cannot access external URLs during PDF generation.
     """
-    import httpx
     import base64
+
+    import httpx
 
     if not url:
         logger.warning("⚠️ download_image_as_base64 called with empty URL")
@@ -1165,22 +1288,24 @@ async def download_image_as_base64(url: str) -> str:
         logger.info(f"📥 Downloading image from: {url[:100]}...")
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.get(url)
-            logger.info(f"📥 Response status: {response.status_code}, content-type: {response.headers.get('content-type')}")
+            logger.info(
+                f"📥 Response status: {response.status_code}, content-type: {response.headers.get('content-type')}"
+            )
             response.raise_for_status()
 
             # Determine content type
-            content_type = response.headers.get('content-type', 'image/png')
+            content_type = response.headers.get("content-type", "image/png")
 
             # Handle content types that might have charset
-            if ';' in content_type:
-                content_type = content_type.split(';')[0].strip()
+            if ";" in content_type:
+                content_type = content_type.split(";")[0].strip()
 
             # Convert to base64
             image_bytes = response.content
             if len(image_bytes) == 0:
                 logger.warning("⚠️ Downloaded image has 0 bytes")
                 return None
-            b64_encoded = base64.b64encode(image_bytes).decode('utf-8')
+            b64_encoded = base64.b64encode(image_bytes).decode("utf-8")
 
             # Return as data URL
             return f"data:{content_type};base64,{b64_encoded}"
@@ -1194,6 +1319,7 @@ async def download_image_as_base64(url: str) -> str:
         logger.error(f"❌ Failed to download image from {url[:100]}...: {type(e).__name__}: {e}")
         return None
 
+
 async def html_to_pdf(html: str) -> bytes:
     """
     Convert HTML to PDF using Playwright via subprocess.
@@ -1203,10 +1329,9 @@ async def html_to_pdf(html: str) -> bytes:
     import base64
     import subprocess
     import sys
-    import os
 
     # Get the path to the pdf_worker script
-    worker_path = os.path.join(os.path.dirname(__file__), '..', 'pdf_worker.py')
+    worker_path = os.path.join(os.path.dirname(__file__), "..", "pdf_worker.py")
     worker_path = os.path.abspath(worker_path)
 
     # Get the correct Python executable from the venv
@@ -1214,7 +1339,7 @@ async def html_to_pdf(html: str) -> bytes:
     python_exe = sys.executable
 
     # Encode HTML as base64 to safely pass via stdin
-    html_b64 = base64.b64encode(html.encode('utf-8')).decode('utf-8')
+    html_b64 = base64.b64encode(html.encode("utf-8")).decode("utf-8")
 
     def run_worker():
         # Run the worker script as a separate process
@@ -1225,7 +1350,7 @@ async def html_to_pdf(html: str) -> bytes:
                 capture_output=True,
                 text=True,
                 timeout=120,  # 120 second timeout for slow systems
-                creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
+                creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
             )
 
             if result.returncode != 0:
@@ -1244,6 +1369,7 @@ async def html_to_pdf(html: str) -> bytes:
     # Run in thread pool to not block the event loop
     return await asyncio.to_thread(run_worker)
 
+
 def upload_pdf_to_r2(pdf_bytes: bytes, owner_uid: str, contract_public_id: str) -> str:
     """Upload PDF to R2 and return the key"""
     key = f"contracts/{owner_uid}/{contract_public_id}.pdf"
@@ -1258,17 +1384,15 @@ def upload_pdf_to_r2(pdf_bytes: bytes, owner_uid: str, contract_public_id: str) 
 
     return key
 
+
 @router.post("/generate-pdf")
-async def generate_contract_pdf(
-    data: ContractGenerateRequest,
-    db: Session = Depends(get_db)
-):
+async def generate_contract_pdf(data: ContractGenerateRequest, db: Session = Depends(get_db)):
     """Generate a PDF contract for a client submission and store in R2"""
     try:
         # Get the business owner
         user = db.query(User).filter(User.firebase_uid == data.ownerUid).first()
         if not user:
-            raise HTTPException(status_code=404, detail="Business not found")
+            raise HTTPException(status_code=404, detail="Business not found") from e
 
         # Get business config
         config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
@@ -1289,9 +1413,21 @@ async def generate_contract_pdf(
             client_id=client.id,
             title=f"Service Agreement - {client.business_name}",
             description=f"Auto-generated contract for {quote['frequency']} cleaning service",
-            contract_type="recurring" if quote['frequency'] not in ["One-time", "One-time deep clean", "Per turnover", "On-demand", "As needed", "one-time"] else "one-time",
+            contract_type=(
+                "recurring"
+                if quote["frequency"]
+                not in [
+                    "One-time",
+                    "One-time deep clean",
+                    "Per turnover",
+                    "On-demand",
+                    "As needed",
+                    "one-time",
+                ]
+                else "one-time"
+            ),
             status="new",
-            total_value=quote['final_price'],
+            total_value=quote["final_price"],
             payment_terms=f"Net {config.payment_due_days or 15} days",
         )
         db.add(contract)
@@ -1306,7 +1442,7 @@ async def generate_contract_pdf(
             quote,
             db,
             client_signature=data.clientSignature,
-            contract_public_id=contract.public_id
+            contract_public_id=contract.public_id,
         )
 
         # Generate PDF
@@ -1319,9 +1455,12 @@ async def generate_contract_pdf(
 
         # Generate backend URL instead of presigned R2 URL to avoid CORS issues
         from ..config import FRONTEND_URL
+
         # Determine the backend base URL based on the frontend URL
         if "localhost" in FRONTEND_URL:
-            backend_base = FRONTEND_URL.replace("localhost:5173", "localhost:8000").replace("localhost:5174", "localhost:8000")
+            backend_base = FRONTEND_URL.replace("localhost:5173", "localhost:8000").replace(
+                "localhost:5174", "localhost:8000"
+            )
         else:
             backend_base = "https://api.cleanenroll.com"
 
@@ -1330,7 +1469,7 @@ async def generate_contract_pdf(
             "contractId": contract.id,
             "pdfKey": pdf_key,
             "pdfUrl": backend_pdf_url,
-            "message": "Contract generated successfully"
+            "message": "Contract generated successfully",
         }
 
     except HTTPException:
@@ -1338,19 +1477,22 @@ async def generate_contract_pdf(
     except Exception as e:
         logger.error(f"❌ Error generating contract PDF: {str(e)}", exc_info=True)
         # Don't expose technical details to users in production
-        raise HTTPException(status_code=500, detail="Failed to generate contract. Please try again or contact support.")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to generate contract. Please try again or contact support.",
+        ) from e
+
 
 @router.get("/pdf/{contract_id}")
 async def get_contract_pdf(
-    contract_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    contract_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
     """Get a backend URL for a contract PDF (avoids CORS issues)"""
-    contract = db.query(Contract).filter(
-        Contract.id == contract_id,
-        Contract.user_id == current_user.id
-    ).first()
+    contract = (
+        db.query(Contract)
+        .filter(Contract.id == contract_id, Contract.user_id == current_user.id)
+        .first()
+    )
 
     if not contract:
         raise HTTPException(status_code=404, detail="Contract not found")
@@ -1361,22 +1503,22 @@ async def get_contract_pdf(
     try:
         # Generate backend URL instead of presigned R2 URL to avoid CORS issues
         from ..config import FRONTEND_URL
+
         # Determine the backend base URL based on the frontend URL
         if "localhost" in FRONTEND_URL:
-            backend_base = FRONTEND_URL.replace("localhost:5173", "localhost:8000").replace("localhost:5174", "localhost:8000")
+            backend_base = FRONTEND_URL.replace("localhost:5173", "localhost:8000").replace(
+                "localhost:5174", "localhost:8000"
+            )
         else:
             backend_base = "https://api.cleanenroll.com"
 
         backend_pdf_url = f"{backend_base}/contracts/pdf/public/{contract.public_id}"
 
-        return {
-            "url": backend_pdf_url,
-            "contractId": contract.id,
-            "title": contract.title
-        }
+        return {"url": backend_pdf_url, "contractId": contract.id, "title": contract.title}
     except Exception as e:
         logger.error(f"❌ Failed to generate presigned URL: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to generate PDF URL")
+        raise HTTPException(status_code=500, detail="Failed to generate PDF URL") from e
+
 
 @router.get("/pdf/download/{contract_id}")
 async def download_contract_pdf(
@@ -1384,7 +1526,7 @@ async def download_contract_pdf(
     request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-    _ip: None = Depends(rate_limit_download_per_ip)
+    _ip: None = Depends(rate_limit_download_per_ip),
 ):
     """
     Download a contract PDF directly
@@ -1392,10 +1534,11 @@ async def download_contract_pdf(
     """
     # Apply per-contract rate limit
     await rate_limit_per_contract(request, contract_id)
-    contract = db.query(Contract).filter(
-        Contract.id == contract_id,
-        Contract.user_id == current_user.id
-    ).first()
+    contract = (
+        db.query(Contract)
+        .filter(Contract.id == contract_id, Contract.user_id == current_user.id)
+        .first()
+    )
 
     if not contract:
         raise HTTPException(status_code=404, detail="Contract not found")
@@ -1406,7 +1549,7 @@ async def download_contract_pdf(
     try:
         r2 = get_r2_client()
         response = r2.get_object(Bucket=R2_BUCKET_NAME, Key=contract.pdf_key)
-        pdf_bytes = response['Body'].read()
+        pdf_bytes = response["Body"].read()
 
         return Response(
             content=pdf_bytes,
@@ -1415,19 +1558,20 @@ async def download_contract_pdf(
                 "Content-Disposition": f"attachment; filename=contract-{contract.id}.pdf",
                 "Access-Control-Allow-Origin": FRONTEND_URL,
                 "Access-Control-Allow-Methods": "GET",
-                "Access-Control-Allow-Headers": "Content-Type, Authorization"
-            }
+                "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            },
         )
     except Exception as e:
         logger.error(f"❌ Failed to download PDF: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to download PDF")
+        raise HTTPException(status_code=500, detail="Failed to download PDF") from e
+
 
 @router.get("/pdf/public/{contract_public_id}")
 async def view_contract_pdf_public(
     contract_public_id: str,
     request: Request,
     db: Session = Depends(get_db),
-    _ip: None = Depends(rate_limit_download_per_ip)
+    _ip: None = Depends(rate_limit_download_per_ip),
 ):
     """
     View a contract PDF publicly using the contract's public ID
@@ -1435,6 +1579,7 @@ async def view_contract_pdf_public(
     """
     # Validate UUID format
     from .contracts import validate_uuid
+
     if not validate_uuid(contract_public_id):
         raise HTTPException(status_code=400, detail="Invalid contract ID format")
 
@@ -1452,7 +1597,7 @@ async def view_contract_pdf_public(
     try:
         r2 = get_r2_client()
         response = r2.get_object(Bucket=R2_BUCKET_NAME, Key=contract.pdf_key)
-        pdf_bytes = response['Body'].read()
+        pdf_bytes = response["Body"].read()
 
         headers = {
             "Content-Disposition": f"inline; filename=contract-{contract.id}.pdf",
@@ -1464,21 +1609,14 @@ async def view_contract_pdf_public(
         if contract.pdf_hash:
             headers["ETag"] = contract.pdf_hash
 
-        return Response(
-            content=pdf_bytes,
-            media_type="application/pdf",
-            headers=headers
-        )
+        return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
     except Exception as e:
         logger.error(f"❌ Failed to serve PDF: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to load PDF")
+        raise HTTPException(status_code=500, detail="Failed to load PDF") from e
+
 
 @router.get("/preview/{client_id}")
-async def preview_contract(
-    client_id: int,
-    owner_uid: str,
-    db: Session = Depends(get_db)
-):
+async def preview_contract(client_id: int, owner_uid: str, db: Session = Depends(get_db)):
     """Preview contract HTML (for debugging)"""
     user = db.query(User).filter(User.firebase_uid == owner_uid).first()
     if not user:

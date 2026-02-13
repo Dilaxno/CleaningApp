@@ -140,10 +140,7 @@ async def upload_property_shot_public(
     # Build key
     safe_template = _safe_segment(templateId or "intake")
     safe_field = _safe_segment(fieldId or "propertyShots")
-    key = (
-        f"property-shots/{ownerUid}/{safe_template}/{safe_field}/"
-        f"{uuid.uuid4().hex}{ext}"
-    )
+    key = f"property-shots/{ownerUid}/{safe_template}/{safe_field}/" f"{uuid.uuid4().hex}{ext}"
 
     try:
         r2 = get_r2_client()
@@ -158,7 +155,7 @@ async def upload_property_shot_public(
         return PropertyShotUploadResponse(key=key)
     except Exception as e:
         logger.error(f"❌ Failed to upload property shot: {e}")
-        raise HTTPException(status_code=500, detail="Failed to upload image")
+        raise HTTPException(status_code=500, detail="Failed to upload image") from e
 
 
 class PropertyShotSignedUrlRequest(BaseModel):
@@ -180,7 +177,7 @@ async def get_property_shot_signed_url(
 
     Ensures the requested object key belongs to the requesting user's client.
     """
-    
+
     logger.info(f"🔍 Fetching signed URL for client {payload.clientId}, key: {payload.key}")
 
     client = (
@@ -209,5 +206,7 @@ async def get_property_shot_signed_url(
         logger.info(f"✅ Generated signed URL for client {payload.clientId}, key: {payload.key}")
         return PropertyShotSignedUrlResponse(url=url)
     except Exception as e:
-        logger.error(f"❌ Failed to generate signed URL for client {payload.clientId}, key {payload.key}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to generate signed URL")
+        logger.error(
+            f"❌ Failed to generate signed URL for client {payload.clientId}, key {payload.key}: {e}"
+        )
+        raise HTTPException(status_code=500, detail="Failed to generate signed URL") from e

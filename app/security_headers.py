@@ -11,9 +11,11 @@ Adds security headers to all responses to protect against common web vulnerabili
 - Permissions-Policy: Controls browser features
 - Cache-Control: Prevents caching of sensitive data
 """
-import os
+
 import logging
-from typing import Callable, List, Optional
+import os
+from typing import Callable, Optional
+
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
@@ -23,20 +25,22 @@ logger = logging.getLogger(__name__)
 # Environment-based configuration
 IS_PRODUCTION = os.getenv("ENVIRONMENT", "development").lower() == "production"
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
-FRONTEND_ORIGINS = os.getenv("FRONTEND_ORIGINS", f"{FRONTEND_URL},https://cleanenroll.com,https://www.cleanenroll.com")
+FRONTEND_ORIGINS = os.getenv(
+    "FRONTEND_ORIGINS", f"{FRONTEND_URL},https://cleanenroll.com,https://www.cleanenroll.com"
+)
 
 
 def get_csp_policy() -> str:
     """
     Generate Content-Security-Policy header value.
-    
+
     This is configured for an API that serves JSON responses.
     Adjusted to allow framing from frontend domains and Firebase authentication.
     """
     # Get frontend origins for frame-ancestors
     frontend_origins = FRONTEND_ORIGINS.split(",")
     frame_ancestors = " ".join(frontend_origins)
-    
+
     # For API backends, we use a restrictive CSP but allow necessary functionality
     directives = [
         "default-src 'self'",  # Allow same-origin by default for API functionality
@@ -51,7 +55,7 @@ def get_csp_policy() -> str:
         "base-uri 'none'",  # Prevent base tag injection
         "form-action 'self'",  # Allow form submissions to same origin
     ]
-    
+
     policy = "; ".join(directives)
     logger.debug(f"🔒 Generated CSP policy: {policy}")
     return policy
@@ -60,7 +64,7 @@ def get_csp_policy() -> str:
 def get_permissions_policy() -> str:
     """
     Generate Permissions-Policy header value.
-    
+
     Disables browser features that aren't needed for an API.
     """
     # Disable all sensitive browser features for API responses
@@ -75,14 +79,14 @@ def get_permissions_policy() -> str:
         "usb=()",
         "interest-cohort=()",  # Disable FLoC tracking
     ]
-    
+
     return ", ".join(features)
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """
     Middleware that adds security headers to all responses.
-    
+
     Headers added:
     - X-Frame-Options: DENY
     - X-Content-Type-Options: nosniff
@@ -93,39 +97,39 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     - Permissions-Policy: (disable unnecessary features)
     - Cache-Control: no-store (for API responses)
     """
-    
-    def __init__(self, app, exclude_paths: Optional[List[str]] = None):
+
+    def __init__(self, app, exclude_paths: Optional[list[str]] = None):
         super().__init__(app)
         self.exclude_paths = exclude_paths or []
-    
+
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         response = await call_next(request)
-        
+
         # Skip security headers for excluded paths (e.g., health checks)
         path = request.url.path
         if any(path.startswith(excluded) for excluded in self.exclude_paths):
             return response
-        
+
         # X-Frame-Options: Allow framing from same origin
         # SAMEORIGIN allows framing from the same origin (frontend can embed API responses)
         response.headers["X-Frame-Options"] = "SAMEORIGIN"
-        
+
         # X-Content-Type-Options: Prevent MIME type sniffing
         # Browsers should trust the Content-Type header
         response.headers["X-Content-Type-Options"] = "nosniff"
-        
+
         # X-XSS-Protection: Legacy XSS filter for older browsers
         # Modern browsers use CSP instead, but this helps older ones
         response.headers["X-XSS-Protection"] = "1; mode=block"
-        
+
         # Referrer-Policy: Control referrer information
         # strict-origin-when-cross-origin = send full URL for same-origin,
         # only origin for cross-origin, nothing for downgrade
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        
+
         # Content-Security-Policy: Restrict resource loading
         response.headers["Content-Security-Policy"] = get_csp_policy()
-        
+
         # Strict-Transport-Security: Enforce HTTPS (production only)
         # max-age=31536000 = 1 year
         # includeSubDomains = apply to all subdomains
@@ -134,31 +138,31 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             response.headers["Strict-Transport-Security"] = (
                 "max-age=31536000; includeSubDomains; preload"
             )
-        
+
         # Permissions-Policy: Disable unnecessary browser features
         response.headers["Permissions-Policy"] = get_permissions_policy()
-        
+
         # Cache-Control: Prevent caching of API responses
         # This is important for authenticated endpoints
         # Adjust for specific endpoints that can be cached
         if "Cache-Control" not in response.headers:
             response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
-        
+
         # X-Permitted-Cross-Domain-Policies: Restrict Adobe cross-domain policies
         response.headers["X-Permitted-Cross-Domain-Policies"] = "none"
-        
+
         # Cross-Origin-Opener-Policy: Isolate browsing context
         response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
-        
+
         # Cross-Origin-Resource-Policy: Restrict cross-origin resource access
         response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
-        
+
         # X-DNS-Prefetch-Control: Disable DNS prefetching
         response.headers["X-DNS-Prefetch-Control"] = "off"
-        
+
         # Cross-Origin-Resource-Policy: Restrict resource sharing
         response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
-        
+
         return response
 
 
@@ -179,8 +183,8 @@ def get_security_headers_dict() -> dict:
         "Cross-Origin-Resource-Policy": "same-origin",
         "Cache-Control": "no-store, no-cache, must-revalidate",
     }
-    
+
     if IS_PRODUCTION:
         headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
-    
+
     return headers

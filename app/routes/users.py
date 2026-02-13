@@ -1,35 +1,40 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from pydantic import BaseModel
 from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+from ..auth import get_current_user
 from ..database import get_db
 from ..models import User
-from ..auth import get_current_user
 from .upload import generate_presigned_url
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
+
 def validate_firebase_uid(firebase_uid: str) -> bool:
     """Validate firebase_uid format using strict Firebase UID pattern"""
     if not firebase_uid:
         return False
-    
+
     # Firebase UIDs are exactly 28 characters, alphanumeric with possible hyphens and underscores
     # They follow a specific pattern: base64url-encoded 128-bit identifier
     import re
-    firebase_uid_pattern = r'^[a-zA-Z0-9_-]{28}$'
-    
+
+    firebase_uid_pattern = r"^[a-zA-Z0-9_-]{28}$"
+
     if not re.match(firebase_uid_pattern, firebase_uid):
         return False
-    
+
     # Additional length check for safety
     if len(firebase_uid) != 28:
         return False
-        
+
     return True
+
 
 def verify_user_access(firebase_uid: str, current_user: User) -> None:
     """Verify the authenticated user has access to the requested resource"""
@@ -37,9 +42,8 @@ def verify_user_access(firebase_uid: str, current_user: User) -> None:
         logger.warning(
             f"🚫 Access denied: User {current_user.firebase_uid} tried to access {firebase_uid}"
         )
-        raise HTTPException(
-            status_code=403, detail="You can only access your own user data"
-        )
+        raise HTTPException(status_code=403, detail="You can only access your own user data")
+
 
 class UserCreate(BaseModel):
     firebaseUid: str
@@ -49,6 +53,7 @@ class UserCreate(BaseModel):
     hearAbout: Optional[str] = None
     profilePictureUrl: Optional[str] = None
 
+
 class UserUpdate(BaseModel):
     fullName: Optional[str] = None
     email: Optional[str] = None
@@ -57,6 +62,7 @@ class UserUpdate(BaseModel):
     hearAbout: Optional[str] = None
     plan: Optional[str] = None
     default_brand_color: Optional[str] = None
+
 
 class UserResponse(BaseModel):
     id: int
@@ -72,6 +78,7 @@ class UserResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
 
 @router.post("", response_model=UserResponse)
 def create_or_update_user(data: UserCreate, db: Session = Depends(get_db)):
@@ -117,7 +124,9 @@ def create_or_update_user(data: UserCreate, db: Session = Depends(get_db)):
         response = UserResponse.model_validate(user)
         if user.profile_picture_url:
             try:
-                response.profile_picture_presigned = generate_presigned_url(user.profile_picture_url)
+                response.profile_picture_presigned = generate_presigned_url(
+                    user.profile_picture_url
+                )
             except Exception:
                 pass
         return response
@@ -125,7 +134,8 @@ def create_or_update_user(data: UserCreate, db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"❌ Error saving user: {str(e)}")
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
 
 @router.get("/{firebase_uid}/plan-usage")
 def get_plan_usage(
@@ -145,6 +155,7 @@ def get_plan_usage(
 
     return get_usage_stats(current_user, db)
 
+
 @router.get("/{firebase_uid}")
 def get_user(
     firebase_uid: str,
@@ -163,13 +174,9 @@ def get_user(
     profile_picture_presigned = None
     if current_user.profile_picture_url:
         try:
-            profile_picture_presigned = generate_presigned_url(
-                current_user.profile_picture_url
-            )
+            profile_picture_presigned = generate_presigned_url(current_user.profile_picture_url)
         except Exception as e:
-            logger.warning(
-                f"⚠️ Failed to generate presigned URL for profile picture: {e}"
-            )
+            logger.warning(f"⚠️ Failed to generate presigned URL for profile picture: {e}")
 
     return {
         "id": current_user.id,
@@ -186,6 +193,7 @@ def get_user(
         "default_brand_color": current_user.default_brand_color,
     }
 
+
 @router.put("/{firebase_uid}")
 def update_user(
     firebase_uid: str,
@@ -198,7 +206,7 @@ def update_user(
 
     # Validate firebase_uid format
     if not validate_firebase_uid(firebase_uid):
-        raise HTTPException(status_code=400, detail="Invalid user identifier")
+        raise HTTPException(status_code=400, detail="Invalid user identifier") from e
 
     # Verify the authenticated user is updating their own data
     verify_user_access(firebase_uid, current_user)
@@ -219,9 +227,7 @@ def update_user(
             logger.info(f"📋 User plan updated to: {data.plan}")
         if data.default_brand_color is not None:
             current_user.default_brand_color = data.default_brand_color
-            logger.info(
-                f"🎨 User default brand color updated to: {data.default_brand_color}"
-            )
+            logger.info(f"🎨 User default brand color updated to: {data.default_brand_color}")
 
         db.commit()
         db.refresh(current_user)
@@ -230,9 +236,7 @@ def update_user(
         profile_picture_presigned = None
         if current_user.profile_picture_url:
             try:
-                profile_picture_presigned = generate_presigned_url(
-                    current_user.profile_picture_url
-                )
+                profile_picture_presigned = generate_presigned_url(current_user.profile_picture_url)
             except Exception:
                 pass
         return {
@@ -252,7 +256,8 @@ def update_user(
     except Exception as e:
         logger.error(f"❌ Error updating user: {str(e)}")
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
 
 @router.patch("/{firebase_uid}")
 def patch_user(
@@ -263,6 +268,7 @@ def patch_user(
 ):
     """Partially update user settings (authenticated - same as PUT)"""
     return update_user(firebase_uid, data, current_user, db)
+
 
 # Payout Information Models
 class PayoutInfoUpdate(BaseModel):
@@ -276,6 +282,7 @@ class PayoutInfoUpdate(BaseModel):
     swiftBic: Optional[str] = None  # SWIFT/BIC code
     bankAddress: Optional[str] = None
 
+
 class PayoutInfoResponse(BaseModel):
     country: Optional[str] = None
     currency: Optional[str] = None
@@ -288,11 +295,13 @@ class PayoutInfoResponse(BaseModel):
     bankAddress: Optional[str] = None
     isConfigured: bool = False
 
+
 def mask_sensitive(value: Optional[str], visible_chars: int = 2) -> Optional[str]:
     """Mask sensitive data, showing only first 2 and last 2 characters for security"""
     if not value or len(value) <= 4:
         return "****" if value else None  # Always mask short values
     return value[:2] + "*" * (len(value) - 4) + value[-2:]
+
 
 @router.get("/{firebase_uid}/payout-info", response_model=PayoutInfoResponse)
 def get_payout_info(
@@ -303,15 +312,15 @@ def get_payout_info(
     """Get user's payout information (masked for security)"""
     if not validate_firebase_uid(firebase_uid):
         raise HTTPException(status_code=400, detail="Invalid firebase_uid format")
-    
+
     verify_user_access(firebase_uid, current_user)
-    
+
     is_configured = bool(
-        current_user.payout_country and 
-        current_user.payout_account_holder_name and
-        (current_user.payout_account_number or current_user.payout_iban)
+        current_user.payout_country
+        and current_user.payout_account_holder_name
+        and (current_user.payout_account_number or current_user.payout_iban)
     )
-    
+
     return PayoutInfoResponse(
         country=current_user.payout_country,
         currency=current_user.payout_currency,
@@ -322,8 +331,9 @@ def get_payout_info(
         iban=mask_sensitive(current_user.payout_iban),
         swiftBic=current_user.payout_swift_bic,
         bankAddress=current_user.payout_bank_address,
-        isConfigured=is_configured
+        isConfigured=is_configured,
     )
+
 
 @router.put("/{firebase_uid}/payout-info")
 def update_payout_info(
@@ -335,11 +345,11 @@ def update_payout_info(
     """Update user's payout information"""
     if not validate_firebase_uid(firebase_uid):
         raise HTTPException(status_code=400, detail="Invalid firebase_uid format")
-    
+
     verify_user_access(firebase_uid, current_user)
-    
+
     logger.info(f"📥 Updating payout info for user: {current_user.id}")
-    
+
     try:
         current_user.payout_country = data.country
         current_user.payout_currency = data.currency
@@ -350,14 +360,11 @@ def update_payout_info(
         current_user.payout_iban = data.iban
         current_user.payout_swift_bic = data.swiftBic
         current_user.payout_bank_address = data.bankAddress
-        
+
         db.commit()
         db.refresh(current_user)
-        return {
-            "success": True,
-            "message": "Payout information saved successfully"
-        }
+        return {"success": True, "message": "Payout information saved successfully"}
     except Exception as e:
         logger.error(f"❌ Error updating payout info: {str(e)}")
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e

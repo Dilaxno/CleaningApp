@@ -2,10 +2,12 @@
 Redis caching utilities for frequently accessed data
 Reduces database load and improves response times
 """
+
 import json
 import logging
-from typing import Optional, Any, Callable
 from functools import wraps
+from typing import Any, Callable, Optional
+
 from .rate_limiter import get_redis_client
 
 logger = logging.getLogger(__name__)
@@ -13,10 +15,10 @@ logger = logging.getLogger(__name__)
 
 class Cache:
     """Redis cache wrapper with automatic serialization"""
-    
+
     def __init__(self):
         self.redis_client = None
-    
+
     def _get_client(self):
         """Lazy load Redis client"""
         if self.redis_client is None:
@@ -26,13 +28,13 @@ class Cache:
                 logger.warning(f"⚠️ Redis cache unavailable: {e}")
                 return None
         return self.redis_client
-    
+
     def get(self, key: str) -> Optional[Any]:
         """Get value from cache"""
         client = self._get_client()
         if not client:
             return None
-        
+
         try:
             value = client.get(key)
             if value:
@@ -43,13 +45,13 @@ class Cache:
         except Exception as e:
             logger.error(f"❌ Cache get error for {key}: {e}")
             return None
-    
+
     def set(self, key: str, value: Any, ttl: int = 3600) -> bool:
         """Set value in cache with TTL (default 1 hour)"""
         client = self._get_client()
         if not client:
             return False
-        
+
         try:
             serialized = json.dumps(value)
             client.setex(key, ttl, serialized)
@@ -58,13 +60,13 @@ class Cache:
         except Exception as e:
             logger.error(f"❌ Cache set error for {key}: {e}")
             return False
-    
+
     def delete(self, key: str) -> bool:
         """Delete value from cache"""
         client = self._get_client()
         if not client:
             return False
-        
+
         try:
             client.delete(key)
             logger.debug(f"✅ Cache DELETE: {key}")
@@ -72,13 +74,13 @@ class Cache:
         except Exception as e:
             logger.error(f"❌ Cache delete error for {key}: {e}")
             return False
-    
+
     def delete_pattern(self, pattern: str) -> int:
         """Delete all keys matching pattern (e.g., 'user:123:*')"""
         client = self._get_client()
         if not client:
             return 0
-        
+
         try:
             keys = client.keys(pattern)
             if keys:
@@ -98,17 +100,18 @@ cache = Cache()
 def cached(key_prefix: str, ttl: int = 3600, key_builder: Optional[Callable] = None):
     """
     Decorator to cache function results
-    
+
     Args:
         key_prefix: Prefix for cache key (e.g., 'business_config')
         ttl: Time to live in seconds (default 1 hour)
         key_builder: Optional function to build cache key from function args
-    
+
     Example:
         @cached(key_prefix='business_config', ttl=3600)
         def get_business_config(user_id: int):
             return db.query(BusinessConfig).filter(...).first()
     """
+
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -119,23 +122,26 @@ def cached(key_prefix: str, ttl: int = 3600, key_builder: Optional[Callable] = N
                 # Default: use function name and first argument
                 arg_str = str(args[0]) if args else "default"
                 cache_key = f"{key_prefix}:{arg_str}"
-            
+
             # Try to get from cache
             cached_value = cache.get(cache_key)
             if cached_value is not None:
                 return cached_value
-            
+
             # Call function and cache result
             result = func(*args, **kwargs)
             if result is not None:
                 cache.set(cache_key, result, ttl)
-            
+
             return result
+
         return wrapper
+
     return decorator
 
 
 # Specific cache utilities for common use cases
+
 
 def get_business_config_cached(user_id: int) -> Optional[dict]:
     """Get business config from cache"""
@@ -176,13 +182,18 @@ def invalidate_user_cache(user_id: int) -> int:
 
 # Cache key builders for complex scenarios
 
-def build_client_list_key(user_id: int, status: Optional[str] = None, skip: int = 0, limit: int = 50) -> str:
+
+def build_client_list_key(
+    user_id: int, status: Optional[str] = None, skip: int = 0, limit: int = 50
+) -> str:
     """Build cache key for client list queries"""
     status_str = status or "all"
     return f"clients:{user_id}:{status_str}:{skip}:{limit}"
 
 
-def build_contract_list_key(user_id: int, status: Optional[str] = None, skip: int = 0, limit: int = 50) -> str:
+def build_contract_list_key(
+    user_id: int, status: Optional[str] = None, skip: int = 0, limit: int = 50
+) -> str:
     """Build cache key for contract list queries"""
     status_str = status or "all"
     return f"contracts:{user_id}:{status_str}:{skip}:{limit}"
@@ -190,12 +201,13 @@ def build_contract_list_key(user_id: int, status: Optional[str] = None, skip: in
 
 # Cache statistics (for monitoring)
 
+
 def get_cache_stats() -> dict:
     """Get cache statistics"""
     client = cache._get_client()
     if not client:
         return {"available": False}
-    
+
     try:
         info = client.info()
         return {
@@ -206,9 +218,10 @@ def get_cache_stats() -> dict:
             "keyspace_hits": info.get("keyspace_hits", 0),
             "keyspace_misses": info.get("keyspace_misses", 0),
             "hit_rate": (
-                info.get("keyspace_hits", 0) / 
-                max(info.get("keyspace_hits", 0) + info.get("keyspace_misses", 0), 1)
-            ) * 100
+                info.get("keyspace_hits", 0)
+                / max(info.get("keyspace_hits", 0) + info.get("keyspace_misses", 0), 1)
+            )
+            * 100,
         }
     except Exception as e:
         logger.error(f"❌ Failed to get cache stats: {e}")

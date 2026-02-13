@@ -1,6 +1,7 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
 from datetime import datetime
+from typing import Any, Optional
+
+from pydantic import BaseModel, Field
 
 
 class UserUpdate(BaseModel):
@@ -49,7 +50,7 @@ class CustomQuoteLineItem(BaseModel):
 class CustomQuoteSubmission(BaseModel):
     custom_quote_amount: float
     custom_quote_description: Optional[str] = None
-    custom_quote_line_items: Optional[List[CustomQuoteLineItem]] = None
+    custom_quote_line_items: Optional[list[CustomQuoteLineItem]] = None
     custom_quote_notes: Optional[str] = None
     expires_at: Optional[datetime] = None
 
@@ -72,7 +73,7 @@ class CustomQuoteRequestResponse(BaseModel):
     custom_quote_amount: Optional[float]
     custom_quote_currency: str
     custom_quote_description: Optional[str]
-    custom_quote_line_items: Optional[List[Dict[str, Any]]]
+    custom_quote_line_items: Optional[list[dict[str, Any]]]
     custom_quote_notes: Optional[str]
     quoted_at: Optional[datetime]
     client_response: Optional[str]
@@ -82,9 +83,9 @@ class CustomQuoteRequestResponse(BaseModel):
     expires_at: Optional[datetime]
     created_at: datetime
     updated_at: datetime
-    
+
     # Include client details
-    client: Optional[Dict[str, Any]] = None
+    client: Optional[dict[str, Any]] = None
 
     class Config:
         from_attributes = True

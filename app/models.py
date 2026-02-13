@@ -29,25 +29,15 @@ class User(Base):
     firebase_uid = Column(String(255), unique=True, index=True, nullable=False)
     full_name = Column(String(255), nullable=True)
     email = Column(String(255), unique=True, index=True, nullable=False)
-    email_verified = Column(
-        Boolean, default=False, nullable=False
-    )  # Email verification status
-    pending_email = Column(
-        String(255), nullable=True
-    )  # Pending new email during email change
-    verification_otp = Column(
-        String(10), nullable=True
-    )  # Current OTP for email verification
+    email_verified = Column(Boolean, default=False, nullable=False)  # Email verification status
+    pending_email = Column(String(255), nullable=True)  # Pending new email during email change
+    verification_otp = Column(String(10), nullable=True)  # Current OTP for email verification
     otp_expires_at = Column(DateTime, nullable=True)  # OTP expiration time
-    profile_picture_url = Column(
-        String(500), nullable=True
-    )  # R2 key for profile picture
+    profile_picture_url = Column(String(500), nullable=True)  # R2 key for profile picture
     default_brand_color = Column(String(7), nullable=True)  # e.g., #RRGGBB
     account_type = Column(String(50), nullable=True)
     hear_about = Column(String(100), nullable=True)
-    plan = Column(
-        String(50), nullable=True
-    )  # solo, team, enterprise - null until user selects
+    plan = Column(String(50), nullable=True)  # solo, team, enterprise - null until user selects
     # Dodo subscription identifier for this user's active subscription; used for change/cancel flows
     subscription_id = Column(String(255), nullable=True)
     subscription_start_date = Column(
@@ -56,9 +46,7 @@ class User(Base):
     billing_cycle = Column(
         String(20), nullable=True
     )  # monthly, yearly - tracks subscription interval
-    last_payment_date = Column(
-        DateTime, nullable=True
-    )  # Last successful payment date for renewals
+    last_payment_date = Column(DateTime, nullable=True)  # Last successful payment date for renewals
     next_billing_date = Column(DateTime, nullable=True)  # Next scheduled billing date
     subscription_status = Column(
         String(50), default="active", nullable=True
@@ -71,15 +59,11 @@ class User(Base):
     )  # Track when to reset the counter (30 days from subscription date)
     onboarding_completed = Column(Boolean, default=False)
     # Two-Factor Authentication fields
-    totp_secret = Column(
-        String(100), nullable=True
-    )  # TOTP secret for authenticator app
+    totp_secret = Column(String(100), nullable=True)  # TOTP secret for authenticator app
     totp_enabled = Column(Boolean, default=False, nullable=False)  # Is TOTP enabled
     phone_number = Column(String(50), nullable=True)  # Phone number for SMS 2FA
     phone_verified = Column(Boolean, default=False, nullable=False)  # Is phone verified
-    phone_2fa_enabled = Column(
-        Boolean, default=False, nullable=False
-    )  # Is SMS 2FA enabled
+    phone_2fa_enabled = Column(Boolean, default=False, nullable=False)  # Is SMS 2FA enabled
     recovery_email = Column(String(255), nullable=True)  # Secondary email for recovery
     recovery_email_verified = Column(
         Boolean, default=False, nullable=False
@@ -108,26 +92,16 @@ class User(Base):
     unread_payments_count = Column(
         Integer, default=0, nullable=False
     )  # Count of unread payment notifications
-    last_payment_check = Column(
-        DateTime, nullable=True
-    )  # Last time user checked payments
+    last_payment_check = Column(DateTime, nullable=True)  # Last time user checked payments
     # Payout information
-    payout_country = Column(
-        String(2), nullable=True
-    )  # ISO country code (e.g., "US", "GB", "FR")
-    payout_currency = Column(
-        String(3), nullable=True
-    )  # Currency code (e.g., "USD", "EUR", "GBP")
-    payout_account_holder_name = Column(
-        String(255), nullable=True
-    )  # Account holder name
+    payout_country = Column(String(2), nullable=True)  # ISO country code (e.g., "US", "GB", "FR")
+    payout_currency = Column(String(3), nullable=True)  # Currency code (e.g., "USD", "EUR", "GBP")
+    payout_account_holder_name = Column(String(255), nullable=True)  # Account holder name
     payout_bank_name = Column(String(255), nullable=True)  # Bank name
     payout_account_number = Column(
         String(50), nullable=True
     )  # Account number (encrypted in production)
-    payout_routing_number = Column(
-        String(50), nullable=True
-    )  # Routing/Sort code (US/UK)
+    payout_routing_number = Column(String(50), nullable=True)  # Routing/Sort code (US/UK)
     payout_iban = Column(String(50), nullable=True)  # IBAN (Europe)
     payout_swift_bic = Column(String(20), nullable=True)  # SWIFT/BIC code
     payout_bank_address = Column(
@@ -153,15 +127,11 @@ class User(Base):
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
-    business_config = relationship(
-        "BusinessConfig", back_populates="user", uselist=False
-    )
+    business_config = relationship("BusinessConfig", back_populates="user", uselist=False)
     clients = relationship("Client", back_populates="user")
     contracts = relationship("Contract", back_populates="user")
     schedules = relationship("Schedule", back_populates="user")
-    calendly_integration = relationship(
-        "CalendlyIntegration", back_populates="user", uselist=False
-    )
+    calendly_integration = relationship("CalendlyIntegration", back_populates="user", uselist=False)
     form_templates = relationship("FormTemplate", back_populates="user")
 
 
@@ -173,9 +143,7 @@ class BusinessConfig(Base):
     # Branding
     business_name = Column(String(255), nullable=True)
     logo_url = Column(String(500), nullable=True)
-    brand_color = Column(
-        String(7), nullable=True
-    )  # Hex color code for brand (e.g., #00C4B4)
+    brand_color = Column(String(7), nullable=True)  # Hex color code for brand (e.g., #00C4B4)
     signature_url = Column(String(500), nullable=True)
     onboarding_complete = Column(Boolean, default=False)
     form_embedding_enabled = Column(
@@ -188,20 +156,14 @@ class BusinessConfig(Base):
     payment_handling = Column(
         String(20), nullable=True
     )  # "manual" or "automatic" - how provider handles payments
-    cancellation_window = Column(
-        Integer, default=24
-    )  # Hours notice required for cancellation
+    cancellation_window = Column(Integer, default=24)  # Hours notice required for cancellation
 
     # Availability settings
     working_days = Column(
         JSON, nullable=True
     )  # e.g., ["monday", "tuesday", "wednesday", "thursday", "friday"]
-    working_hours = Column(
-        JSON, nullable=True
-    )  # e.g., {"start": "09:00", "end": "17:00"}
-    break_times = Column(
-        JSON, nullable=True
-    )  # e.g., [{"start": "12:00", "end": "13:00"}]
+    working_hours = Column(JSON, nullable=True)  # e.g., {"start": "09:00", "end": "17:00"}
+    break_times = Column(JSON, nullable=True)  # e.g., [{"start": "12:00", "end": "13:00"}]
     day_schedules = Column(
         JSON, nullable=True
     )  # Per-day working hours: {"monday": {"enabled": true, "startTime": "09:00", "endTime": "17:00"}, ...}
@@ -212,9 +174,7 @@ class BusinessConfig(Base):
         JSON, nullable=True
     )  # Custom add-on services: [{"id": "...", "name": "Oven cleaning", "price": "25", "pricingMetric": "per service"}]
     supplies_provided = Column(String(20), nullable=True)  # "provider" or "client"
-    available_supplies = Column(
-        JSON, nullable=True
-    )  # List of supply IDs the provider brings
+    available_supplies = Column(JSON, nullable=True)  # List of supply IDs the provider brings
     rate_per_sqft = Column(Float, nullable=True)
     hourly_rate = Column(Float, nullable=True)
     flat_rate = Column(Float, nullable=True)
@@ -242,9 +202,7 @@ class BusinessConfig(Base):
     first_cleaning_discount_type = Column(String(20), nullable=True)  # percent | fixed
     first_cleaning_discount_value = Column(Float, nullable=True)
     addon_windows = Column(Float, nullable=True)
-    addon_carpets = Column(
-        Float, nullable=True
-    )  # Legacy per sq ft pricing - deprecated
+    addon_carpets = Column(Float, nullable=True)  # Legacy per sq ft pricing - deprecated
     addon_carpet_small = Column(Float, nullable=True)  # Small carpet pricing
     addon_carpet_medium = Column(Float, nullable=True)  # Medium carpet pricing
     addon_carpet_large = Column(Float, nullable=True)  # Large carpet pricing
@@ -255,7 +213,7 @@ class BusinessConfig(Base):
     custom_inclusions = Column(JSON, default=list)  # Custom user-added inclusions
     custom_exclusions = Column(JSON, default=list)  # Custom user-added exclusions
     preferred_units = Column(String(20), default="sqft")
-    
+
     # Custom packages for "packages" pricing model
     custom_packages = Column(
         JSON, nullable=True
@@ -267,7 +225,16 @@ class BusinessConfig(Base):
 
     # Accepted frequencies and payment methods
     accepted_frequencies = Column(
-        JSON, default=["one-time", "daily", "2x-per-week", "3x-per-week", "weekly", "bi-weekly", "monthly"]
+        JSON,
+        default=[
+            "one-time",
+            "daily",
+            "2x-per-week",
+            "3x-per-week",
+            "weekly",
+            "bi-weekly",
+            "monthly",
+        ],
     )  # Array of accepted cleaning frequencies
     accepted_payment_methods = Column(
         JSON, default=list
@@ -294,10 +261,14 @@ class BusinessConfig(Base):
     subdomain_verification_token = Column(String(255), nullable=True)  # Unique token for TXT record
 
     # Service areas configuration
-    service_areas = Column(JSON, default=list)  # List of service areas with states, counties, neighborhoods
+    service_areas = Column(
+        JSON, default=list
+    )  # List of service areas with states, counties, neighborhoods
 
     # Active templates - list of template IDs that the business owner has selected to work with
-    active_templates = Column(JSON, default=list)  # List of template IDs: ["office", "retail", "medical", ...]
+    active_templates = Column(
+        JSON, default=list
+    )  # List of template IDs: ["office", "retail", "medical", ...]
 
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
@@ -326,7 +297,7 @@ class Client(Base):
     status = Column(String(50), default="pending")
     notes = Column(String(1000), nullable=True)
     form_data = Column(JSON, nullable=True)  # Store structured form submission data
-    
+
     # Pending contract fields - stored until client completes signing and scheduling
     pending_contract_title = Column(String(255), nullable=True)
     pending_contract_description = Column(String(2000), nullable=True)
@@ -336,25 +307,19 @@ class Client(Base):
     pending_contract_total_value = Column(Float, nullable=True)
     pending_contract_payment_terms = Column(String(255), nullable=True)
     pending_contract_terms_conditions = Column(String(5000), nullable=True)
-    
+
     # Square subscription tracking (for recurring services)
     square_subscription_id = Column(String(255), nullable=True)  # Square subscription ID
     subscription_status = Column(String(50), nullable=True)  # active, paused, cancelled
     subscription_frequency = Column(String(50), nullable=True)  # weekly, bi-weekly, monthly
-    
+
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     user = relationship("User", back_populates="clients")
-    contracts = relationship(
-        "Contract", back_populates="client", cascade="all, delete-orphan"
-    )
-    schedules = relationship(
-        "Schedule", back_populates="client", cascade="all, delete-orphan"
-    )
-    invoices = relationship(
-        "Invoice", back_populates="client", cascade="all, delete-orphan"
-    )
+    contracts = relationship("Contract", back_populates="client", cascade="all, delete-orphan")
+    schedules = relationship("Schedule", back_populates="client", cascade="all, delete-orphan")
+    invoices = relationship("Invoice", back_populates="client", cascade="all, delete-orphan")
     scheduling_proposals = relationship(
         "SchedulingProposal", back_populates="client", cascade="all, delete-orphan"
     )
@@ -374,9 +339,7 @@ class Contract(Base):
     client_id = Column(Integer, ForeignKey("clients.id"), nullable=False)
     title = Column(String(255), nullable=False)
     description = Column(String(2000), nullable=True)
-    contract_type = Column(
-        String(100), nullable=True
-    )  # one-time, recurring, maintenance
+    contract_type = Column(String(100), nullable=True)  # one-time, recurring, maintenance
     # Status workflow: new → signed → active → completed/cancelled
     # new: Initial contract sent to client for signature
     # signed: Contract signed by both provider and client
@@ -394,9 +357,7 @@ class Contract(Base):
     payment_terms = Column(String(255), nullable=True)
     terms_conditions = Column(String(5000), nullable=True)
     pdf_key = Column(String(500), nullable=True)  # R2 key for the contract PDF
-    pdf_hash = Column(
-        String(64), nullable=True
-    )  # SHA-256 hash of the PDF for integrity
+    pdf_hash = Column(String(64), nullable=True)  # SHA-256 hash of the PDF for integrity
     # Provider signature audit trail
     provider_signature = Column(String(100000), nullable=True)  # Base64 signature image
     signed_at = Column(DateTime, nullable=True)
@@ -409,49 +370,43 @@ class Contract(Base):
     client_signature_user_agent = Column(String(500), nullable=True)
     client_signature_timestamp = Column(DateTime, nullable=True)
     # Legal
-    jurisdiction = Column(
-        String(255), nullable=True
-    )  # e.g., "State of California, USA"
+    jurisdiction = Column(String(255), nullable=True)  # e.g., "State of California, USA"
 
     # Revision request system
-    revision_requested = Column(
-        Boolean, default=False
-    )  # True if provider requested changes
+    revision_requested = Column(Boolean, default=False)  # True if provider requested changes
     revision_type = Column(String(50), nullable=True)  # 'pricing', 'scope', 'both'
-    revision_notes = Column(
-        String(2000), nullable=True
-    )  # Provider's notes about requested changes
+    revision_notes = Column(String(2000), nullable=True)  # Provider's notes about requested changes
     revision_requested_at = Column(DateTime, nullable=True)
     revision_count = Column(Integer, default=0)  # Track number of revision rounds
     custom_quote = Column(
         JSON, nullable=True
     )  # Provider's custom pricing if different from auto-quote
-    custom_scope = Column(
-        JSON, nullable=True
-    )  # Provider's custom scope (inclusions/exclusions)
+    custom_scope = Column(JSON, nullable=True)  # Provider's custom scope (inclusions/exclusions)
 
     # Square payment integration
     square_invoice_id = Column(String(255), nullable=True)  # Square invoice ID
     square_invoice_url = Column(Text, nullable=True)  # Public Square payment URL
     square_payment_status = Column(String(50), nullable=True)  # pending, paid, failed, cancelled
     square_invoice_created_at = Column(DateTime, nullable=True)  # When invoice was created
-    
+
     # Square subscription integration (for recurring services)
     square_subscription_id = Column(String(255), nullable=True)  # Square subscription ID
     square_subscription_status = Column(String(50), nullable=True)  # active, paused, cancelled
-    square_subscription_created_at = Column(DateTime, nullable=True)  # When subscription was created
+    square_subscription_created_at = Column(
+        DateTime, nullable=True
+    )  # When subscription was created
     frequency = Column(String(50), nullable=True)  # weekly, bi-weekly, monthly, etc.
-    
+
     # Payment tracking
     square_payment_received_at = Column(DateTime, nullable=True)  # When payment was received
     payment_confirmation_pending = Column(Boolean, default=False)  # Frontend redirect flag
     payment_confirmed_at = Column(DateTime, nullable=True)  # When payment was confirmed via webhook
-    
+
     # Enhanced signature tracking
     provider_signed_at = Column(DateTime, nullable=True)  # When provider signed
     both_parties_signed_at = Column(DateTime, nullable=True)  # When both parties signed
     invoice_auto_generated = Column(Boolean, default=False)  # Whether invoice was auto-generated
-    
+
     # Custom quote workflow
     custom_quote_request_id = Column(Integer, ForeignKey("custom_quote_requests.id"), nullable=True)
     invoice_auto_sent = Column(Boolean, default=False)  # Whether Square invoice was auto-sent
@@ -462,10 +417,11 @@ class Contract(Base):
 
     user = relationship("User", back_populates="contracts")
     client = relationship("Client", back_populates="contracts")
-    custom_quote_request = relationship("CustomQuoteRequest", foreign_keys=[custom_quote_request_id], uselist=False)
-    invoices = relationship(
-        "Invoice", back_populates="contract", cascade="all, delete-orphan"
+    custom_quote_request = relationship(
+        "CustomQuoteRequest", foreign_keys=[custom_quote_request_id], uselist=False
     )
+    invoices = relationship("Invoice", back_populates="contract", cascade="all, delete-orphan")
+
 
 class Schedule(Base):
     __tablename__ = "schedules"
@@ -475,28 +431,16 @@ class Schedule(Base):
     client_id = Column(Integer, ForeignKey("clients.id"), nullable=False)
     title = Column(String(255), nullable=False)
     description = Column(String(1000), nullable=True)
-    service_type = Column(
-        String(100), nullable=True
-    )  # standard, deep-clean, move-in, move-out
+    service_type = Column(String(100), nullable=True)  # standard, deep-clean, move-in, move-out
     scheduled_date = Column(DateTime, nullable=False)
     start_time = Column(String(10), nullable=True)  # HH:MM format
     end_time = Column(String(10), nullable=True)
     duration_minutes = Column(Integer, nullable=True)
-    status = Column(
-        String(50), default="scheduled"
-    )  # scheduled, in-progress, completed, cancelled
-    approval_status = Column(
-        String(50), default="pending"
-    )  # pending, accepted, change_requested
-    proposed_date = Column(
-        DateTime, nullable=True
-    )  # Provider's proposed alternative date
-    proposed_start_time = Column(
-        String(10), nullable=True
-    )  # Provider's proposed alternative start
-    proposed_end_time = Column(
-        String(10), nullable=True
-    )  # Provider's proposed alternative end
+    status = Column(String(50), default="scheduled")  # scheduled, in-progress, completed, cancelled
+    approval_status = Column(String(50), default="pending")  # pending, accepted, change_requested
+    proposed_date = Column(DateTime, nullable=True)  # Provider's proposed alternative date
+    proposed_start_time = Column(String(10), nullable=True)  # Provider's proposed alternative start
+    proposed_end_time = Column(String(10), nullable=True)  # Provider's proposed alternative end
     notes = Column(String(1000), nullable=True)
     address = Column(String(500), nullable=True)
     assigned_to = Column(String(255), nullable=True)  # cleaner name or team
@@ -505,20 +449,14 @@ class Schedule(Base):
     recurrence_pattern = Column(String(50), nullable=True)  # weekly, bi-weekly, monthly
 
     # Calendly integration fields
-    calendly_event_uri = Column(
-        String(500), nullable=True, index=True
-    )  # Unique Calendly event URI
+    calendly_event_uri = Column(String(500), nullable=True, index=True)  # Unique Calendly event URI
     calendly_event_id = Column(String(255), nullable=True)  # Calendly event UUID
-    calendly_invitee_uri = Column(
-        String(500), nullable=True
-    )  # Invitee URI for tracking
+    calendly_invitee_uri = Column(String(500), nullable=True)  # Invitee URI for tracking
     calendly_booking_method = Column(
         String(50), nullable=True
     )  # 'client_selected', 'provider_created', 'synced'
-    location = Column(
-        String(500), nullable=True
-    )  # Event location (separate from address)
-    
+    location = Column(String(500), nullable=True)  # Event location (separate from address)
+
     # Google Calendar integration fields
     google_calendar_event_id = Column(
         String(500), nullable=True, index=True
@@ -594,9 +532,7 @@ class IntegrationRequest(Base):
     __tablename__ = "integration_requests"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(
-        Integer, ForeignKey("users.id"), nullable=False
-    )  # Who submitted the request
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # Who submitted the request
     name = Column(String(255), nullable=False)  # Integration name (e.g., "QuickBooks")
     logo_url = Column(
         String(2000), nullable=False
@@ -619,9 +555,7 @@ class IntegrationRequestVote(Base):
     __tablename__ = "integration_request_votes"
 
     id = Column(Integer, primary_key=True, index=True)
-    integration_request_id = Column(
-        Integer, ForeignKey("integration_requests.id"), nullable=False
-    )
+    integration_request_id = Column(Integer, ForeignKey("integration_requests.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime, server_default=func.now())
 
@@ -633,13 +567,17 @@ class FormTemplate(Base):
     __tablename__ = "form_templates"
 
     id = Column(Integer, primary_key=True, index=True)
-    template_id = Column(String(100), unique=True, index=True, nullable=False)  # e.g., "office", "retail"
+    template_id = Column(
+        String(100), unique=True, index=True, nullable=False
+    )  # e.g., "office", "retail"
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # null for system templates
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     image = Column(String(500), nullable=True)
     color = Column(String(7), nullable=True)  # hex color
-    is_system_template = Column(Boolean, default=False, nullable=False)  # true for pre-built templates
+    is_system_template = Column(
+        Boolean, default=False, nullable=False
+    )  # true for pre-built templates
     is_active = Column(Boolean, default=True, nullable=False)
     template_data = Column(JSON, nullable=False)  # stores the complete template structure
     created_at = Column(DateTime, server_default=func.now())
@@ -672,19 +610,19 @@ class CustomQuoteRequest(Base):
     )
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # Provider
     client_id = Column(Integer, ForeignKey("clients.id"), nullable=False)
-    
+
     # Video details
     video_r2_key = Column(String(500), nullable=False)  # R2 storage key
     video_filename = Column(String(255), nullable=False)  # Original filename
     video_size_bytes = Column(Integer, nullable=False)  # File size in bytes
     video_duration_seconds = Column(Float, nullable=True)  # Video duration
     video_mime_type = Column(String(100), nullable=False)  # e.g., video/mp4
-    
+
     # Request status
     status = Column(
         String(50), default="pending", nullable=False
     )  # pending, quoted, approved, rejected, expired
-    
+
     # Custom quote from provider
     custom_quote_amount = Column(Float, nullable=True)
     custom_quote_currency = Column(String(10), default="USD")
@@ -692,20 +630,20 @@ class CustomQuoteRequest(Base):
     custom_quote_line_items = Column(JSON, nullable=True)  # Detailed breakdown
     custom_quote_notes = Column(Text, nullable=True)  # Provider notes to client
     quoted_at = Column(DateTime, nullable=True)
-    
+
     # Client response
     client_response = Column(String(50), nullable=True)  # approved, rejected
     client_response_notes = Column(Text, nullable=True)
     responded_at = Column(DateTime, nullable=True)
-    
+
     # Link to generated contract after approval
     contract_id = Column(Integer, ForeignKey("contracts.id"), nullable=True)
-    
+
     # Metadata
     client_ip = Column(String(45), nullable=True)  # IP when video uploaded
     client_user_agent = Column(String(500), nullable=True)
     expires_at = Column(DateTime, nullable=True)  # Quote expiration (optional)
-    
+
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
@@ -713,5 +651,3 @@ class CustomQuoteRequest(Base):
     user = relationship("User")
     client = relationship("Client")
     contract = relationship("Contract", foreign_keys=[contract_id], uselist=False)
-
-

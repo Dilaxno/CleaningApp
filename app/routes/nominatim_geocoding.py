@@ -7,7 +7,7 @@ No API keys required, just needs a user agent string.
 
 import logging
 import os
-from typing import List, Optional
+from typing import Optional
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -42,7 +42,7 @@ class NominatimAddressSuggestion(BaseModel):
 
 
 class NominatimAutocompleteResponse(BaseModel):
-    suggestions: List[NominatimAddressSuggestion]
+    suggestions: list[NominatimAddressSuggestion]
 
 
 @router.get("/nominatim-test")
@@ -51,7 +51,7 @@ async def nominatim_test():
     Test endpoint to verify Nominatim configuration.
     Returns the configuration status.
     """
-    
+
     return {
         "nominatim_configured": True,
         "base_url": NOMINATIM_BASE_URL,
@@ -70,15 +70,15 @@ async def nominatim_autocomplete(
 ):
     """
     Nominatim address autocomplete endpoint.
-    
+
     Args:
         search: Address search query
         max_results: Maximum number of results (1-10)
-    
+
     Returns:
         NominatimAutocompleteResponse with address suggestions
     """
-    
+
     search = (search or "").strip()
     if len(search) < 3:
         return NominatimAutocompleteResponse(suggestions=[])
@@ -95,6 +95,7 @@ async def nominatim_autocomplete(
             cached = redis.get(cache_key)
             if cached:
                 import json
+
                 data = json.loads(cached)
                 return NominatimAutocompleteResponse(
                     suggestions=[NominatimAddressSuggestion(**x) for x in data]
@@ -111,7 +112,7 @@ async def nominatim_autocomplete(
         "limit": str(max_results),
         "countrycodes": "us",  # Limit to US addresses
     }
-    
+
     headers = {
         "User-Agent": NOMINATIM_USER_AGENT,
     }
@@ -121,21 +122,20 @@ async def nominatim_autocomplete(
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.get(url, params=params, headers=headers, timeout=10.0)
-            
+
             if resp.status_code >= 400:
                 logger.warning(f"Nominatim API error {resp.status_code}: {resp.text[:200]}")
                 raise HTTPException(
-                    status_code=502, 
-                    detail="Address lookup service temporarily unavailable"
-                )
+                    status_code=502, detail="Address lookup service temporarily unavailable"
+                ) from e
 
             raw_data = resp.json()
             suggestions = []
-            
+
             # Parse Nominatim response format
             for item in raw_data:
                 address = item.get("address", {})
-                
+
                 # Build street line from house number and road
                 street_parts = []
                 if address.get("house_number"):
@@ -143,21 +143,21 @@ async def nominatim_autocomplete(
                 if address.get("road"):
                     street_parts.append(address["road"])
                 street_line = " ".join(street_parts) if street_parts else None
-                
+
                 # Get city (try multiple fields)
                 city = (
-                    address.get("city") or 
-                    address.get("town") or 
-                    address.get("village") or 
-                    address.get("hamlet")
+                    address.get("city")
+                    or address.get("town")
+                    or address.get("village")
+                    or address.get("hamlet")
                 )
-                
+
                 # Get state
                 state = address.get("state")
-                
+
                 # Get zipcode
                 zipcode = address.get("postcode")
-                
+
                 # Build display text
                 display_parts = []
                 if street_line:
@@ -168,9 +168,9 @@ async def nominatim_autocomplete(
                     display_parts.append(state)
                 if zipcode:
                     display_parts.append(zipcode)
-                
+
                 text = ", ".join(display_parts) if display_parts else item.get("display_name", "")
-                
+
                 if text:
                     suggestion = NominatimAddressSuggestion(
                         text=text,
@@ -186,10 +186,9 @@ async def nominatim_autocomplete(
                 redis = get_redis_client()
                 if redis:
                     import json
+
                     redis.setex(
-                        cache_key, 
-                        CACHE_SECONDS, 
-                        json.dumps([s.model_dump() for s in suggestions])
+                        cache_key, CACHE_SECONDS, json.dumps([s.model_dump() for s in suggestions])
                     )
             except Exception as e:
                 logger.warning(f"Redis cache write error: {e}")
@@ -200,7 +199,4 @@ async def nominatim_autocomplete(
         raise
     except Exception as e:
         logger.error(f"Nominatim autocomplete error: {e}")
-        raise HTTPException(
-            status_code=500, 
-            detail="Address lookup failed"
-        )
+        raise HTTPException(status_code=500, detail="Address lookup failed") from e

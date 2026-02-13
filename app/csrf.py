@@ -10,11 +10,12 @@ Implements double-submit cookie pattern for CSRF protection.
 NOTE: CSRF protection is DISABLED by default until frontend integration is complete.
 Set CSRF_ENABLED=true in environment to enable.
 """
-import os
-import secrets
+
 import logging
-from typing import Callable, List, Optional
-from fastapi import Request, HTTPException
+import secrets
+from typing import Callable
+
+from fastapi import HTTPException, Request
 from fastapi.responses import Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -28,7 +29,7 @@ CSRF_HEADER_NAME = "X-CSRF-Token"
 PROTECTED_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
 # Paths that are exempt from CSRF protection (webhooks, public endpoints, API routes)
-EXEMPT_PATHS: List[str] = [
+EXEMPT_PATHS: list[str] = [
     "/webhooks/",
     "/api/payments/",
     "/clients/public/",
@@ -67,7 +68,7 @@ def is_path_exempt(path: str) -> bool:
 class CSRFMiddleware(BaseHTTPMiddleware):
     """
     CSRF Protection Middleware using double-submit cookie pattern.
-    
+
     How it works:
     1. On any request, if no CSRF cookie exists, generate one and set it
     2. For state-changing requests (POST/PUT/PATCH/DELETE):
@@ -75,48 +76,47 @@ class CSRFMiddleware(BaseHTTPMiddleware):
        - Verify it matches the csrf_token cookie
        - Reject if missing or mismatched
     """
-    
+
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         # Get existing CSRF token from cookie
         csrf_cookie = request.cookies.get(CSRF_COOKIE_NAME)
-        
+
         # Check if this request needs CSRF validation
-        needs_validation = (
-            request.method in PROTECTED_METHODS
-            and not is_path_exempt(request.url.path)
+        needs_validation = request.method in PROTECTED_METHODS and not is_path_exempt(
+            request.url.path
         )
-        
+
         if needs_validation:
             # Get CSRF token from header
             csrf_header = request.headers.get(CSRF_HEADER_NAME)
-            
+
             if not csrf_cookie:
                 logger.warning(f"🚫 CSRF: Missing cookie for {request.method} {request.url.path}")
                 raise HTTPException(
                     status_code=403,
-                    detail="CSRF token missing. Please refresh the page and try again."
+                    detail="CSRF token missing. Please refresh the page and try again.",
                 )
-            
+
             if not csrf_header:
                 logger.warning(f"🚫 CSRF: Missing header for {request.method} {request.url.path}")
                 raise HTTPException(
                     status_code=403,
-                    detail="CSRF token header missing. Please refresh the page and try again."
+                    detail="CSRF token header missing. Please refresh the page and try again.",
                 )
-            
+
             # Constant-time comparison to prevent timing attacks
             if not secrets.compare_digest(csrf_cookie, csrf_header):
                 logger.warning(f"🚫 CSRF: Token mismatch for {request.method} {request.url.path}")
                 raise HTTPException(
                     status_code=403,
-                    detail="CSRF token invalid. Please refresh the page and try again."
+                    detail="CSRF token invalid. Please refresh the page and try again.",
                 )
-            
+
             logger.debug(f"✅ CSRF: Valid token for {request.method} {request.url.path}")
-        
+
         # Process the request
         response = await call_next(request)
-        
+
         # Set or refresh CSRF cookie if not present
         if not csrf_cookie:
             new_token = generate_csrf_token()
@@ -129,8 +129,8 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                 max_age=86400,
                 path="/",
             )
-            logger.debug(f"🔑 CSRF: Set new token cookie")
-        
+            logger.debug("🔑 CSRF: Set new token cookie")
+
         return response
 
 
@@ -139,13 +139,14 @@ def get_csrf_token_endpoint():
     Endpoint to get a fresh CSRF token.
     Frontend can call this on app load to ensure they have a valid token.
     """
+
     async def csrf_token_handler(request: Request, response: Response):
         # Check if token already exists
         existing_token = request.cookies.get(CSRF_COOKIE_NAME)
-        
+
         if existing_token:
             return {"csrf_token": existing_token}
-        
+
         # Generate new token
         new_token = generate_csrf_token()
         response.set_cookie(
@@ -158,5 +159,5 @@ def get_csrf_token_endpoint():
             path="/",
         )
         return {"csrf_token": new_token}
-    
+
     return csrf_token_handler
