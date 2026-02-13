@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from ..auth import get_current_user
 from ..database import get_db
-from ..models import Client, Contract, Schedule, User
+from ..models import Client, Contract, Schedule, User, BusinessConfig
 
 logger = logging.getLogger(__name__)
 

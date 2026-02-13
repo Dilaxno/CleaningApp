@@ -486,6 +486,7 @@ async def sign_contract_as_provider(
     # Update contract with provider signature
     contract.provider_signature = signature_to_use  # Store the signature image
     contract.signed_at = datetime.utcnow()
+    contract.provider_signed_at = datetime.utcnow()  # Track when provider signed
     contract.signature_timestamp = datetime.utcnow()
     contract.signature_ip = request.client.host if request.client else None
     contract.signature_user_agent = request.headers.get("user-agent")

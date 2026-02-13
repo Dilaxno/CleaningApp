@@ -13,7 +13,7 @@ from ..email_service import (
     send_scheduling_counter_proposal_email,
     send_scheduling_proposal_email,
 )
-from ..models import Client, Contract, Schedule, SchedulingProposal, User
+from ..models import Client, Contract, Schedule, SchedulingProposal, User, BusinessConfig
 from ..utils.sanitization import sanitize_dict, sanitize_string
 
 logger = logging.getLogger(__name__)
@@ -27,7 +27,6 @@ async def get_scheduling_info_by_client(client_id: int, db: Session = Depends(ge
     Public endpoint for client to get scheduling info.
     Returns business info, working hours, and estimated duration.
     """
-    from ..models import BusinessConfig
     from .upload import generate_presigned_url
 
     # Get client
@@ -182,8 +181,6 @@ async def get_client_latest_appointment(client_id: int, db: Session = Depends(ge
     """
     try:
         # Get the latest schedule for this client
-        from ..models import BusinessConfig, Contract, Schedule
-
         schedule = (
             db.query(Schedule)
             .filter(Schedule.client_id == client_id)
@@ -769,7 +766,6 @@ async def get_public_scheduling_info(contract_public_id: str, db: Session = Depe
     Public endpoint for client to get scheduling info for a contract.
     Returns contract details, business info, and available time slots.
     """
-    from ..models import BusinessConfig
     from .upload import generate_presigned_url
 
     # Find contract by public_id
@@ -1037,8 +1033,6 @@ async def create_direct_booking(data: DirectBookingRequest, db: Session = Depend
         raise HTTPException(status_code=404, detail="Client or provider not found")
 
     # Get business config for duration calculation
-    from ..models import BusinessConfig
-
     business_config = (
         db.query(BusinessConfig).filter(BusinessConfig.user_id == contract.user_id).first()
     )
