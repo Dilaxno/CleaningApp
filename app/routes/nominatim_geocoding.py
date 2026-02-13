@@ -127,8 +127,7 @@ async def nominatim_autocomplete(
                 logger.warning(f"Nominatim API error {resp.status_code}: {resp.text[:200]}")
                 raise HTTPException(
                     status_code=502, detail="Address lookup service temporarily unavailable"
-                ) from e
-
+                )
             raw_data = resp.json()
             suggestions = []
 
@@ -199,4 +198,4 @@ async def nominatim_autocomplete(
         raise
     except Exception as e:
         logger.error(f"Nominatim autocomplete error: {e}")
-        raise HTTPException(status_code=500, detail="Address lookup failed") from e
+        raise HTTPException(status_code=500, detail="Address lookup failed")

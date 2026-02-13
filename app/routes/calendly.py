@@ -131,7 +131,7 @@ async def calendly_oauth_callback(
 
     except Exception as e:
         logger.error(f"❌ Failed to connect Calendly for user {current_user.id}: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"Failed to connect Calendly: {str(e)}") from e
+        raise HTTPException(status_code=400, detail=f"Failed to connect Calendly: {str(e)}")
 
 
 async def _ensure_fresh_token(integration: CalendlyIntegration, db: Session) -> str:
@@ -148,10 +148,7 @@ async def _ensure_fresh_token(integration: CalendlyIntegration, db: Session) -> 
             db.commit()
         except Exception as e:
             logger.error(f"❌ Failed to refresh token for user {integration.user_id}: {str(e)}")
-            raise HTTPException(
-                status_code=401, detail="Calendly token expired. Please reconnect."
-            ) from e
-
+            raise HTTPException(status_code=401, detail="Calendly token expired. Please reconnect.")
     return integration.access_token
 
 
@@ -218,8 +215,7 @@ async def disconnect_calendly(
     )
 
     if not integration:
-        raise HTTPException(status_code=404, detail="No Calendly integration found") from e
-
+        raise HTTPException(status_code=404, detail="No Calendly integration found")
     # TODO: Optionally delete webhook subscriptions before disconnecting
 
     db.delete(integration)
@@ -315,8 +311,7 @@ async def get_client_scheduling_link(
         raise HTTPException(
             status_code=404,
             detail="Calendly not configured. Please connect Calendly and set a default event type.",
-        ) from e
-
+        )
     # Get client info
     client = (
         db.query(Client).filter(Client.id == client_id, Client.user_id == current_user.id).first()
@@ -377,12 +372,12 @@ async def cancel_calendly_event(
                 raise HTTPException(
                     status_code=404,
                     detail="Event not found. The consultation may have already been cancelled or the event ID is incorrect.",
-                )
+                ) from None
             elif e.response.status_code == 403:
                 raise HTTPException(
                     status_code=403,
                     detail="Permission denied. You may not have access to this event.",
-                )
+                ) from None
             # For other errors, continue with cancellation attempt
             logger.warning(f"⚠️ Could not verify event details, proceeding with cancellation: {e}")
 
@@ -399,7 +394,7 @@ async def cancel_calendly_event(
             raise HTTPException(
                 status_code=403,
                 detail="Permission denied. You may not be the owner of this event, or it may already be cancelled. Only the event owner can cancel events through the API.",
-            )
+            ) from None
         elif e.response.status_code == 404:
             logger.error(
                 f"❌ 404 Not Found cancelling event {event_uuid} for user {current_user.id}"
@@ -407,7 +402,7 @@ async def cancel_calendly_event(
             raise HTTPException(
                 status_code=404,
                 detail="Event not found. The consultation may have already been cancelled or the event ID is incorrect.",
-            )
+            ) from None
         elif e.response.status_code == 401:
             logger.error(
                 f"❌ 401 Unauthorized cancelling event {event_uuid} for user {current_user.id}"
@@ -415,7 +410,7 @@ async def cancel_calendly_event(
             raise HTTPException(
                 status_code=401,
                 detail="Authentication failed. Please disconnect and reconnect your Calendly account.",
-            )
+            ) from None
         else:
             logger.error(
                 f"❌ HTTP {e.response.status_code} cancelling event {event_uuid} for user {current_user.id}: {str(e)}"
@@ -423,11 +418,9 @@ async def cancel_calendly_event(
             raise HTTPException(
                 status_code=e.response.status_code,
                 detail=f"Failed to cancel consultation: {str(e)}",
-            )
+            ) from None
     except Exception as e:
         logger.error(
             f"❌ Unexpected error cancelling event {event_uuid} for user {current_user.id}: {str(e)}"
         )
-        raise HTTPException(
-            status_code=500, detail=f"Failed to cancel consultation: {str(e)}"
-        ) from e
+        raise HTTPException(status_code=500, detail=f"Failed to cancel consultation: {str(e)}")

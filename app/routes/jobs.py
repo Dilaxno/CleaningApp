@@ -85,30 +85,28 @@ async def get_job_status_with_retry(job_id: str, max_retries: int = 3, retry_del
                         logger.error(f"❌ Job {job_id} failed: {error}")
 
                 await pool.close()
-
                 return JobStatusResponse(jobId=job_id, status=status, result=result, error=error)
 
             finally:
                 # Ensure pool is always closed
                 try:
                     await pool.close()
-                except:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Pool close failed (non-critical): {e}")
 
         except asyncio.TimeoutError:
             logger.warning(f"⏰ Timeout on attempt {attempt + 1}/{max_retries} for job {job_id}")
             if attempt == max_retries - 1:
                 raise HTTPException(
                     status_code=504, detail="Timeout connecting to job queue - please try again"
-                ) from e
+                ) from None
         except Exception as e:
             logger.warning(f"🔄 Retry {attempt + 1}/{max_retries} for job {job_id}: {str(e)}")
             if attempt == max_retries - 1:
                 logger.error(f"❌ All retries failed for job {job_id}: {str(e)}")
                 raise HTTPException(
                     status_code=500, detail="Failed to retrieve job status after retries"
-                ) from e
-
+                )
         # Exponential backoff
         if attempt < max_retries - 1:
             await asyncio.sleep(retry_delay * (2**attempt))
@@ -127,4 +125,4 @@ async def get_job_status(job_id: str):
         raise
     except Exception as e:
         logger.error(f"❌ Unexpected error getting job status: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error") from e
+        raise HTTPException(status_code=500, detail="Internal server error")

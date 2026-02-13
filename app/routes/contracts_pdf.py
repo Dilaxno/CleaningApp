@@ -671,11 +671,9 @@ async def generate_contract_html(
     if is_recurring:
         # Recurring contracts: billing starts on signing date
         start_date = base_date.strftime("%B %d, %Y")
-        start_date_note = "Agreement effective immediately upon signing. First service will be scheduled separately."
     else:
         # One-time/deep cleans: align with service date (typically 7 days out)
         start_date = (base_date + timedelta(days=7)).strftime("%B %d, %Y")
-        start_date_note = "Agreement effective on scheduled service date."
 
     payment_due_days = business_config.payment_due_days or 15
     late_fee = business_config.late_fee_percent or 1.5
@@ -699,7 +697,7 @@ async def generate_contract_html(
         property_shots_keys = []
 
     # Property shots are no longer embedded in PDFs - they are sent to provider via email
-    property_shots_b64 = []
+    # Property shots feature - reserved for future implementation
 
     # Special requests from client form
     special_requests = (
@@ -1361,10 +1359,10 @@ async def html_to_pdf(html: str) -> bytes:
             if not pdf_b64:
                 raise Exception("PDF worker returned empty output")
             return base64.b64decode(pdf_b64)
-        except subprocess.TimeoutExpired:
-            raise Exception("PDF generation timed out after 120 seconds")
+        except subprocess.TimeoutExpired as e:
+            raise Exception("PDF generation timed out after 120 seconds") from e
         except Exception as e:
-            raise Exception(f"PDF generation error: {str(e)}")
+            raise Exception(f"PDF generation error: {str(e)}") from e
 
     # Run in thread pool to not block the event loop
     return await asyncio.to_thread(run_worker)
@@ -1392,7 +1390,7 @@ async def generate_contract_pdf(data: ContractGenerateRequest, db: Session = Dep
         # Get the business owner
         user = db.query(User).filter(User.firebase_uid == data.ownerUid).first()
         if not user:
-            raise HTTPException(status_code=404, detail="Business not found") from e
+            raise HTTPException(status_code=404, detail="Business not found")
 
         # Get business config
         config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()

@@ -36,12 +36,12 @@ QUICKBOOKS_REDIRECT_URI = os.getenv(
 # QuickBooks API URLs
 if QUICKBOOKS_ENVIRONMENT == "production":
     QUICKBOOKS_AUTH_URL = "https://appcenter.intuit.com/connect/oauth2"
-    QUICKBOOKS_TOKEN_URL = "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer"
+    QUICKBOOKS_TOKEN_URL = "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer"  # noqa: S105
     QUICKBOOKS_API_BASE_URL = "https://quickbooks.api.intuit.com/v3"
     QUICKBOOKS_DISCOVERY_URL = "https://developer.api.intuit.com/.well-known/openid_configuration"
 else:
     QUICKBOOKS_AUTH_URL = "https://appcenter.intuit.com/connect/oauth2"
-    QUICKBOOKS_TOKEN_URL = "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer"
+    QUICKBOOKS_TOKEN_URL = "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer"  # noqa: S105
     QUICKBOOKS_API_BASE_URL = "https://sandbox-quickbooks.api.intuit.com/v3"
     QUICKBOOKS_DISCOVERY_URL = (
         "https://developer.api.intuit.com/.well-known/openid_sandbox_configuration"

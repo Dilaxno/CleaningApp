@@ -57,7 +57,7 @@ async def verify_firebase_token(token: str) -> dict:
 
     if not FIREBASE_PROJECT_ID:
         logger.error("❌ FIREBASE_PROJECT_ID not configured")
-        raise HTTPException(status_code=500, detail="Firebase not configured") from e
+        raise HTTPException(status_code=500, detail="Firebase not configured")
 
     try:
         # Split token into parts

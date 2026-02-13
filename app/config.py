@@ -36,7 +36,7 @@ if not SECRET_KEY:
     warnings.warn(
         "SECRET_KEY not set! Using insecure default - DO NOT USE IN PRODUCTION", RuntimeWarning
     )
-    SECRET_KEY = "INSECURE-DEV-KEY-CHANGE-IN-PRODUCTION"
+    SECRET_KEY = "INSECURE-DEV-KEY-CHANGE-IN-PRODUCTION"  # noqa: S105 - Dev fallback only
 
 # Frontend base URL for redirects
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")

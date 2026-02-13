@@ -7,10 +7,10 @@ import logging
 import os
 import time
 from threading import Lock
-from typing import Optional
+from typing import Dict, Optional
 
 import redis
-from fastapi import HTTPException, Request
+from fastapi import HTTPException, Request, status
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ def get_redis_client() -> redis.Redis:
                     max_connections=20,  # Connection pooling
                 )
                 # Test connection
-                info = redis_client.ping()
+                redis_client.ping()
                 logger.info("Redis connected successfully via URL")
             except Exception as e:
                 logger.error(f"❌ Failed to connect to Redis via URL: {str(e)}")

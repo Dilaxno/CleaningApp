@@ -7,7 +7,7 @@ import logging
 import re
 import secrets
 from datetime import datetime
-from typing import Optional
+from typing import Dict, Optional
 
 import dns.resolver
 from fastapi import APIRouter, Depends, HTTPException

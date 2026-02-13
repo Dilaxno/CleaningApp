@@ -127,8 +127,8 @@ def create_or_update_user(data: UserCreate, db: Session = Depends(get_db)):
                 response.profile_picture_presigned = generate_presigned_url(
                     user.profile_picture_url
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to generate presigned URL for profile picture: {e}")
         return response
 
     except Exception as e:
@@ -206,7 +206,7 @@ def update_user(
 
     # Validate firebase_uid format
     if not validate_firebase_uid(firebase_uid):
-        raise HTTPException(status_code=400, detail="Invalid user identifier") from e
+        raise HTTPException(status_code=400, detail="Invalid user identifier")
 
     # Verify the authenticated user is updating their own data
     verify_user_access(firebase_uid, current_user)
@@ -237,8 +237,8 @@ def update_user(
         if current_user.profile_picture_url:
             try:
                 profile_picture_presigned = generate_presigned_url(current_user.profile_picture_url)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to generate presigned URL for profile picture: {e}")
         return {
             "id": current_user.id,
             "firebase_uid": current_user.firebase_uid,

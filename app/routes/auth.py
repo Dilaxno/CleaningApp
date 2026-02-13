@@ -1,7 +1,8 @@
 import base64
 import hashlib
+import json
 import logging
-import random
+import secrets
 import string
 from datetime import datetime, timedelta
 from typing import Optional
@@ -21,7 +22,7 @@ from ..config import FIREBASE_PROJECT_ID, SECRET_KEY
 from ..database import get_db
 from ..email_service import send_email
 from ..models import User
-from ..rate_limiter import create_rate_limiter
+from ..rate_limiter import create_rate_limiter, get_redis_client
 from ..schemas import UserResponse, UserUpdate
 from ..turnstile import verify_turnstile
 
@@ -52,11 +53,6 @@ except ValueError:
         logger.info("Firebase Admin initialized with project ID only")
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
-
-# Redis-based OTP storage for security and persistence
-import json
-
-from ..rate_limiter import get_redis_client
 
 
 def store_otp_in_redis(email: str, otp: str, expires_in_seconds: int = 600):
@@ -152,8 +148,8 @@ class VerifyRecoveryRequest(BaseModel):
 
 
 def generate_otp() -> str:
-    """Generate a 6-digit OTP"""
-    return "".join(random.choices(string.digits, k=6))
+    """Generate a 6-digit OTP using cryptographically secure random"""
+    return "".join(secrets.choice(string.digits) for _ in range(6))
 
 
 def mask_email(email: str) -> str:
@@ -213,7 +209,7 @@ async def request_password_reset_otp(
         is_valid = await verify_turnstile(data.turnstileToken, client_ip)
         if not is_valid:
             logger.warning(f"Turnstile verification failed for {data.email}")
-            raise HTTPException(status_code=400, detail="CAPTCHA verification failed") from e
+            raise HTTPException(status_code=400, detail="CAPTCHA verification failed")
     else:
         logger.warning("⚠️ No Turnstile token provided for password reset request")
 
@@ -225,7 +221,7 @@ async def request_password_reset_otp(
 
     # Generate OTP
     otp = generate_otp()
-    expiry = datetime.utcnow() + timedelta(minutes=10)
+    # OTP expires in 10 minutes (stored in Redis with TTL)
 
     # Store OTP in Redis with expiry
     store_otp_in_redis(data.email, otp, expires_in_seconds=600)  # 10 minutes
@@ -323,7 +319,9 @@ async def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_d
         logger.info(f"Password updated for user: {user.email}")
     except firebase_admin.exceptions.FirebaseError as e:
         logger.error(f"Firebase password update failed: {e}")
-        raise HTTPException(status_code=500, detail="Failed to update password. Please try again.")
+        raise HTTPException(
+            status_code=500, detail="Failed to update password. Please try again."
+        ) from e
     except Exception as e:
         logger.error(f"Password update error: {e}")
         raise HTTPException(
@@ -393,7 +391,7 @@ async def send_recovery_code(
 
     # Generate OTP
     otp = generate_otp()
-    expiry = datetime.utcnow() + timedelta(minutes=10)
+    # OTP expires in 10 minutes (stored in Redis with TTL)
 
     # Store OTP in Redis
     store_otp_in_redis(f"recovery_{data.email}", otp, expires_in_seconds=600)  # 10 minutes

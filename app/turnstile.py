@@ -9,19 +9,6 @@ from typing import Optional
 
 import httpx
 
-from .cache import get_redis_client
-
-logger = logging.getLogger(__name__)
-
-TURNSTILE_SECRET_KEY = os.getenv("TURNSTILE_SECRET_KEY")
-
-
-"""
-Cloudflare Turnstile CAPTCHA verification
-"""
-import logging
-import os
-
 from .rate_limiter import get_redis_client
 
 logger = logging.getLogger(__name__)

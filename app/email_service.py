@@ -138,7 +138,7 @@ def send_via_custom_smtp(
 
     except Exception as e:
         logger.error(f"❌ Custom SMTP send failed: {e}")
-        raise Exception(f"Custom SMTP failed: {str(e)}")
+        raise Exception(f"Custom SMTP failed: {str(e)}") from e
 
 
 async def create_property_shots_zip(
@@ -562,7 +562,7 @@ async def send_email(
         return response
     except Exception as e:
         logger.error(f"❌ Email send error to {recipients}: {e}")
-        raise Exception(f"Failed to send email: {str(e)}")
+        raise Exception(f"Failed to send email: {str(e)}") from e
 
 
 # ============================================
@@ -942,13 +942,6 @@ async def send_contract_fully_executed_email(
     contract_public_id: Optional[str] = None,
 ) -> dict:
     """Notify client when contract is fully signed by both parties"""
-    from .config import FRONTEND_URL
-
-    # Build scheduling link
-    scheduling_url = None
-    if contract_public_id:
-        frontend_base = FRONTEND_URL or "http://localhost:5173"
-        scheduling_url = f"{frontend_base}/scheduling/{contract_public_id}"
 
     # Build scheduled time section if applicable
     schedule_section = ""

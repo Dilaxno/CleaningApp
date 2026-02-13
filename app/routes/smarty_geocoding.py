@@ -137,9 +137,7 @@ async def smarty_autocomplete(
 
             if resp.status_code == 401:
                 logger.error("Smarty API authentication failed")
-                raise HTTPException(
-                    status_code=500, detail="Address service authentication failed"
-                ) from e
+                raise HTTPException(status_code=500, detail="Address service authentication failed")
             elif resp.status_code == 402:
                 logger.error("Smarty API payment required")
                 raise HTTPException(status_code=500, detail="Address service quota exceeded")
@@ -180,4 +178,4 @@ async def smarty_autocomplete(
         raise
     except Exception as e:
         logger.error(f"Smarty autocomplete error: {e}")
-        raise HTTPException(status_code=500, detail="Address autocomplete service error") from e
+        raise HTTPException(status_code=500, detail="Address autocomplete service error")

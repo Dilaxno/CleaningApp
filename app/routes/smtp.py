@@ -185,7 +185,7 @@ async def setup_smtp(
     )
 
     if not success:
-        raise HTTPException(status_code=400, detail=message) from e
+        raise HTTPException(status_code=400, detail=message)
 
     # Get or create business config
     config = db.query(BusinessConfig).filter(BusinessConfig.user_id == current_user.id).first()

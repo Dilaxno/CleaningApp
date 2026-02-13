@@ -8,7 +8,7 @@ Uses zipcodes library for comprehensive US ZIP code data.
 
 import logging
 import re
-from typing import Optional
+from typing import Dict, Optional
 
 import zipcodes
 from sqlalchemy.orm import Session

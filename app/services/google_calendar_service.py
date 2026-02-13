@@ -17,7 +17,7 @@ from ..models_google_calendar import GoogleCalendarIntegration
 
 logger = logging.getLogger(__name__)
 
-GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"  # noqa: S105 - OAuth endpoint URL
 GOOGLE_CALENDAR_API = "https://www.googleapis.com/calendar/v3"
 
 

@@ -87,14 +87,14 @@ async def handle_square_payment_webhook(request: Request, db: Session = Depends(
         # Verify webhook signature
         if not verify_square_signature(body, signature, notification_url):
             logger.error("❌ Invalid webhook signature")
-            raise HTTPException(status_code=401, detail="Invalid signature") from e
+            raise HTTPException(status_code=401, detail="Invalid signature")
 
         # Parse webhook payload
         try:
             payload = json.loads(body.decode("utf-8"))
         except json.JSONDecodeError:
             logger.error("❌ Invalid JSON payload")
-            raise HTTPException(status_code=400, detail="Invalid JSON")
+            raise HTTPException(status_code=400, detail="Invalid JSON") from None
 
         event_type = payload.get("type")
         event_data = payload.get("data", {})
@@ -118,7 +118,7 @@ async def handle_square_payment_webhook(request: Request, db: Session = Depends(
         raise
     except Exception as e:
         logger.error(f"❌ Webhook processing error: {str(e)}")
-        raise HTTPException(status_code=500, detail="Webhook processing failed") from e
+        raise HTTPException(status_code=500, detail="Webhook processing failed")
 
 
 async def handle_invoice_payment(event_data: dict, db: Session):
@@ -703,7 +703,7 @@ async def send_subscription_notification_to_owner(
         db = next(get_db())
         business_config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
 
-        business_name = business_config.business_name if business_config else "CleanEnroll"
+        # Business name available for future email customization
 
         # Calculate next billing date
         next_billing_date = datetime.utcnow()
@@ -862,7 +862,7 @@ async def send_provider_payment_notification(
         db = next(get_db())
         business_config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
 
-        business_name = business_config.business_name if business_config else "CleanEnroll"
+        # Business name available for future email customization
         client_name = client.contact_name or client.business_name
 
         if user.email:
@@ -998,8 +998,7 @@ async def check_payment_status(contract_id: int, db: Session = Depends(get_db)):
         contract = db.query(Contract).filter(Contract.id == contract_id).first()
 
         if not contract:
-            raise HTTPException(status_code=404, detail="Contract not found") from e
-
+            raise HTTPException(status_code=404, detail="Contract not found")
         # Check if payment confirmation is pending
         if (
             hasattr(contract, "payment_confirmation_pending")
@@ -1027,4 +1026,4 @@ async def check_payment_status(contract_id: int, db: Session = Depends(get_db)):
         raise
     except Exception as e:
         logger.error(f"❌ Error checking payment status: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to check payment status") from e
+        raise HTTPException(status_code=500, detail="Failed to check payment status")

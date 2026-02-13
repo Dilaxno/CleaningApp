@@ -81,9 +81,9 @@ async def autocomplete(
 
             data = json.loads(cached)
             return AutocompleteResponse(results=[AutocompleteResponseItem(**x) for x in data])
-    except Exception:
-        # fail open
-        pass
+    except Exception as e:
+        # Fail open - continue to API if cache fails
+        logger.debug(f"Cache read failed, continuing to API: {e}")
 
     params = {
         "q": q,
@@ -130,8 +130,8 @@ async def autocomplete(
 
             redis = get_redis_client()
             redis.setex(cache_key, CACHE_SECONDS, json.dumps(results))
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Cache write failed: {e}")
 
         return AutocompleteResponse(results=[AutocompleteResponseItem(**x) for x in results])
 

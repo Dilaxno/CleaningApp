@@ -211,7 +211,7 @@ async def verify_dodo_webhook(
     logger.info("🔍 Byte-perfect payload construction used")
 
     if raise_on_failure:
-        raise HTTPException(status_code=401, detail="Invalid webhook signature") from e
+        raise HTTPException(status_code=401, detail="Invalid webhook signature")
     return False, raw_body
 
 

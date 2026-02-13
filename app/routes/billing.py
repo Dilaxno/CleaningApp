@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Optional
+from typing import Dict, Optional
 
 # Prefer Async client for FastAPI per official docs
 # Reference: https://github.com/dodopayments/dodo-docs/blob/main/developer-resources/fastapi-boilerplate.mdx
@@ -227,7 +227,7 @@ async def update_user_plan(
     if body.plan not in allowed_plans:
         raise HTTPException(
             status_code=400, detail=f"Invalid plan. Must be one of: {allowed_plans}"
-        ) from e
+        )
 
     user.plan = body.plan
     db.commit()
@@ -339,7 +339,7 @@ async def manually_activate_plan(
     except Exception as e:
         db.rollback()
         logger.error(f"❌ Failed to activate plan for user {current_user.id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to activate plan") from e
+        raise HTTPException(status_code=500, detail="Failed to activate plan")
 
 
 @router.get("/current-plan")
@@ -429,7 +429,7 @@ async def create_checkout_session(
 
     except Exception as e:
         logger.error(f"Failed to create checkout session: {e}")
-        raise HTTPException(status_code=400, detail="Failed to create checkout session") from e
+        raise HTTPException(status_code=400, detail="Failed to create checkout session")
 
 
 @router.post("/cancel")
@@ -470,7 +470,7 @@ async def cancel_subscription(
         }
     except Exception as e:
         logger.error(f"Failed to cancel subscription: {e}")
-        raise HTTPException(status_code=400, detail="Failed to cancel subscription") from e
+        raise HTTPException(status_code=400, detail="Failed to cancel subscription")
 
 
 @router.post("/change-plan")
@@ -510,7 +510,7 @@ async def change_subscription_plan(
         return {"status": "ok"}
     except Exception as e:
         logger.error(f"Failed to change plan: {e}")
-        raise HTTPException(status_code=400, detail="Failed to change subscription plan") from e
+        raise HTTPException(status_code=400, detail="Failed to change subscription plan")
 
 
 # No product-to-plan mapping on backend; plan is derived from metadata set at checkout creation.
@@ -756,8 +756,7 @@ async def download_payment_invoice_pdf(
     Validates ownership by scanning the user's own payments in-memory before requesting the PDF.
     """
     if not DODO_PAYMENTS_API_KEY or dodo_client is None:
-        raise HTTPException(status_code=500, detail="Billing not configured") from e
-
+        raise HTTPException(status_code=500, detail="Billing not configured")
     # Ownership check
     is_owned = False
     try:
@@ -783,11 +782,9 @@ async def download_payment_invoice_pdf(
             break
     except Exception as e:
         logger.error(f"Failed during ownership verification for payment {payment_id}: {e}")
-        raise HTTPException(status_code=400, detail="Unable to verify payment ownership") from e
-
+        raise HTTPException(status_code=400, detail="Unable to verify payment ownership")
     if not is_owned:
         raise HTTPException(status_code=404, detail="Invoice not found")
-
     try:
         # Retrieve PDF content via Dodo SDK
         invoice_file = await dodo_client.invoices.payments.retrieve(payment_id)
@@ -807,7 +804,6 @@ async def download_payment_invoice_pdf(
         if not content:
             logger.error(f"Invoice content empty for payment {payment_id}")
             raise HTTPException(status_code=502, detail="Failed to fetch invoice")
-
         from fastapi import Response as FastAPIResponse
 
         return FastAPIResponse(
@@ -819,7 +815,7 @@ async def download_payment_invoice_pdf(
         raise
     except Exception as e:
         logger.error(f"Failed to download invoice for payment {payment_id}: {e}")
-        raise HTTPException(status_code=400, detail="Failed to download invoice") from e
+        raise HTTPException(status_code=400, detail="Failed to download invoice")
 
 
 @webhooks_router.post("/webhooks/dodopayments/bypass")
@@ -1263,7 +1259,7 @@ async def handle_dodopayments_webhook(
     """
     if not DODO_PAYMENTS_WEBHOOK_SECRET:
         logger.error("❌ DODO_PAYMENTS_WEBHOOK_SECRET not configured")
-        raise HTTPException(status_code=500, detail="Webhook not configured") from e
+        raise HTTPException(status_code=500, detail="Webhook not configured")
 
     # Log webhook secret length for debugging
     logger.info(f"🔑 Webhook secret configured, length = {len(DODO_PAYMENTS_WEBHOOK_SECRET)}")
@@ -1293,8 +1289,7 @@ async def handle_dodopayments_webhook(
         event = json.loads(raw_body.decode("utf-8"))
     except Exception as e:
         logger.error(f"Failed to parse webhook JSON: {e}")
-        raise HTTPException(status_code=400, detail="Invalid JSON payload") from e
-
+        raise HTTPException(status_code=400, detail="Invalid JSON payload")
     event_type = event.get("type")
     data = event.get("data") or {}
     logger.info(f"🔔 Webhook received id={webhook_id} ts={webhook_timestamp} type={event_type}")
@@ -1520,8 +1515,8 @@ async def handle_dodopayments_webhook(
                         and getattr(user, "subscription_id", None) == subscription_id
                     ):
                         user.subscription_id = None
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f"Failed to clear subscription_id for user: {e}")
                 db.commit()
         elif event_type == "invoice.paid":
             # Track successful subscription invoice payment
@@ -1594,7 +1589,7 @@ async def handle_dodopayments_webhook(
         return {"status": "received"}
     except Exception as e:
         logger.error(f"Error processing webhook: {e}")
-        raise HTTPException(status_code=500, detail="Webhook processing failed") from e
+        raise HTTPException(status_code=500, detail="Webhook processing failed")
 
 
 async def _handle_client_invoice_payment(data, db: Session):

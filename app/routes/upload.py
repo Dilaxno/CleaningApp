@@ -95,8 +95,7 @@ async def upload_logo(
         or len(firebase_uid) > 128
         or not firebase_uid.replace("-", "").replace("_", "").isalnum()
     ):
-        raise HTTPException(status_code=400, detail="Invalid user identifier") from e
-
+        raise HTTPException(status_code=400, detail="Invalid user identifier")
     user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -193,7 +192,7 @@ async def upload_logo(
 
     except Exception as e:
         logger.error(f"❌ Upload failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}") from e
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 
 @router.post("/signature/{firebase_uid}")
@@ -258,7 +257,7 @@ async def upload_signature(
 
     except Exception as e:
         logger.error(f"❌ Upload failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}") from e
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 
 @router.get("/presigned/{firebase_uid}/{file_type}")
@@ -313,7 +312,7 @@ async def get_presigned_url_endpoint(
         return {"url": presigned_url}
     except Exception as e:
         logger.error(f"❌ Failed to generate presigned URL: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to generate URL: {str(e)}") from e
+        raise HTTPException(status_code=500, detail=f"Failed to generate URL: {str(e)}")
 
 
 @router.post("/profile-picture/{firebase_uid}")
@@ -396,7 +395,7 @@ async def upload_profile_picture(
 
     except Exception as e:
         logger.error(f"❌ Upload failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}") from e
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 
 @router.post("/integration-logo")
@@ -462,4 +461,4 @@ async def upload_integration_logo(
 
     except Exception as e:
         logger.error(f"❌ Upload failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}") from e
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")

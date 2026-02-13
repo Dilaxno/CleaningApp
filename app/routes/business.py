@@ -1,5 +1,5 @@
 import logging
-from typing import Optional
+from typing import Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
@@ -350,7 +350,7 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
         user = db.query(User).filter(User.firebase_uid == data.firebaseUid).first()
         if not user:
             logger.error(f"❌ User not found for firebase_uid: {data.firebaseUid}")
-            raise HTTPException(status_code=404, detail="User not found") from e
+            raise HTTPException(status_code=404, detail="User not found")
 
         existing = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
 
@@ -606,7 +606,7 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
     except Exception as e:
         logger.error(f"❌ Error creating business config: {str(e)}")
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/{firebase_uid}")
@@ -725,7 +725,7 @@ def get_public_branding(firebase_uid: str, request: Request, db: Session = Depen
             )
             raise HTTPException(
                 status_code=403, detail="Access denied: Custom domain does not match requested user"
-            ) from e
+            )
         logger.info(f"✅ Custom domain validation passed for branding {firebase_uid}")
 
     # Validate firebase_uid format to prevent injection
@@ -787,7 +787,7 @@ def get_public_addons(firebase_uid: str, request: Request, db: Session = Depends
             )
             raise HTTPException(
                 status_code=403, detail="Access denied: Custom domain does not match requested user"
-            ) from e
+            )
         logger.info(f"✅ Custom domain validation passed for addons {firebase_uid}")
 
     # Validate firebase_uid format to prevent injection

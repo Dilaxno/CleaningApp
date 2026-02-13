@@ -1,7 +1,7 @@
 import logging
 import os
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 import httpx
 
@@ -13,7 +13,7 @@ class CalendlyService:
 
     BASE_URL = "https://api.calendly.com"
     AUTH_URL = "https://auth.calendly.com/oauth/authorize"
-    TOKEN_URL = "https://auth.calendly.com/oauth/token"
+    TOKEN_URL = "https://auth.calendly.com/oauth/token"  # noqa: S105 - OAuth endpoint URL
 
     def __init__(self):
         self.client_id = os.getenv("CALENDLY_CLIENT_ID")

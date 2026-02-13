@@ -2,7 +2,7 @@ import base64
 import hashlib
 import io
 import logging
-import random
+import secrets
 import string
 from datetime import datetime, timedelta
 from typing import Optional
@@ -85,9 +85,10 @@ class TOTPSetupResponse(BaseModel):
 def generate_backup_codes(count: int = 10) -> list[str]:
     """Generate cryptographically secure backup codes"""
     codes = []
+    charset = string.ascii_uppercase + string.digits
     for _ in range(count):
-        code = "".join(random.choices(string.ascii_uppercase + string.digits, k=4))
-        code2 = "".join(random.choices(string.ascii_uppercase + string.digits, k=4))
+        code = "".join(secrets.choice(charset) for _ in range(4))
+        code2 = "".join(secrets.choice(charset) for _ in range(4))
         codes.append(f"{code}-{code2}")
     return codes
 
@@ -103,8 +104,8 @@ def decrypt_backup_codes(encrypted_codes: list[str]) -> list[str]:
 
 
 def generate_otp() -> str:
-    """Generate 6-digit OTP"""
-    return "".join(random.choices(string.digits, k=6))
+    """Generate 6-digit OTP using cryptographically secure random"""
+    return "".join(secrets.choice(string.digits) for _ in range(6))
 
 
 async def send_otp_email(email: str, otp: str):

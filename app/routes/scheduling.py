@@ -192,10 +192,7 @@ async def get_client_latest_appointment(client_id: int, db: Session = Depends(ge
         )
 
         if not schedule:
-            raise HTTPException(
-                status_code=404, detail="No appointments found for this client"
-            ) from e
-
+            raise HTTPException(status_code=404, detail="No appointments found for this client")
         # Get client info
         client = db.query(Client).filter(Client.id == client_id).first()
         if not client:
@@ -253,7 +250,7 @@ async def get_client_latest_appointment(client_id: int, db: Session = Depends(ge
         raise
     except Exception as e:
         logger.error(f"❌ Failed to get client appointment details: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve appointment details") from e
+        raise HTTPException(status_code=500, detail="Failed to retrieve appointment details")
 
 
 class ClientBookingRequest(BaseModel):
@@ -463,7 +460,7 @@ async def create_scheduling_proposal(
     )
 
     if not contract:
-        raise HTTPException(status_code=404, detail="Contract not found") from e
+        raise HTTPException(status_code=404, detail="Contract not found")
 
     # Check if proposal already exists - if so, update it instead of creating new
     existing = (
@@ -543,7 +540,7 @@ async def get_contract_proposals(
     )
 
     if not contract:
-        raise HTTPException(status_code=404, detail="Contract not found") from e
+        raise HTTPException(status_code=404, detail="Contract not found")
 
     proposals = (
         db.query(SchedulingProposal)
@@ -687,8 +684,7 @@ async def client_counter_proposal(
     proposal = db.query(SchedulingProposal).filter(SchedulingProposal.id == proposal_id).first()
 
     if not proposal:
-        raise HTTPException(status_code=404, detail="Proposal not found") from e
-
+        raise HTTPException(status_code=404, detail="Proposal not found")
     if proposal.status != "pending":
         raise HTTPException(status_code=400, detail="Proposal is not pending")
 
@@ -775,7 +771,7 @@ async def get_public_scheduling_info(contract_public_id: str, db: Session = Depe
     contract = db.query(Contract).filter(Contract.public_id == contract_public_id).first()
 
     if not contract:
-        raise HTTPException(status_code=404, detail="Contract not found") from e
+        raise HTTPException(status_code=404, detail="Contract not found")
 
     # Get client info
     client = db.query(Client).filter(Client.id == contract.client_id).first()
@@ -924,12 +920,14 @@ async def get_public_busy_intervals(
     # Find contract by public_id (used only to resolve provider/user)
     contract = db.query(Contract).filter(Contract.public_id == contract_public_id).first()
     if not contract:
-        raise HTTPException(status_code=404, detail="Contract not found") from e
+        raise HTTPException(status_code=404, detail="Contract not found")
 
     try:
         day = datetime.fromisoformat(date).date()
     except Exception:
-        raise HTTPException(status_code=400, detail="Invalid date format. Expected YYYY-MM-DD")
+        raise HTTPException(
+            status_code=400, detail="Invalid date format. Expected YYYY-MM-DD"
+        ) from None
 
     # Get all schedules for that provider on that day.
     # We include any schedules that represent a blocked time on the calendar.
@@ -956,16 +954,16 @@ async def get_public_busy_intervals(
         def parse_time(t: str):
             if not t:
                 return None
-            # 24h format
+            # Try 24h format first
             try:
                 return datetime.strptime(t, "%H:%M").time()
             except Exception:
-                pass
-            # 12h format
-            try:
-                return datetime.strptime(t, "%I:%M %p").time()
-            except Exception:
-                return None
+                # Try 12h format
+                try:
+                    return datetime.strptime(t, "%I:%M %p").time()
+                except Exception:
+                    logger.debug(f"Failed to parse time format: {t}")
+                    return None
 
         start_t = parse_time(start_raw)
         end_t = parse_time(end_raw)
@@ -1203,12 +1201,14 @@ async def get_busy_slots_by_client(
     # Get client to find the provider
     client = db.query(Client).filter(Client.id == client_id).first()
     if not client:
-        raise HTTPException(status_code=404, detail="Client not found") from e
+        raise HTTPException(status_code=404, detail="Client not found")
 
     try:
         day = datetime.fromisoformat(date).date()
     except Exception:
-        raise HTTPException(status_code=400, detail="Invalid date format. Expected YYYY-MM-DD")
+        raise HTTPException(
+            status_code=400, detail="Invalid date format. Expected YYYY-MM-DD"
+        ) from None
 
     # Get all schedules for that provider on that day
     # Include scheduled, in-progress, and pending appointments
@@ -1231,16 +1231,16 @@ async def get_busy_slots_by_client(
         def parse_time(t: str):
             if not t:
                 return None
-            # Try 24h format
+            # Try 24h format first
             try:
                 return datetime.strptime(t, "%H:%M").time()
             except Exception:
-                pass
-            # Try 12h format
-            try:
-                return datetime.strptime(t, "%I:%M %p").time()
-            except Exception:
-                return None
+                # Try 12h format
+                try:
+                    return datetime.strptime(t, "%I:%M %p").time()
+                except Exception:
+                    logger.debug(f"Failed to parse time format: {t}")
+                    return None
 
         start_t = parse_time(start_raw)
         end_t = parse_time(end_raw)

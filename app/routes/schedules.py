@@ -1,4 +1,6 @@
+import hashlib
 import logging
+import secrets
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -316,7 +318,7 @@ async def delete_schedule(
         .first()
     )
     if not schedule:
-        raise HTTPException(status_code=404, detail="Schedule not found") from e
+        raise HTTPException(status_code=404, detail="Schedule not found")
 
     # 🆕 DELETE GOOGLE CALENDAR EVENT IF EXISTS
     if schedule.google_calendar_event_id:
@@ -359,7 +361,7 @@ async def approve_schedule(
     )
 
     if not schedule:
-        raise HTTPException(status_code=404, detail="Schedule not found") from e
+        raise HTTPException(status_code=404, detail="Schedule not found")
 
     if request.action == "accept":
         # Require a fully signed contract before a provider can accept/verify scheduling.
@@ -521,8 +523,7 @@ async def approve_schedule(
         if not request.proposedDate or not request.proposedStartTime or not request.proposedEndTime:
             raise HTTPException(
                 status_code=400, detail="Proposed date and time required for change request"
-            ) from e
-
+            )
         schedule.approval_status = "change_requested"
         schedule.proposed_date = request.proposedDate
         schedule.proposed_start_time = request.proposedStartTime
@@ -557,15 +558,12 @@ async def approve_schedule(
         }
 
     else:
-        raise HTTPException(status_code=400, detail="Invalid action") from e
+        raise HTTPException(status_code=400, detail="Invalid action")
 
 
 # ============================================
 # PUBLIC ENDPOINTS - Client Schedule Response
 # ============================================
-
-import hashlib
-import secrets
 
 
 def generate_schedule_token(schedule_id: int, client_id: int) -> str:
@@ -730,8 +728,7 @@ async def client_counter_proposal(
     schedule = db.query(Schedule).filter(Schedule.id == schedule_id).first()
 
     if not schedule:
-        raise HTTPException(status_code=404, detail="Schedule not found") from e
-
+        raise HTTPException(status_code=404, detail="Schedule not found")
     # Verify token
     if not verify_schedule_token(schedule_id, schedule.client_id, request.token):
         raise HTTPException(status_code=403, detail="Invalid or expired link")
@@ -742,7 +739,7 @@ async def client_counter_proposal(
 
         preferred_date = dt.fromisoformat(request.preferred_date)
     except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid date format")
+        raise HTTPException(status_code=400, detail="Invalid date format") from None
 
     # Update schedule with client's counter-proposal
     # Store in proposed fields (now representing client's suggestion)

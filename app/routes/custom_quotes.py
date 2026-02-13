@@ -416,7 +416,7 @@ async def send_custom_quote_request_notification(
             db.query(BusinessConfig).filter(BusinessConfig.user_id == provider.id).first()
         )
 
-        business_name = business_config.business_name if business_config else "Your Business"
+        # Business name available for future email customization
         client_name = client.contact_name or client.business_name
 
         if provider.email:

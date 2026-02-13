@@ -95,7 +95,7 @@ async def generate_contract_pdf_task(
             logger.info(f"📊 Quote calculated: ${quote.get('total', 0)}")
         except Exception as e:
             logger.error(f"❌ Quote calculation failed: {str(e)}")
-            raise Exception(f"Failed to calculate quote: {str(e)}")
+            raise Exception(f"Failed to calculate quote: {str(e)}") from e
 
         # Create contract record first to get public_id for secure contract numbering
         contract = Contract(
@@ -131,7 +131,7 @@ async def generate_contract_pdf_task(
         except Exception as e:
             logger.error(f"❌ HTML generation failed: {str(e)}")
             db.rollback()
-            raise Exception(f"Failed to generate contract HTML: {str(e)}")
+            raise Exception(f"Failed to generate contract HTML: {str(e)}") from e
 
         # Generate PDF
         try:
@@ -140,7 +140,7 @@ async def generate_contract_pdf_task(
         except Exception as e:
             logger.error(f"❌ PDF generation failed: {str(e)}")
             db.rollback()
-            raise Exception(f"Failed to generate PDF: {str(e)}")
+            raise Exception(f"Failed to generate PDF: {str(e)}") from e
 
         # Upload to R2
         pdf_key = f"contracts/{user.firebase_uid}/{contract.public_id}.pdf"
@@ -154,7 +154,7 @@ async def generate_contract_pdf_task(
         except Exception as e:
             logger.error(f"❌ R2 upload failed: {str(e)}")
             db.rollback()
-            raise Exception(f"Failed to upload PDF to storage: {str(e)}")
+            raise Exception(f"Failed to upload PDF to storage: {str(e)}") from e
 
         # Update contract with PDF key
         contract.pdf_key = pdf_key

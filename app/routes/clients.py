@@ -271,9 +271,7 @@ async def export_clients_csv(
     except Exception as e:
         logger.error(f"❌ CSV export failed for user {current_user.id}: {str(e)}")
         logger.exception(e)
-        raise HTTPException(
-            status_code=500, detail="Failed to export clients. Please try again."
-        ) from e
+        raise HTTPException(status_code=500, detail="Failed to export clients. Please try again.")
 
 
 @router.get("/{client_id}", response_model=ClientResponse)
@@ -682,9 +680,7 @@ async def get_quote_preview(
     # Build pricing explanation
     pricing_model = config.pricing_model or ""
     property_size = int(data.formData.get("squareFootage", 0) or 0)
-    num_rooms = int(
-        data.formData.get("numberOfOffices", 0) or data.formData.get("numberOfRooms", 0) or 0
-    )
+    # num_rooms reserved for future pricing calculations
     frequency = data.formData.get("cleaningFrequency", "")
 
     explanation_parts = []
@@ -866,7 +862,7 @@ async def submit_public_form(
     )
     if client_ip and "," in client_ip:
         client_ip = client_ip.split(",")[0].strip()
-    user_agent = request.headers.get("User-Agent", "unknown")
+    # User agent available for future analytics/logging
 
     logger.info(f"📥 Public form submission for owner UID: {data.ownerUid} from IP: {client_ip}")
 
@@ -1161,7 +1157,7 @@ async def generate_contract_for_client(
     client = db.query(Client).filter(Client.id == client_id).first()
     if not client:
         logger.error(f"❌ Client not found: {client_id}")
-        raise HTTPException(status_code=404, detail="Client not found") from queue_err
+        raise HTTPException(status_code=404, detail="Client not found")
 
     # Get the user/business owner
     user = db.query(User).filter(User.id == client.user_id).first()
@@ -1205,7 +1201,7 @@ async def generate_contract_for_client(
 
     except Exception as e:
         logger.error(f"❌ Failed to queue contract generation for client {client_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to start contract generation") from e
+        raise HTTPException(status_code=500, detail="Failed to start contract generation")
 
 
 @router.post("/public/sign-contract")
@@ -1515,7 +1511,7 @@ async def handle_schedule_decision(
         # Get client
         client = db.query(Client).filter(Client.id == client_id).first()
         if not client:
-            raise HTTPException(status_code=404, detail="Client not found") from sig_err
+            raise HTTPException(status_code=404, detail="Client not found")
 
         # Get business config for business name
         config = db.query(BusinessConfig).filter(BusinessConfig.user_id == client.user_id).first()
@@ -1687,7 +1683,7 @@ async def handle_schedule_decision(
         raise
     except Exception as e:
         logger.error(f"❌ Error handling schedule decision: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 class ClientScheduleSubmission(BaseModel):
@@ -1884,4 +1880,4 @@ async def submit_client_schedule(
     except Exception as e:
         logger.error(f"❌ Error submitting client schedule: {str(e)}")
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e)) from email_err
+        raise HTTPException(status_code=500, detail=str(e))

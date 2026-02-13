@@ -4,7 +4,7 @@ Handles OTP generation, sending, and verification with comprehensive logging
 """
 
 import logging
-import random
+import secrets
 import string
 from datetime import datetime, timedelta
 
@@ -73,8 +73,8 @@ class EmailChangeResponse(BaseModel):
 
 
 def generate_otp(length: int = 6) -> str:
-    """Generate a random numeric OTP code"""
-    otp = "".join(random.choices(string.digits, k=length))
+    """Generate a cryptographically secure random numeric OTP code"""
+    otp = "".join(secrets.choice(string.digits) for _ in range(length))
     logger.debug(f"🔢 Generated OTP: {otp}")
     return otp
 

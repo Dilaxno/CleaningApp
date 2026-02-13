@@ -458,7 +458,7 @@ async def get_public_invoice(public_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Invoice not found")
 
     client = db.query(Client).filter(Client.id == invoice.client_id).first()
-    user = db.query(User).filter(User.id == invoice.user_id).first()
+    # User data available for future invoice customization
     business_config = (
         db.query(BusinessConfig).filter(BusinessConfig.user_id == invoice.user_id).first()
     )

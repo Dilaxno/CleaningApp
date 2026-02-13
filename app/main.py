@@ -4,7 +4,9 @@ import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 # Import all models to ensure they're registered with SQLAlchemy Base
@@ -93,7 +95,7 @@ async def lifespan(app: FastAPI):
     try:
         from .rate_limiter import get_redis_client
 
-        redis_client = get_redis_client()
+        _redis_client = get_redis_client()  # Connection test
         logger.info("Redis connection established")
     except Exception as e:
         logger.warning(
@@ -105,11 +107,6 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="CleanEnroll API", version="1.0.0", lifespan=lifespan)
-
-
-# Custom exception handler for authentication errors
-from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
 
 
 @app.exception_handler(RequestValidationError)

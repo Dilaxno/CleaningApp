@@ -1,4 +1,5 @@
 import logging
+import os
 import uuid
 from datetime import datetime
 from typing import Optional
@@ -196,7 +197,7 @@ async def initiate_contract_process(
         .first()
     )
     if not client:
-        raise HTTPException(status_code=404, detail="Client not found") from e
+        raise HTTPException(status_code=404, detail="Client not found")
 
     # Store contract template data in client record for later use
     client.pending_contract_title = data.title
@@ -431,7 +432,7 @@ async def sign_contract_as_provider(
     )
 
     if not contract:
-        raise HTTPException(status_code=404, detail="Contract not found") from e
+        raise HTTPException(status_code=404, detail="Contract not found")
     logger.info(
         f"📋 Contract {contract_id} signature status: client_signature={bool(contract.client_signature)}, client_signature_timestamp={contract.client_signature_timestamp}"
     )
@@ -639,7 +640,7 @@ async def delete_contract(
         .first()
     )
     if not contract:
-        raise HTTPException(status_code=404, detail="Contract not found") from e
+        raise HTTPException(status_code=404, detail="Contract not found")
 
     try:
         # Delete related invoices first to avoid foreign key constraint violation
@@ -922,7 +923,7 @@ async def download_contract(contract_id: int, db: Session = Depends(get_db)):
     contract = db.query(Contract).filter(Contract.id == contract_id).first()
 
     if not contract:
-        raise HTTPException(status_code=404, detail="Contract not found") from e
+        raise HTTPException(status_code=404, detail="Contract not found")
 
     if not contract.pdf_key:
         raise HTTPException(status_code=404, detail="Contract PDF not available")
