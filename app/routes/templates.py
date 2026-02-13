@@ -86,7 +86,8 @@ async def get_templates(
 
     if cached_templates is not None:
         logger.info(f"✅ Returning cached templates for user {current_user.email}")
-        return cached_templates
+        # Convert cached dicts back to Pydantic models
+        return [FormTemplateSchema(**t) for t in cached_templates]
 
     # Get user's business config to check active templates
     business_config = (
@@ -174,8 +175,8 @@ async def get_templates(
             )
         )
 
-    # Cache the result for 5 minutes
-    cache.set(cache_key, templates, ttl=300)
+    # Cache the result for 5 minutes (convert to dict for JSON serialization)
+    cache.set(cache_key, [t.model_dump() for t in templates], ttl=300)
 
     logger.info(
         f"✅ Returning {len(templates)} total templates to user {current_user.email} (cached)"

@@ -478,7 +478,8 @@ async def send_custom_quote_request_notification(
             await send_email(
                 to=provider.email,
                 subject=f"New Custom Quote Request from {client_name}",
-                html_content=html,
+                title="New Custom Quote Request",
+                content_html=html,
                 business_config=business_config,
             )
 
@@ -592,7 +593,8 @@ async def send_custom_quote_email(
             await send_email(
                 to=client.email,
                 subject=f"Your Custom Quote from {business_name} - ${quote_request.custom_quote_amount:.2f}",
-                html_content=html,
+                title="Your Custom Quote is Ready!",
+                content_html=html,
                 business_config=business_config,
             )
 

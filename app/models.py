@@ -611,6 +611,9 @@ class CustomQuoteRequest(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # Provider
     client_id = Column(Integer, ForeignKey("clients.id"), nullable=False)
 
+    # Client request details
+    client_notes = Column(Text, nullable=True)  # Client-provided notes describing their needs
+
     # Video details
     video_r2_key = Column(String(500), nullable=False)  # R2 storage key
     video_filename = Column(String(255), nullable=False)  # Original filename
@@ -643,6 +646,7 @@ class CustomQuoteRequest(Base):
     client_ip = Column(String(45), nullable=True)  # IP when video uploaded
     client_user_agent = Column(String(500), nullable=True)
     expires_at = Column(DateTime, nullable=True)  # Quote expiration (optional)
+    provider_viewed_at = Column(DateTime, nullable=True)  # When provider first viewed
 
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
