@@ -646,13 +646,28 @@ async def get_quote_preview(
     ).first()
     
     # Auto-set isFirstCleaning based on IP - if no signed contracts from this IP, it's their first cleaning
-    is_first_cleaning = existing_signed_contract is None
-    data.formData["isFirstCleaning"] = is_first_cleaning
+    # BUT: If frontend explicitly sent isFirstCleaning=true (for quote preview), respect that
+    frontend_is_first = data.formData.get("isFirstCleaning", None)
+    is_first_cleaning_by_ip = existing_signed_contract is None
     
-    logger.info(f"🔍 First cleaning check for IP {client_ip}: {is_first_cleaning} (existing signed contracts: {'none' if is_first_cleaning else 'found'})")
+    # Use frontend value if provided, otherwise use IP-based detection
+    if frontend_is_first is not None:
+        is_first_cleaning = bool(frontend_is_first)
+        logger.info(f"🔍 Using frontend isFirstCleaning value: {is_first_cleaning} (IP check would be: {is_first_cleaning_by_ip})")
+    else:
+        is_first_cleaning = is_first_cleaning_by_ip
+        logger.info(f"🔍 Using IP-based first cleaning check for IP {client_ip}: {is_first_cleaning} (existing signed contracts: {'none' if is_first_cleaning else 'found'})")
+    
+    data.formData["isFirstCleaning"] = is_first_cleaning
 
     # Calculate quote
     quote = calculate_quote(config, data.formData)
+    
+    # Log the discount calculation for debugging
+    logger.info(f"📊 Quote calculation - first_cleaning_discount_amount: ${quote.get('first_cleaning_discount_amount', 0):.2f}, "
+                f"first_cleaning_discount_type: {quote.get('first_cleaning_discount_type')}, "
+                f"first_cleaning_discount_value: {quote.get('first_cleaning_discount_value')}, "
+                f"isFirstCleaning: {is_first_cleaning}")
 
     # Convert addon details from snake_case to camelCase for API response
     addon_details_camel = [
@@ -793,6 +808,35 @@ async def get_quote_preview(
     )
 
 
+@router.get("/public/check-email")
+async def check_email_availability(
+    owner_uid: str = Query(..., description="Firebase UID of the business owner"),
+    email: str = Query(..., description="Email address to check"),
+    template_id: str = Query(..., description="Template ID for the service"),
+    db: Session = Depends(get_db),
+):
+    """
+    Public endpoint to check if an email is already used for a specific provider and template.
+    Returns availability status without authentication.
+    """
+    # Find the user by Firebase UID
+    user = db.query(User).filter(User.firebase_uid == owner_uid).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Business not found")
+    
+    # Check if email exists for this provider and template
+    existing_client = db.query(Client).filter(
+        Client.user_id == user.id,
+        Client.email == email,
+        Client.property_type == template_id
+    ).first()
+    
+    return {
+        "available": existing_client is None,
+        "message": None if existing_client is None else "This email address has already been used to submit a request for this service."
+    }
+
+
 @router.post("/public/submit")
 async def submit_public_form(
     data: PublicClientCreate,
@@ -904,6 +948,21 @@ async def submit_public_form(
     if not user:
         logger.error(f"❌ User not found for Firebase UID: {data.ownerUid}")
         raise HTTPException(status_code=404, detail="Business not found")
+    
+    # Check if email already exists for this provider and template
+    if data.email:
+        existing_client = db.query(Client).filter(
+            Client.user_id == user.id,
+            Client.email == data.email,
+            Client.property_type == data.templateId
+        ).first()
+        
+        if existing_client:
+            logger.warning(f"❌ Duplicate email submission blocked: {data.email} for provider {user.id}, template {data.templateId}")
+            raise HTTPException(
+                status_code=409,
+                detail="This email address has already been used to submit a request for this service. If you need to make changes or submit a new request, please contact the service provider directly."
+            )
 
     # Check if this IP has any signed contracts with this business (first cleaning detection)
     existing_signed_contract = db.query(Contract).filter(

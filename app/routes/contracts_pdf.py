@@ -352,15 +352,23 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
     first_cleaning_discount_type = None
     first_cleaning_discount_value = None
 
+    logger.info(f"🔍 First cleaning discount check - isFirstCleaning: {is_first_cleaning}, "
+                f"config.first_cleaning_discount_value: {getattr(config, 'first_cleaning_discount_value', None)}, "
+                f"config.first_cleaning_discount_type: {getattr(config, 'first_cleaning_discount_type', None)}")
+
     if is_first_cleaning and getattr(config, "first_cleaning_discount_value", None):
         first_cleaning_discount_type = getattr(config, "first_cleaning_discount_type", None) or "percent"
         first_cleaning_discount_value = float(getattr(config, "first_cleaning_discount_value") or 0)
+
+        logger.info(f"💰 Applying first cleaning discount - type: {first_cleaning_discount_type}, value: {first_cleaning_discount_value}, discounted_base_price: ${discounted_base_price:.2f}")
 
         if first_cleaning_discount_type == "fixed":
             first_cleaning_discount_amount = min(first_cleaning_discount_value, discounted_base_price)
         else:
             # Default to percent
             first_cleaning_discount_amount = discounted_base_price * (first_cleaning_discount_value / 100.0)
+
+        logger.info(f"💰 First cleaning discount calculated: ${first_cleaning_discount_amount:.2f}")
 
         discounted_base_price = max(0.0, discounted_base_price - first_cleaning_discount_amount)
 
