@@ -488,10 +488,14 @@ async def approve_schedule(
         # Send confirmation email to client
         if client and client.email:
             try:
+                # Get business name for client-facing email
+                config = db.query(BusinessConfig).filter(BusinessConfig.user_id == current_user.id).first()
+                business_name = config.business_name if config else current_user.email
+                
                 await email_service.send_appointment_confirmed_to_client(
                     client_email=client.email,
                     client_name=client.business_name or client.contact_name or "Client",
-                    provider_name=current_user.full_name or current_user.email,
+                    provider_name=business_name,
                     confirmed_date=schedule.scheduled_date,
                     confirmed_start_time=schedule.start_time,
                     confirmed_end_time=schedule.end_time,
@@ -535,10 +539,14 @@ async def approve_schedule(
         client = db.query(Client).filter(Client.id == schedule.client_id).first()
         if client and client.email:
             try:
+                # Get business name for client-facing email
+                config = db.query(BusinessConfig).filter(BusinessConfig.user_id == current_user.id).first()
+                business_name = config.business_name if config else current_user.email
+                
                 await email_service.send_schedule_change_request(
                     client_email=client.email,
                     client_name=client.business_name or client.contact_name,
-                    provider_name=current_user.full_name or current_user.email,
+                    provider_name=business_name,
                     original_time=schedule.scheduled_date,
                     proposed_time=request.proposedDate,
                     proposed_start=request.proposedStartTime,

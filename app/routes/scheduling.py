@@ -372,6 +372,7 @@ async def create_client_booking(data: ClientBookingRequest, db: Session = Depend
     # Send notification email to provider about pending booking
     try:
         if user.email:
+            # Get business name for provider email (this is TO provider, so can use their name)
             await send_pending_booking_notification(
                 provider_email=user.email,
                 provider_name=sanitize_string(user.full_name or "Service Provider"),
@@ -501,10 +502,14 @@ async def create_scheduling_proposal(
     client = db.query(Client).filter(Client.id == contract.client_id).first()
     if client and client.email:
         try:
+            # Get business name for client-facing email
+            config = db.query(BusinessConfig).filter(BusinessConfig.user_id == current_user.id).first()
+            business_name = config.business_name if config else "Your Service Provider"
+            
             await send_scheduling_proposal_email(
                 client_email=client.email,
                 client_name=sanitize_string(client.contact_name or client.business_name),
-                provider_name=sanitize_string(current_user.full_name or "Your Service Provider"),
+                provider_name=sanitize_string(business_name),
                 contract_id=contract.id,
                 time_slots=(
                     [sanitize_dict(slot) for slot in proposal.time_slots]
