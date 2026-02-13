@@ -462,6 +462,7 @@ class Contract(Base):
 
     user = relationship("User", back_populates="contracts")
     client = relationship("Client", back_populates="contracts")
+    custom_quote_request = relationship("CustomQuoteRequest", foreign_keys=[custom_quote_request_id], back_populates="contract")
     invoices = relationship(
         "Invoice", back_populates="contract", cascade="all, delete-orphan"
     )
@@ -711,5 +712,6 @@ class CustomQuoteRequest(Base):
     # Relationships
     user = relationship("User")
     client = relationship("Client")
-    contract = relationship("Contract")
+    contract = relationship("Contract", foreign_keys=[contract_id], back_populates="custom_quote_request")
+
 
