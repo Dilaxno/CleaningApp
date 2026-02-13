@@ -1742,54 +1742,78 @@ async def submit_client_schedule(
             scheduled_start = f"{data.scheduledDate}T{data.scheduledTime}:00"
             scheduled_end = f"{data.scheduledDate}T{data.endTime}:00"
             
-            # Update client with scheduled time
-            client.scheduled_start_time = scheduled_start
-            client.scheduled_end_time = scheduled_end
-            client.scheduling_status = "pending_provider_confirmation"
-            
-            # Create a Schedule record with pending approval status
-            # This ensures the provider sees it in their schedule view and gets a notification badge
+            # Parse datetime for duplicate check
             scheduled_datetime = datetime.fromisoformat(scheduled_start)
             
-            # Extract address from form_data if available
-            address = None
-            if client.form_data and isinstance(client.form_data, dict):
-                address = client.form_data.get('address') or client.form_data.get('serviceAddress')
+            # Check if schedule already exists to prevent duplicates
+            # Use FOR UPDATE to lock the row and prevent race conditions
+            existing_schedule = db.query(Schedule).filter(
+                Schedule.client_id == client.id,
+                Schedule.scheduled_date == scheduled_datetime.date(),
+                Schedule.start_time == data.scheduledTime,
+                Schedule.status == "scheduled"
+            ).with_for_update().first()
             
-            new_schedule = Schedule(
-                user_id=client.user_id,
-                client_id=client.id,
-                title=f"Cleaning for {client.contact_name or client.business_name}",
-                description=f"Client-requested cleaning appointment",
-                service_type=client.property_type or "standard",
-                scheduled_date=scheduled_datetime,
-                start_time=data.scheduledTime,
-                end_time=data.endTime,
-                duration_minutes=data.durationMinutes,
-                status="scheduled",
-                approval_status="pending",  # This triggers the notification badge
-                address=address,
-                price=None,  # Will be set when provider confirms
-                is_recurring=False,
-                calendly_booking_method="client_selected",
-            )
-            
-            db.add(new_schedule)
-            db.commit()
-            db.refresh(client)
-            db.refresh(new_schedule)
-            
-            logger.info(f"✅ Client {client_id} submitted schedule: {scheduled_start} - {scheduled_end}")
-            logger.info(f"✅ Created Schedule record {new_schedule.id} with approval_status='pending'")
+            if existing_schedule:
+                logger.warning(f"⚠️ Schedule already exists for client {client_id} on {scheduled_datetime.date()} at {data.scheduledTime} - returning existing schedule")
+                # Update client with scheduled time (in case it wasn't set)
+                client.scheduled_start_time = scheduled_start
+                client.scheduled_end_time = scheduled_end
+                client.scheduling_status = "pending_provider_confirmation"
+                db.commit()
+                db.refresh(existing_schedule)
+                
+                # Use existing schedule for the rest of the function
+                new_schedule = existing_schedule
+                send_notification = False  # Don't send duplicate notification
+            else:
+                # Update client with scheduled time
+                client.scheduled_start_time = scheduled_start
+                client.scheduled_end_time = scheduled_end
+                client.scheduling_status = "pending_provider_confirmation"
+                
+                # Extract address from form_data if available
+                address = None
+                if client.form_data and isinstance(client.form_data, dict):
+                    address = client.form_data.get('address') or client.form_data.get('serviceAddress')
+                
+                # Create a Schedule record with pending approval status
+                # This ensures the provider sees it in their schedule view and gets a notification badge
+                new_schedule = Schedule(
+                    user_id=client.user_id,
+                    client_id=client.id,
+                    title=f"Cleaning for {client.contact_name or client.business_name}",
+                    description=f"Client-requested cleaning appointment",
+                    service_type=client.property_type or "standard",
+                    scheduled_date=scheduled_datetime,
+                    start_time=data.scheduledTime,
+                    end_time=data.endTime,
+                    duration_minutes=data.durationMinutes,
+                    status="scheduled",
+                    approval_status="pending",  # This triggers the notification badge
+                    address=address,
+                    price=None,  # Will be set when provider confirms
+                    is_recurring=False,
+                    calendly_booking_method="client_selected",
+                )
+                
+                db.add(new_schedule)
+                db.commit()
+                db.refresh(client)
+                db.refresh(new_schedule)
+                
+                logger.info(f"✅ Client {client_id} submitted schedule: {scheduled_start} - {scheduled_end}")
+                logger.info(f"✅ Created new Schedule record {new_schedule.id} with approval_status='pending'")
+                send_notification = True  # Send notification for new schedule
             
         except Exception as parse_err:
             logger.error(f"❌ Failed to parse schedule times or create schedule: {parse_err}")
             db.rollback()
             raise HTTPException(status_code=400, detail="Invalid date/time format")
 
-        # Send notification email to provider
+        # Send notification email to provider (only for new schedules)
         try:
-            if provider.email:
+            if provider.email and send_notification:
                 # Parse times for email display
                 start_dt = datetime.fromisoformat(scheduled_start)
                 end_dt = datetime.fromisoformat(scheduled_end)
