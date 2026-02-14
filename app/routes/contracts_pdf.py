@@ -144,7 +144,25 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
     elif pricing_model == "hourly" and config.hourly_rate:
         # Use new three-category time estimation system
         estimated_hours = calculate_estimated_hours(config, property_size)
-        base_price = estimated_hours * config.hourly_rate
+        
+        # Determine number of cleaners based on property size
+        num_cleaners = config.cleaners_small_job or 1
+        if property_size > 2000:
+            num_cleaners = config.cleaners_large_job or 2
+        
+        # Calculate base price based on hourly rate mode
+        if config.hourly_rate_mode == "general":
+            # General hourly rate: Total = Hourly Rate × Job Duration (cleaner count doesn't multiply)
+            base_price = estimated_hours * config.hourly_rate
+            logger.info(
+                f"💰 Hourly pricing (general mode): {estimated_hours} hours × ${config.hourly_rate}/hr = ${base_price:.2f}"
+            )
+        else:
+            # Per cleaner mode (default): Total = Hourly Rate × Number of Cleaners × Job Duration
+            base_price = estimated_hours * config.hourly_rate * num_cleaners
+            logger.info(
+                f"💰 Hourly pricing (per cleaner mode): {estimated_hours} hours × ${config.hourly_rate}/hr × {num_cleaners} cleaners = ${base_price:.2f}"
+            )
     elif pricing_model == "packages":
         # Custom packages pricing
         selected_package_id = form_data.get("selectedPackage")

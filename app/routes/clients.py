@@ -701,14 +701,34 @@ async def get_quote_preview(
         elif pricing_model == "hourly" and config.hourly_rate:
             estimated_hours = quote.get("estimated_hours", 0)
             if estimated_hours > 0:
-                base_calculation = estimated_hours * config.hourly_rate
-                explanation_parts.append(
-                    f"{business_name} charges ${config.hourly_rate:.2f} per hour ({estimated_hours:.1f} hours × ${config.hourly_rate:.2f} = ${base_calculation:,.2f})"
-                )
+                # Determine number of cleaners based on property size
+                num_cleaners = config.cleaners_small_job or 1
+                if property_size > 2000:
+                    num_cleaners = config.cleaners_large_job or 2
+                
+                # Generate explanation based on hourly rate mode
+                if config.hourly_rate_mode == "general":
+                    # General hourly rate: Total = Hourly Rate × Job Duration
+                    base_calculation = estimated_hours * config.hourly_rate
+                    explanation_parts.append(
+                        f"{business_name} charges ${config.hourly_rate:.2f} per hour ({estimated_hours:.1f} hours × ${config.hourly_rate:.2f} = ${base_calculation:,.2f})"
+                    )
+                else:
+                    # Per cleaner mode: Total = Hourly Rate × Number of Cleaners × Job Duration
+                    base_calculation = estimated_hours * config.hourly_rate * num_cleaners
+                    explanation_parts.append(
+                        f"{business_name} charges ${config.hourly_rate:.2f} per hour per cleaner ({estimated_hours:.1f} hours × ${config.hourly_rate:.2f} × {num_cleaners} cleaners = ${base_calculation:,.2f})"
+                    )
             else:
-                explanation_parts.append(
-                    f"{business_name} charges ${config.hourly_rate:.2f} per hour"
-                )
+                # No estimated hours available
+                if config.hourly_rate_mode == "general":
+                    explanation_parts.append(
+                        f"{business_name} charges ${config.hourly_rate:.2f} per hour"
+                    )
+                else:
+                    explanation_parts.append(
+                        f"{business_name} charges ${config.hourly_rate:.2f} per hour per cleaner"
+                    )
         elif pricing_model == "packages":
             # Find the selected package for explanation
             selected_package_id = data.formData.get("selectedPackage")

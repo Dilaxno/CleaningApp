@@ -98,6 +98,11 @@ LANGCACHE_API_KEY=your-langcache-api-key
 ```env
 FRONTEND_URL=http://localhost:5173
 API_URL=http://localhost:8000
+
+# Security - Frontend Origins (comma-separated list for CSP frame-ancestors)
+# Add all domains that should be allowed to embed API responses in iframes
+# The wildcard *.cleanenroll.com is automatically added to support custom subdomains
+FRONTEND_ORIGINS=http://localhost:5173,https://cleanenroll.com,https://www.cleanenroll.com
 ```
 
 ## Rate Limiting Configuration
@@ -111,6 +116,40 @@ The application uses Redis for rate limiting with the following defaults:
   - 15 submissions per minute globally
 
 These limits are enforced at the application level using Redis sorted sets for sliding window rate limiting.
+
+## Content Security Policy (CSP) Configuration
+
+The backend API includes Content Security Policy headers to prevent security vulnerabilities. The `frame-ancestors` directive controls which domains can embed API responses in iframes.
+
+### Default Configuration
+
+By default, the following origins are allowed:
+- The configured `FRONTEND_URL`
+- `https://cleanenroll.com`
+- `https://www.cleanenroll.com`
+- `https://*.cleanenroll.com` (wildcard for all subdomains)
+
+### Adding Custom Origins
+
+If you need to allow additional domains to embed API responses (e.g., for custom client subdomains or partner integrations), add them to the `FRONTEND_ORIGINS` environment variable as a comma-separated list:
+
+```env
+FRONTEND_ORIGINS=http://localhost:5173,https://cleanenroll.com,https://www.cleanenroll.com,https://custom-domain.com
+```
+
+### CSP Error Troubleshooting
+
+If you see a CSP error like:
+```
+Framing 'https://api.cleanenroll.com/' violates the following Content Security Policy directive: "frame-ancestors ..."
+```
+
+This means a domain is trying to embed the API in an iframe but isn't in the allowed list. To fix:
+
+1. Identify the domain that needs access
+2. Add it to the `FRONTEND_ORIGINS` environment variable
+3. Restart the backend server
+4. The wildcard `*.cleanenroll.com` automatically covers all cleanenroll subdomains
 
 ## Setting up Redis
 

@@ -42,6 +42,7 @@ class BusinessConfigCreate(BaseModel):
     availableSupplies: Optional[list[str]] = None  # List of supply IDs
     ratePerSqft: Optional[str] = None
     hourlyRate: Optional[str] = None
+    hourlyRateMode: Optional[str] = None  # per_cleaner or general
     flatRate: Optional[str] = None
     flatRateSmall: Optional[str] = None
     flatRateMedium: Optional[str] = None
@@ -295,6 +296,7 @@ def get_current_user_business_config(
         "availableSupplies": config.available_supplies,
         "ratePerSqft": config.rate_per_sqft,
         "hourlyRate": config.hourly_rate,
+        "hourlyRateMode": config.hourly_rate_mode,
         "flatRate": config.flat_rate,
         "flatRateSmall": config.flat_rate_small,
         "flatRateMedium": config.flat_rate_medium,
@@ -408,6 +410,8 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 existing.rate_per_sqft = to_float(data.ratePerSqft)
             if is_provided(data.hourlyRate):
                 existing.hourly_rate = to_float(data.hourlyRate)
+            if is_provided(data.hourlyRateMode):
+                existing.hourly_rate_mode = data.hourlyRateMode
             if is_provided(data.flatRate):
                 existing.flat_rate = to_float(data.flatRate)
             if is_provided(data.flatRateSmall):
@@ -525,6 +529,7 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 available_supplies=data.availableSupplies,
                 rate_per_sqft=to_float(data.ratePerSqft),
                 hourly_rate=to_float(data.hourlyRate),
+                hourly_rate_mode=data.hourlyRateMode or "per_cleaner",
                 flat_rate=to_float(data.flatRate),
                 flat_rate_small=to_float(data.flatRateSmall),
                 flat_rate_medium=to_float(data.flatRateMedium),

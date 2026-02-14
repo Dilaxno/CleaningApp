@@ -177,6 +177,7 @@ class BusinessConfig(Base):
     available_supplies = Column(JSON, nullable=True)  # List of supply IDs the provider brings
     rate_per_sqft = Column(Float, nullable=True)
     hourly_rate = Column(Float, nullable=True)
+    hourly_rate_mode = Column(String(20), default="per_cleaner")  # per_cleaner or general
     flat_rate = Column(Float, nullable=True)
     # Flat fee by job size (used when pricing_model == "flat")
     flat_rate_small = Column(Float, nullable=True)

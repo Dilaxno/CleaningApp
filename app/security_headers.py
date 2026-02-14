@@ -38,13 +38,16 @@ def get_csp_policy() -> str:
     Adjusted to allow framing from frontend domains and Firebase authentication.
     """
     # Get frontend origins for frame-ancestors
+    # Allow framing from configured frontend origins plus any custom domains
     frontend_origins = FRONTEND_ORIGINS.split(",")
-    frame_ancestors = " ".join(frontend_origins)
+    # Add wildcard support for custom subdomains (e.g., *.cleanenroll.com)
+    frame_ancestors_list = frontend_origins + ["https://*.cleanenroll.com"]
+    frame_ancestors = " ".join(frame_ancestors_list)
 
     # For API backends, we use a restrictive CSP but allow necessary functionality
     directives = [
         "default-src 'self'",  # Allow same-origin by default for API functionality
-        f"frame-ancestors {frame_ancestors}",  # Allow embedding from frontend domains
+        f"frame-ancestors {frame_ancestors}",  # Allow embedding from frontend domains and subdomains
         "script-src 'self' https://apis.google.com https://accounts.google.com https://www.gstatic.com https://*.googleapis.com https://static.cloudflareinsights.com https://challenges.cloudflare.com https://player.vimeo.com https://assets.calendly.com https://widget.intercom.io https://js.intercomcdn.com data:",  # Allow Intercom scripts
         "style-src 'self' https://accounts.google.com https://fonts.googleapis.com",  # Removed unsafe-inline
         "font-src 'self' data: https://fonts.gstatic.com https://r2cdn.perplexity.ai https://js.intercomcdn.com",  # Allow Intercom fonts and data URIs
