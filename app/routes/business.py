@@ -833,6 +833,66 @@ def get_public_addons(firebase_uid: str, request: Request, db: Session = Depends
     }
 
 
+@router.get("/public/calendly-status/{firebase_uid}")
+def get_public_calendly_status(firebase_uid: str, request: Request, db: Session = Depends(get_db)):
+    """
+    Public endpoint to check if business owner has Calendly integration connected.
+    Returns Calendly booking URL if connected and configured.
+    No authentication required - accessed via client forms.
+    """
+    logger.info(f"📥 Checking Calendly status for firebase_uid: {firebase_uid}")
+
+    # Custom domain security validation
+    if hasattr(request.state, "is_custom_domain") and request.state.is_custom_domain:
+        if (
+            not hasattr(request.state, "custom_domain_user_uid")
+            or request.state.custom_domain_user_uid != firebase_uid
+        ):
+            logger.warning(
+                f"🚫 Custom domain security violation in Calendly status: Domain user {getattr(request.state, 'custom_domain_user_uid', 'unknown')} "
+                f"does not match requested user {firebase_uid}"
+            )
+            raise HTTPException(
+                status_code=403, detail="Access denied: Custom domain does not match requested user"
+            )
+        logger.info(f"✅ Custom domain validation passed for Calendly status {firebase_uid}")
+
+    # Validate firebase_uid format to prevent injection
+    if (
+        not firebase_uid
+        or len(firebase_uid) > 128
+        or not firebase_uid.replace("-", "").replace("_", "").isalnum()
+    ):
+        raise HTTPException(status_code=400, detail="Invalid business identifier")
+
+    # Find user by firebase_uid
+    user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
+    if not user:
+        logger.warning(f"❌ User not found for firebase_uid: {firebase_uid}")
+        raise HTTPException(status_code=404, detail="Business not found")
+
+    # Check if user has Calendly integration
+    from ..models import CalendlyIntegration
+
+    calendly_integration = (
+        db.query(CalendlyIntegration)
+        .filter(CalendlyIntegration.user_id == user.id)
+        .first()
+    )
+
+    if not calendly_integration or not calendly_integration.default_event_type_url:
+        return {
+            "hasCalendly": False,
+            "bookingUrl": None,
+        }
+
+    # Generate Calendly booking URL (without prefill for now, will be added when client info is available)
+    return {
+        "hasCalendly": True,
+        "bookingUrl": calendly_integration.default_event_type_url,
+    }
+
+
 @router.get("/{firebase_uid}/public-info")
 def get_public_business_info(firebase_uid: str, request: Request, db: Session = Depends(get_db)):
     """

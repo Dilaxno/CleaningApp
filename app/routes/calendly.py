@@ -338,6 +338,43 @@ async def get_client_scheduling_link(
     }
 
 
+@router.get("/public/status/{owner_uid}")
+async def get_public_calendly_status(owner_uid: str, db: Session = Depends(get_db)):
+    """
+    Public endpoint to check if a business owner has Calendly connected.
+    Used by client-facing forms to show optional consultation booking.
+    """
+    # Find user by Firebase UID
+    user = db.query(User).filter(User.firebase_uid == owner_uid).first()
+    
+    if not user:
+        return {
+            "connected": False,
+            "scheduling_url": None,
+            "event_type_name": None
+        }
+    
+    # Check if user has Calendly integration
+    integration = (
+        db.query(CalendlyIntegration)
+        .filter(CalendlyIntegration.user_id == user.id)
+        .first()
+    )
+    
+    if not integration or not integration.default_event_type_url:
+        return {
+            "connected": False,
+            "scheduling_url": None,
+            "event_type_name": None
+        }
+    
+    return {
+        "connected": True,
+        "scheduling_url": integration.default_event_type_url,
+        "event_type_name": integration.default_event_type_name or "Consultation"
+    }
+
+
 @router.delete("/events/{event_uuid}")
 async def cancel_calendly_event(
     event_uuid: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
