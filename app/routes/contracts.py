@@ -574,14 +574,13 @@ async def sign_contract_as_provider(
                 client_name=client.contact_name or client.business_name,
                 business_name=business_name,
                 contract_title=contract.title,
-                contract_id=contract.id,
+                contract_id=contract.public_id,  # Use public_id instead of id
                 service_type=service_type,
                 start_date=start_date,
                 total_value=contract.total_value,
                 property_address=property_address,
                 business_phone=business_phone,
                 contract_pdf_url=pdf_url,
-                contract_public_id=contract.public_id,
             )
         except Exception as e:
             logger.error(f"Failed to send client email: {e}")
@@ -593,7 +592,7 @@ async def sign_contract_as_provider(
             await send_provider_contract_signed_confirmation(
                 to=current_user.email,
                 provider_name=current_user.full_name or "Provider",
-                contract_id=contract.id,
+                contract_id=contract.public_id,  # Use public_id instead of id
                 client_name=client.business_name,
                 property_address=property_address,
                 contract_pdf_url=pdf_url,

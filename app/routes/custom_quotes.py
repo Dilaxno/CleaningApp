@@ -416,63 +416,145 @@ async def send_custom_quote_request_notification(
             db.query(BusinessConfig).filter(BusinessConfig.user_id == provider.id).first()
         )
 
-        # Business name available for future email customization
+        business_name = business_config.business_name if business_config else "Your Business"
         client_name = client.contact_name or client.business_name
 
         if provider.email:
             html = f"""
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-                    <h1 style="color: white; margin: 0; font-size: 28px;">📋 New Custom Quote Request</h1>
-                </div>
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <meta http-equiv="X-UA-Compatible" content="IE=edge">
+                <!--[if mso]>
+                <style type="text/css">
+                    table {{border-collapse: collapse; border-spacing: 0; margin: 0;}}
+                    div, td {{padding: 0;}}
+                    div {{margin: 0 !important;}}
+                </style>
+                <![endif]-->
+            </head>
+            <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f8fafc;">
+                    <tr>
+                        <td style="padding: 40px 20px;">
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);">
+                                
+                                <!-- Header -->
+                                <tr>
+                                    <td style="background: linear-gradient(135deg, #00C4B4 0%, #00A89A 100%); padding: 40px 30px; text-align: center;">
+                                        <div style="font-size: 48px; margin-bottom: 16px;">📋</div>
+                                        <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; line-height: 1.3;">
+                                            New Custom Quote Request
+                                        </h1>
+                                    </td>
+                                </tr>
 
-                <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
-                    <p style="font-size: 16px; color: #1e293b; margin-bottom: 20px;">
-                        Hi {provider.full_name or 'there'},
-                    </p>
+                                <!-- Content -->
+                                <tr>
+                                    <td style="padding: 40px 30px;">
+                                        <p style="margin: 0 0 24px 0; color: #1e293b; font-size: 16px; line-height: 1.6;">
+                                            Hi <strong>{provider.full_name or 'there'}</strong>,
+                                        </p>
 
-                    <p style="font-size: 16px; color: #1e293b; margin-bottom: 25px;">
-                        <strong>{client_name}</strong> has requested a custom quote for their cleaning service.
-                    </p>
+                                        <p style="margin: 0 0 32px 0; color: #1e293b; font-size: 16px; line-height: 1.6;">
+                                            <strong>{client_name}</strong> has requested a custom quote for their cleaning service.
+                                        </p>
 
-                    <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
-                        <h2 style="color: #3b82f6; font-size: 18px; margin-top: 0; margin-bottom: 15px;">
-                            Client Information
-                        </h2>
-                        <table style="width: 100%; border-collapse: collapse;">
-                            <tr>
-                                <td style="padding: 8px 0; color: #64748b; font-weight: 600;">Name:</td>
-                                <td style="padding: 8px 0; color: #1e293b; text-align: right;">{client_name}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 8px 0; color: #64748b; font-weight: 600;">Email:</td>
-                                <td style="padding: 8px 0; color: #1e293b; text-align: right;">{client.email or 'N/A'}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 8px 0; color: #64748b; font-weight: 600;">Phone:</td>
-                                <td style="padding: 8px 0; color: #1e293b; text-align: right;">{client.phone or 'N/A'}</td>
-                            </tr>
-                            {f'<tr><td style="padding: 8px 0; color: #64748b; font-weight: 600;">Property Type:</td><td style="padding: 8px 0; color: #1e293b; text-align: right;">{client.property_type}</td></tr>' if client.property_type else ''}
-                            {f'<tr><td style="padding: 8px 0; color: #64748b; font-weight: 600;">Property Size:</td><td style="padding: 8px 0; color: #1e293b; text-align: right;">{client.property_size} sqft</td></tr>' if client.property_size else ''}
-                            {f'<tr><td style="padding: 8px 0; color: #64748b; font-weight: 600;">Frequency:</td><td style="padding: 8px 0; color: #1e293b; text-align: right;">{client.frequency}</td></tr>' if client.frequency else ''}
-                        </table>
-                    </div>
+                                        <!-- Client Info Card -->
+                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f8fafc; border-radius: 12px; margin-bottom: 32px; border: 1px solid #e2e8f0;">
+                                            <tr>
+                                                <td style="padding: 24px;">
+                                                    <div style="display: flex; align-items: center; margin-bottom: 20px;">
+                                                        <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #00C4B4 0%, #00A89A 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-right: 12px;">
+                                                            <span style="font-size: 20px;">👤</span>
+                                                        </div>
+                                                        <h2 style="margin: 0; color: #00C4B4; font-size: 18px; font-weight: 600;">
+                                                            Client Information
+                                                        </h2>
+                                                    </div>
+                                                    
+                                                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                                        <tr>
+                                                            <td style="padding: 10px 0; color: #64748b; font-size: 14px; font-weight: 600; width: 35%;">Name:</td>
+                                                            <td style="padding: 10px 0; color: #1e293b; font-size: 14px; text-align: right;">{client_name}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td style="padding: 10px 0; color: #64748b; font-size: 14px; font-weight: 600; border-top: 1px solid #e2e8f0;">Email:</td>
+                                                            <td style="padding: 10px 0; color: #1e293b; font-size: 14px; text-align: right; border-top: 1px solid #e2e8f0;">{client.email or 'N/A'}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td style="padding: 10px 0; color: #64748b; font-size: 14px; font-weight: 600; border-top: 1px solid #e2e8f0;">Phone:</td>
+                                                            <td style="padding: 10px 0; color: #1e293b; font-size: 14px; text-align: right; border-top: 1px solid #e2e8f0;">{client.phone or 'N/A'}</td>
+                                                        </tr>
+                                                        {f'<tr><td style="padding: 10px 0; color: #64748b; font-size: 14px; font-weight: 600; border-top: 1px solid #e2e8f0;">Property Type:</td><td style="padding: 10px 0; color: #1e293b; font-size: 14px; text-align: right; border-top: 1px solid #e2e8f0;">{client.property_type}</td></tr>' if client.property_type else ''}
+                                                        {f'<tr><td style="padding: 10px 0; color: #64748b; font-size: 14px; font-weight: 600; border-top: 1px solid #e2e8f0;">Property Size:</td><td style="padding: 10px 0; color: #1e293b; font-size: 14px; text-align: right; border-top: 1px solid #e2e8f0;">{client.property_size} sqft</td></tr>' if client.property_size else ''}
+                                                        {f'<tr><td style="padding: 10px 0; color: #64748b; font-size: 14px; font-weight: 600; border-top: 1px solid #e2e8f0;">Frequency:</td><td style="padding: 10px 0; color: #1e293b; font-size: 14px; text-align: right; border-top: 1px solid #e2e8f0;">{client.frequency}</td></tr>' if client.frequency else ''}
+                                                    </table>
+                                                </td>
+                                            </tr>
+                                        </table>
 
-                    {f'<div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin-bottom: 25px; border-radius: 4px;"><p style="margin: 0; color: #92400e; font-size: 14px;"><strong>Client Notes:</strong><br>{quote_request.client_notes}</p></div>' if quote_request.client_notes else ''}
+                                        {f'''
+                                        <!-- Client Notes -->
+                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 8px; margin-bottom: 32px;">
+                                            <tr>
+                                                <td style="padding: 20px;">
+                                                    <div style="display: flex; align-items: flex-start;">
+                                                        <span style="font-size: 24px; margin-right: 12px;">💬</span>
+                                                        <div>
+                                                            <p style="margin: 0 0 8px 0; color: #92400e; font-size: 14px; font-weight: 600;">Client Notes:</p>
+                                                            <p style="margin: 0; color: #92400e; font-size: 14px; line-height: 1.6;">{quote_request.client_notes}</p>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        ''' if quote_request.client_notes else ''}
 
-                    <div style="text-align: center; margin: 30px 0;">
-                        <a href="{FRONTEND_URL}/dashboard/custom-quotes/{quote_request.id}"
-                           style="display: inline-block; background: #3b82f6; color: white; padding: 14px 28px;
-                                  text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
-                            Review & Send Quote →
-                        </a>
-                    </div>
+                                        <!-- CTA Button -->
+                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 32px;">
+                                            <tr>
+                                                <td style="text-align: center;">
+                                                    <a href="{FRONTEND_URL}/dashboard/custom-quotes/{quote_request.id}" 
+                                                       style="display: inline-block; background: linear-gradient(135deg, #00C4B4 0%, #00A89A 100%); color: #ffffff; padding: 16px 32px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(0, 196, 180, 0.3);">
+                                                        Review & Send Quote →
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        </table>
 
-                    <p style="font-size: 14px; color: #64748b; margin-bottom: 0;">
-                        Respond quickly to provide excellent customer service!
-                    </p>
-                </div>
-            </div>
+                                        <!-- Info Box -->
+                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #dbeafe; border-left: 4px solid #3b82f6; border-radius: 8px;">
+                                            <tr>
+                                                <td style="padding: 16px;">
+                                                    <p style="margin: 0; color: #1e40af; font-size: 14px; line-height: 1.6;">
+                                                        <strong>💡 Quick Tip:</strong> Respond quickly to provide excellent customer service and increase your booking rate!
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+
+                                <!-- Footer -->
+                                <tr>
+                                    <td style="padding: 30px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
+                                        <p style="margin: 0 0 8px 0; color: #1e293b; font-size: 16px; font-weight: 600;">
+                                            Best regards,
+                                        </p>
+                                        <p style="margin: 0; color: #64748b; font-size: 14px;">
+                                            The CleanEnroll Team
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </body>
+            </html>
             """
 
             await send_email(
@@ -504,90 +586,190 @@ async def send_custom_quote_email(
         # Build line items HTML
         line_items_html = ""
         if quote_request.custom_quote_line_items:
-            line_items_html = "<div style='margin: 20px 0;'><h3 style='color: #00C4B4; font-size: 16px; margin-bottom: 10px;'>Quote Breakdown:</h3><table style='width: 100%; border-collapse: collapse;'>"
+            line_items_html = """
+            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 20px 0;">
+                <tr>
+                    <td>
+                        <h3 style="margin: 0 0 16px 0; color: #00C4B4; font-size: 16px; font-weight: 600;">Quote Breakdown:</h3>
+                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+            """
             for item in quote_request.custom_quote_line_items:
                 subtotal = item["quantity"] * item["unit_price"]
                 line_items_html += f"""
-                <tr style='border-bottom: 1px solid #e5e7eb;'>
-                    <td style='padding: 8px 0; color: #1e293b;'>{item['name']}</td>
-                    <td style='padding: 8px 0; color: #64748b; text-align: center;'>{item['quantity']} × ${item['unit_price']:.2f}</td>
-                    <td style='padding: 8px 0; color: #1e293b; text-align: right; font-weight: 600;'>${subtotal:.2f}</td>
+                <tr style="border-bottom: 1px solid #e2e8f0;">
+                    <td style="padding: 12px 0; color: #1e293b; font-size: 14px;">{item['name']}</td>
+                    <td style="padding: 12px 0; color: #64748b; text-align: center; font-size: 14px;">{item['quantity']} × ${item['unit_price']:.2f}</td>
+                    <td style="padding: 12px 0; color: #1e293b; text-align: right; font-weight: 600; font-size: 14px;">${subtotal:.2f}</td>
                 </tr>
                 """
-            line_items_html += "</table></div>"
+            line_items_html += """
+                        </table>
+                    </td>
+                </tr>
+            </table>
+            """
 
         expiration_html = ""
         if quote_request.expires_at:
-            expiration_html = f"<p style='color: #f59e0b; font-size: 14px; margin-top: 15px;'>⏰ This quote expires on {quote_request.expires_at.strftime('%B %d, %Y')}</p>"
+            expiration_html = f"""
+            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top: 20px;">
+                <tr>
+                    <td style="background-color: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 16px;">
+                        <p style="margin: 0; color: #92400e; font-size: 14px;">
+                            <strong>⏰ Expires:</strong> {quote_request.expires_at.strftime('%B %d, %Y')}
+                        </p>
+                    </td>
+                </tr>
+            </table>
+            """
 
         if client.email:
             html = f"""
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <div style="background: linear-gradient(135deg, #00C4B4 0%, #00A89A 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-                    <h1 style="color: white; margin: 0; font-size: 28px;">Your Custom Quote is Ready! 📋</h1>
-                </div>
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <meta http-equiv="X-UA-Compatible" content="IE=edge">
+                <!--[if mso]>
+                <style type="text/css">
+                    table {{border-collapse: collapse; border-spacing: 0; margin: 0;}}
+                    div, td {{padding: 0;}}
+                    div {{margin: 0 !important;}}
+                </style>
+                <![endif]-->
+            </head>
+            <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f8fafc;">
+                    <tr>
+                        <td style="padding: 40px 20px;">
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);">
+                                
+                                <!-- Header -->
+                                <tr>
+                                    <td style="background: linear-gradient(135deg, #00C4B4 0%, #00A89A 100%); padding: 40px 30px; text-align: center;">
+                                        <div style="font-size: 48px; margin-bottom: 16px;">✨</div>
+                                        <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; line-height: 1.3;">
+                                            Your Custom Quote is Ready!
+                                        </h1>
+                                    </td>
+                                </tr>
 
-                <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
-                    <p style="font-size: 16px; color: #1e293b; margin-bottom: 20px;">
-                        Hi {client_name},
-                    </p>
+                                <!-- Content -->
+                                <tr>
+                                    <td style="padding: 40px 30px;">
+                                        <p style="margin: 0 0 24px 0; color: #1e293b; font-size: 16px; line-height: 1.6;">
+                                            Hi <strong>{client_name}</strong>,
+                                        </p>
 
-                    <p style="font-size: 16px; color: #1e293b; margin-bottom: 25px;">
-                        Great news! <strong>{business_name}</strong> has prepared a custom quote for your cleaning service.
-                    </p>
+                                        <p style="margin: 0 0 32px 0; color: #1e293b; font-size: 16px; line-height: 1.6;">
+                                            Great news! <strong>{business_name}</strong> has prepared a custom quote for your cleaning service.
+                                        </p>
 
-                    <div style="background: #f0fdf4; padding: 25px; border-radius: 12px; margin-bottom: 25px; border-left: 4px solid #00C4B4;">
-                        <div style="text-align: center; margin-bottom: 15px;">
-                            <p style="color: #64748b; font-size: 14px; margin: 0;">Total Quote</p>
-                            <p style="color: #00C4B4; font-size: 36px; font-weight: bold; margin: 10px 0;">${quote_request.custom_quote_amount:.2f}</p>
-                        </div>
+                                        <!-- Quote Card -->
+                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-radius: 12px; margin-bottom: 32px; border: 2px solid #00C4B4;">
+                                            <tr>
+                                                <td style="padding: 32px 24px; text-align: center;">
+                                                    <div style="margin-bottom: 16px;">
+                                                        <span style="font-size: 40px;">💰</span>
+                                                    </div>
+                                                    <p style="margin: 0 0 8px 0; color: #64748b; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                                                        Total Quote
+                                                    </p>
+                                                    <p style="margin: 0 0 20px 0; color: #00C4B4; font-size: 42px; font-weight: 700; line-height: 1;">
+                                                        ${quote_request.custom_quote_amount:.2f}
+                                                    </p>
 
-                        {f'<p style="color: #1e293b; font-size: 15px; margin: 15px 0;"><strong>Service:</strong> {quote_request.custom_quote_description}</p>' if quote_request.custom_quote_description else ''}
+                                                    {f'<p style="margin: 0 0 20px 0; color: #1e293b; font-size: 15px; line-height: 1.6;"><strong>Service:</strong> {quote_request.custom_quote_description}</p>' if quote_request.custom_quote_description else ''}
 
-                        {line_items_html}
+                                                    {line_items_html}
 
-                        {f'<div style="background: #fef3c7; padding: 15px; border-radius: 8px; margin-top: 20px;"><p style="margin: 0; color: #92400e; font-size: 14px;"><strong>Provider Notes:</strong><br>{quote_request.custom_quote_notes}</p></div>' if quote_request.custom_quote_notes else ''}
+                                                    {f'''
+                                                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #fef3c7; border-radius: 8px; margin-top: 20px;">
+                                                        <tr>
+                                                            <td style="padding: 16px;">
+                                                                <div style="display: flex; align-items: flex-start;">
+                                                                    <span style="font-size: 24px; margin-right: 12px;">📝</span>
+                                                                    <div style="text-align: left;">
+                                                                        <p style="margin: 0 0 8px 0; color: #92400e; font-size: 14px; font-weight: 600;">Provider Notes:</p>
+                                                                        <p style="margin: 0; color: #92400e; font-size: 14px; line-height: 1.6;">{quote_request.custom_quote_notes}</p>
+                                                                    </div>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+                                                    ''' if quote_request.custom_quote_notes else ''}
 
-                        {expiration_html}
-                    </div>
+                                                    {expiration_html}
+                                                </td>
+                                            </tr>
+                                        </table>
 
-                    <div style="text-align: center; margin: 30px 0;">
-                        <a href="{FRONTEND_URL}/quote/{quote_request.public_id}/approve"
-                           style="display: inline-block; background: #00C4B4; color: white; padding: 16px 32px;
-                                  text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 18px; box-shadow: 0 4px 6px rgba(0, 196, 180, 0.3);">
-                            Approve & Schedule →
-                        </a>
-                    </div>
+                                        <!-- CTA Button -->
+                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 32px;">
+                                            <tr>
+                                                <td style="text-align: center;">
+                                                    <a href="{FRONTEND_URL}/quote/{quote_request.public_id}/approve" 
+                                                       style="display: inline-block; background: linear-gradient(135deg, #00C4B4 0%, #00A89A 100%); color: #ffffff; padding: 18px 40px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 18px; box-shadow: 0 4px 6px rgba(0, 196, 180, 0.3);">
+                                                        Approve & Schedule →
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        </table>
 
-                    <div style="background: #dbeafe; border-left: 4px solid #3b82f6; padding: 15px; margin-bottom: 25px; border-radius: 4px;">
-                        <p style="margin: 0; color: #1e40af; font-size: 14px;">
-                            <strong>Next Steps:</strong><br>
-                            1. Review the quote details above<br>
-                            2. Click "Approve & Schedule" to continue<br>
-                            3. Select your preferred service date and time<br>
-                            4. Sign the service agreement<br>
-                            5. Complete payment to confirm your booking
-                        </p>
-                    </div>
+                                        <!-- Next Steps -->
+                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #dbeafe; border-left: 4px solid #3b82f6; border-radius: 8px; margin-bottom: 32px;">
+                                            <tr>
+                                                <td style="padding: 20px;">
+                                                    <div style="display: flex; align-items: flex-start;">
+                                                        <span style="font-size: 24px; margin-right: 12px;">📋</span>
+                                                        <div>
+                                                            <p style="margin: 0 0 12px 0; color: #1e40af; font-size: 14px; font-weight: 600;">Next Steps:</p>
+                                                            <ol style="margin: 0; padding-left: 20px; color: #1e40af; font-size: 14px; line-height: 1.8;">
+                                                                <li>Review the quote details above</li>
+                                                                <li>Click "Approve & Schedule" to continue</li>
+                                                                <li>Select your preferred service date and time</li>
+                                                                <li>Sign the service agreement</li>
+                                                                <li>Complete payment to confirm your booking</li>
+                                                            </ol>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </table>
 
-                    <p style="font-size: 14px; color: #64748b; margin-bottom: 0;">
-                        If you have any questions about this quote, please don't hesitate to reach out to {business_name}.
-                    </p>
+                                        <p style="margin: 0; color: #64748b; font-size: 14px; line-height: 1.6;">
+                                            If you have any questions about this quote, please don't hesitate to reach out to {business_name}.
+                                        </p>
+                                    </td>
+                                </tr>
 
-                    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 25px 0;">
+                                <!-- Footer -->
+                                <tr>
+                                    <td style="padding: 30px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
+                                        <p style="margin: 0 0 8px 0; color: #1e293b; font-size: 16px; font-weight: 600;">
+                                            Best regards,
+                                        </p>
+                                        <p style="margin: 0; color: #64748b; font-size: 14px;">
+                                            <strong>{business_name}</strong>
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
 
-                    <p style="font-size: 16px; color: #1e293b; margin-bottom: 5px;">
-                        Best regards,<br>
-                        <strong>{business_name}</strong>
-                    </p>
-                </div>
-
-                <div style="text-align: center; padding: 20px; color: #64748b; font-size: 12px;">
-                    <p style="margin: 0;">
-                        This quote was prepared specifically for you. Questions? Contact {business_name} directly.
-                    </p>
-                </div>
-            </div>
+                            <!-- Footer Note -->
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: 600px; margin: 20px auto 0;">
+                                <tr>
+                                    <td style="text-align: center; padding: 20px; color: #64748b; font-size: 12px; line-height: 1.6;">
+                                        This quote was prepared specifically for you. Questions? Contact {business_name} directly.
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </body>
+            </html>
             """
 
             await send_email(

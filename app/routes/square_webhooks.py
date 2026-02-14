@@ -758,7 +758,7 @@ async def send_payment_confirmation_email(client: Client, contract: Contract, us
                     </p>
 
                     <div style="text-align: center; margin: 25px 0;">
-                        <a href="{FRONTEND_URL}/dashboard/contracts/{contract.id}"
+                        <a href="{FRONTEND_URL}/dashboard/contracts/{contract.public_id}"
                            style="display: inline-block; background: #00C4B4; color: white; padding: 12px 24px;
                                   text-decoration: none; border-radius: 8px; font-weight: 600;">
                             View Contract Details
@@ -1045,7 +1045,7 @@ async def send_subscription_notification_to_owner(
                     </div>
 
                     <div style="text-align: center; margin: 25px 0;">
-                        <a href="{FRONTEND_URL}/dashboard/contracts/{contract.id}"
+                        <a href="{FRONTEND_URL}/dashboard/contracts/{contract.public_id}"
                            style="display: inline-block; background: #00C4B4; color: white; padding: 12px 24px;
                                   text-decoration: none; border-radius: 8px; font-weight: 600; margin-right: 10px;">
                             View Contract
@@ -1191,7 +1191,7 @@ async def send_provider_payment_notification(
                     {f'<div style="background: #ecfdf5; border-left: 4px solid #10b981; padding: 15px; margin-bottom: 25px; border-radius: 4px;"><p style="margin: 0; color: #065f46; font-weight: 600;">🔄 Recurring Service Active</p><p style="margin: 8px 0 0 0; color: #1e293b; font-size: 14px;">This client is on a {contract.frequency} subscription. Future payments will be processed automatically.</p></div>' if contract.frequency and contract.frequency.lower() not in ["one-time", "per-turnover", "on-demand", "as-needed"] else ''}
 
                     <div style="text-align: center; margin: 25px 0;">
-                        <a href="{FRONTEND_URL}/dashboard/contracts/{contract.id}"
+                        <a href="{FRONTEND_URL}/dashboard/contracts/{contract.public_id}"
                            style="display: inline-block; background: #10b981; color: white; padding: 14px 28px;
                                   text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px;">
                             View Contract Details →

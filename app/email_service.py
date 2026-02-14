@@ -930,7 +930,7 @@ async def send_contract_fully_executed_email(
     client_name: str,
     business_name: str,
     contract_title: str,
-    contract_id: int,
+    contract_id: str,  # Now accepts public_id (string UUID)
     service_type: str,
     start_date: Optional[str] = None,
     total_value: Optional[float] = None,
@@ -939,7 +939,6 @@ async def send_contract_fully_executed_email(
     contract_pdf_url: Optional[str] = None,
     scheduled_time_confirmed: bool = False,
     scheduled_start_time: Optional[str] = None,
-    contract_public_id: Optional[str] = None,
 ) -> dict:
     """Notify client when contract is fully signed by both parties"""
 
@@ -982,7 +981,7 @@ async def send_contract_fully_executed_email(
       <div style="space-y: 12px;">
         <div style="margin-bottom: 12px;">
           <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 4px;">Contract ID</div>
-          <div style="font-weight: 600; font-size: 15px; color: {THEME['text_primary']};">{contract_id}</div>
+          <div style="font-weight: 600; font-size: 15px; color: {THEME['text_primary']}; font-family: monospace;">{contract_id}</div>
         </div>
         <div style="margin-bottom: 12px;">
           <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 4px;">Service Type</div>
@@ -1013,7 +1012,7 @@ async def send_contract_fully_executed_email(
 async def send_provider_contract_signed_confirmation(
     to: str,
     provider_name: str,
-    contract_id: int,
+    contract_id: str,  # Now accepts public_id (string UUID)
     client_name: str,
     property_address: Optional[str] = None,
     contract_pdf_url: Optional[str] = None,
@@ -1026,7 +1025,7 @@ async def send_provider_contract_signed_confirmation(
     <div style="background: {THEME['background']}; border-radius: 12px; padding: 20px; margin: 24px 0;">
       <div style="margin-bottom: 12px;">
         <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 4px;">Contract ID</div>
-        <div style="font-weight: 600; font-size: 15px; color: {THEME['text_primary']};">{contract_id}</div>
+        <div style="font-weight: 600; font-size: 15px; color: {THEME['text_primary']}; font-family: monospace;">{contract_id}</div>
       </div>
       <div style="margin-bottom: 12px;">
         <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 4px;">Client</div>
@@ -1045,7 +1044,7 @@ async def send_provider_contract_signed_confirmation(
     """
     return await send_email(
         to=to,
-        subject=f"You've Signed Contract {contract_id} - Client Notification Sent",
+        subject=f"You've Signed Contract - Client Notification Sent",
         title="Contract Signed Successfully",
         intro="The contract has been fully executed.",
         content_html=content,
@@ -1059,7 +1058,7 @@ async def send_scheduling_proposal_email(
     client_email: str,
     client_name: str,
     provider_name: str,
-    contract_id: int,
+    contract_id: str,  # Now accepts public_id (string UUID)
     time_slots: list,
     expires_at: str,
 ) -> dict:
@@ -1116,7 +1115,7 @@ async def send_scheduling_accepted_email(
     provider_email: str,
     provider_name: str,
     client_name: str,
-    contract_id: int,
+    contract_id: str,  # Now accepts public_id (string UUID)
     selected_date: str,
     start_time: str,
     end_time: str,
@@ -1125,7 +1124,7 @@ async def send_scheduling_accepted_email(
     """Notify provider when client accepts a time slot"""
     content = f"""
     <p>Hi {provider_name},</p>
-    <p>{client_name} has accepted a time slot for Contract {contract_id}:</p>
+    <p>{client_name} has accepted a time slot for Contract <span style="font-family: monospace; font-weight: 600;">{contract_id}</span>:</p>
 
     <div style="background: {THEME['background']}; border-radius: 12px; padding: 20px; margin: 24px 0;">
         <div style="margin-bottom: 16px;">
@@ -1160,7 +1159,7 @@ async def send_scheduling_counter_proposal_email(
     provider_email: str,
     provider_name: str,
     client_name: str,
-    contract_id: int,
+    contract_id: str,  # Now accepts public_id (string UUID)
     preferred_days: Optional[str] = None,
     time_window: Optional[str] = None,
     client_notes: Optional[str] = None,
@@ -1168,7 +1167,7 @@ async def send_scheduling_counter_proposal_email(
     """Notify provider when client proposes alternative times"""
     content = f"""
     <p>Hi {provider_name},</p>
-    <p>{client_name} has suggested alternative scheduling preferences for Contract {contract_id}:</p>
+    <p>{client_name} has suggested alternative scheduling preferences for Contract <span style="font-family: monospace; font-weight: 600;">{contract_id}</span>:</p>
 
     <div style="background: {THEME['background']}; border-radius: 12px; padding: 20px; margin: 24px 0;">
         {f'<div style="margin-bottom: 12px;"><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 4px;">{icon("calendar", THEME["primary"], 18)} Preferred Days</div><div style="font-size: 15px; color: {THEME["text_primary"]};">{preferred_days}</div></div>' if preferred_days else ''}

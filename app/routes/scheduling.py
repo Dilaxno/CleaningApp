@@ -507,7 +507,7 @@ async def create_scheduling_proposal(
                 client_email=client.email,
                 client_name=sanitize_string(client.contact_name or client.business_name),
                 provider_name=sanitize_string(business_name),
-                contract_id=contract.id,
+                contract_id=contract.public_id,  # Use public_id instead of id
                 time_slots=(
                     [sanitize_dict(slot) for slot in proposal.time_slots]
                     if proposal.time_slots
@@ -661,7 +661,7 @@ async def client_accept_slot(
                 provider_email=user.email,
                 provider_name=user.full_name or "Service Provider",
                 client_name=client.contact_name or client.business_name,
-                contract_id=contract.id,
+                contract_id=contract.public_id,  # Use public_id instead of id
                 selected_date=data.slot_date,
                 start_time=data.slot_start_time,
                 end_time=data.slot_end_time,
@@ -715,7 +715,7 @@ async def client_counter_proposal(
                 provider_email=user.email,
                 provider_name=user.full_name or "Service Provider",
                 client_name=client.contact_name or client.business_name,
-                contract_id=contract.id,
+                contract_id=contract.public_id,  # Use public_id instead of id
                 preferred_days=data.preferred_days,
                 time_window=data.preferred_time_window,
                 client_notes=data.client_notes,
