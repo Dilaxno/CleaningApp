@@ -299,6 +299,15 @@ class Client(Base):
     notes = Column(String(1000), nullable=True)
     form_data = Column(JSON, nullable=True)  # Store structured form submission data
 
+    # Quote approval workflow fields
+    quote_status = Column(String(50), default="pending_review")  # pending_review, approved, adjusted, rejected
+    quote_submitted_at = Column(DateTime, nullable=True)  # When client approved the automated quote
+    quote_approved_at = Column(DateTime, nullable=True)  # When provider approved/adjusted
+    quote_approved_by = Column(String(255), nullable=True)  # User ID who approved
+    original_quote_amount = Column(Float, nullable=True)  # Original automated quote
+    adjusted_quote_amount = Column(Float, nullable=True)  # Adjusted amount if changed
+    quote_adjustment_notes = Column(String(5000), nullable=True)  # Provider's adjustment notes
+
     # Pending contract fields - stored until client completes signing and scheduling
     pending_contract_title = Column(String(255), nullable=True)
     pending_contract_description = Column(String(2000), nullable=True)
@@ -324,6 +333,22 @@ class Client(Base):
     scheduling_proposals = relationship(
         "SchedulingProposal", back_populates="client", cascade="all, delete-orphan"
     )
+    quote_history = relationship("QuoteHistory", back_populates="client", cascade="all, delete-orphan")
+
+
+class QuoteHistory(Base):
+    """Audit trail for quote approval workflow"""
+    __tablename__ = "quote_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    client_id = Column(Integer, ForeignKey("clients.id"), nullable=False)
+    action = Column(String(50), nullable=False)  # submitted, approved, adjusted, rejected
+    amount = Column(Float, nullable=True)
+    notes = Column(String(5000), nullable=True)
+    created_by = Column(String(255), nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+    client = relationship("Client", back_populates="quote_history")
 
 
 class Contract(Base):

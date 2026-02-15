@@ -6,10 +6,11 @@ from datetime import datetime
 from io import StringIO
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from ..auth import get_current_user
 from ..database import get_db
@@ -511,6 +512,7 @@ class PublicClientCreate(BaseModel):
     formData: Optional[dict] = None  # Store all form fields as JSON
     clientSignature: Optional[str] = None  # Base64 signature from client
     quoteAccepted: Optional[bool] = False  # Whether client accepted the quote
+    quoteStatus: Optional[str] = None  # Quote approval status: pending_review, approved, etc.
     createOnly: Optional[bool] = False  # NEW: Only create client, don't generate contract yet
 
     @field_validator("phone")
@@ -866,6 +868,7 @@ async def check_email_availability(
 async def submit_public_form(
     data: PublicClientCreate,
     request: Request,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     _ip: None = Depends(rate_limit_form_per_ip),
     _global: None = Depends(rate_limit_form_global),
@@ -1028,6 +1031,16 @@ async def submit_public_form(
         elif "event" in property_type_lower:
             frequency = "One-time"
 
+    # Calculate quote amount if formData is provided
+    quote_amount = None
+    if data.formData and data.quoteAccepted:
+        try:
+            from .contracts_pdf import calculate_quote
+            quote_result = calculate_quote(user.id, data.formData, db)
+            quote_amount = quote_result.get("finalPrice", 0)
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to calculate quote amount: {e}")
+
     # Create the client associated with the business owner
     # Status is "pending_signature" until client signs the contract
     # This prevents the client from appearing in provider's list before contract is signed
@@ -1043,10 +1056,52 @@ async def submit_public_form(
         notes=data.notes,
         form_data=data.formData,  # Store structured form data
         status="pending_signature",  # Will change to "new_lead" after contract is signed
+        quote_status=data.quoteStatus or "pending_review",  # Set quote status
+        quote_submitted_at=func.now() if data.quoteAccepted else None,  # Track when client approved
+        original_quote_amount=quote_amount,  # Store original automated quote
     )
     db.add(client)
     db.commit()
     db.refresh(client)
+
+    # Create quote history entry if quote was accepted
+    if data.quoteAccepted and quote_amount:
+        from .models import QuoteHistory
+        quote_history_entry = QuoteHistory(
+            client_id=client.id,
+            action="submitted",
+            amount=quote_amount,
+            notes="Client approved automated quote",
+            created_by=f"client:{data.email or 'unknown'}",
+        )
+        db.add(quote_history_entry)
+        db.commit()
+
+    # Send emails if quote was accepted
+    if data.quoteAccepted and data.email:
+        from ..email_service import send_quote_submitted_confirmation, send_quote_review_notification
+        
+        # Send confirmation email to client (background task)
+        background_tasks.add_task(
+            send_quote_submitted_confirmation,
+            to=data.email,
+            client_name=data.contactName or data.businessName,
+            business_name=user.business_name or "Service Provider",
+            quote_amount=quote_amount or 0,
+        )
+        
+        # Send notification email to provider (background task)
+        if user.email:
+            background_tasks.add_task(
+                send_quote_review_notification,
+                to=user.email,
+                provider_name=user.business_name or "Provider",
+                client_name=data.contactName or data.businessName,
+                client_email=data.email,
+                quote_amount=quote_amount or 0,
+                client_id=client.id,
+                client_public_id=client.public_id,
+            )
 
     # If createOnly flag is set, skip contract generation and return client data immediately
     if data.createOnly:
@@ -1233,7 +1288,59 @@ async def generate_contract_for_client(
         raise HTTPException(status_code=500, detail="Failed to start contract generation")
 
 
+@router.get("/public/{client_public_id}/info")
+async def get_client_info_by_public_id(
+    client_public_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Public endpoint to get client information by public_id.
+    Used for quote-approved clients to check contract status and proceed to scheduling.
+    Returns client_id, form_data, and contract_public_id if contract exists.
+    """
+    # Validate UUID format
+    if not validate_uuid(client_public_id):
+        raise HTTPException(status_code=400, detail="Invalid client identifier")
+
+    # Find client by public_id
+    client = db.query(Client).filter(Client.public_id == client_public_id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    # Get most recent contract if exists
+    contract = (
+        db.query(Contract)
+        .filter(Contract.client_id == client.id)
+        .order_by(Contract.created_at.desc())
+        .first()
+    )
+
+    return {
+        "client_id": client.id,
+        "client_public_id": client.public_id,
+        "business_name": client.business_name,
+        "contact_name": client.contact_name,
+        "email": client.email,
+        "quote_status": client.quote_status,
+        "form_data": client.form_data,
+        "contract_public_id": contract.public_id if contract else None,
+        "contract_id": contract.id if contract else None,
+    }
+
+
 @router.post("/public/sign-contract")
+async def sign_contract(
+    data: SignContractRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    _: None = Depends(rate_limit_sign_contract),
+):
+    """
+    Public endpoint for clients to sign their contract after reviewing the PDF.
+    Updates the contract with the client's signature and audit trail.
+    Rate limited to 10 per hour per IP.
+    Uses UUID for secure access (prevents enumeration).
+    """
 async def sign_contract(
     data: SignContractRequest,
     request: Request,
@@ -1910,3 +2017,344 @@ async def submit_client_schedule(
         logger.error(f"❌ Error submitting client schedule: {str(e)}")
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+
+# ============================================================================
+# QUOTE APPROVAL ENDPOINTS
+# ============================================================================
+
+
+class QuoteApprovalRequest(BaseModel):
+    """Schema for provider approving a quote as-is"""
+    notes: Optional[str] = None
+
+
+class QuoteAdjustmentRequest(BaseModel):
+    """Schema for provider adjusting a quote"""
+    adjusted_amount: float
+    adjustment_notes: str
+
+    @field_validator("adjusted_amount")
+    @classmethod
+    def validate_amount(cls, v):
+        if v <= 0:
+            raise ValueError("Adjusted amount must be greater than 0")
+        if v > 1000000:
+            raise ValueError("Adjusted amount must be less than $1,000,000")
+        return v
+
+
+@router.get("/pending-review")
+async def get_pending_review_clients(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Get all clients with pending quote reviews for the current provider.
+    Returns clients with quote_status='pending_review' ordered by submission date.
+    """
+    clients = (
+        db.query(Client)
+        .filter(
+            Client.user_id == current_user.id,
+            Client.quote_status == "pending_review"
+        )
+        .order_by(Client.quote_submitted_at.desc())
+        .all()
+    )
+
+    return {
+        "clients": [
+            {
+                "id": client.id,
+                "public_id": client.public_id,
+                "business_name": client.business_name,
+                "contact_name": client.contact_name,
+                "email": client.email,
+                "phone": client.phone,
+                "property_type": client.property_type,
+                "property_size": client.property_size,
+                "frequency": client.frequency,
+                "original_quote_amount": client.original_quote_amount,
+                "quote_submitted_at": client.quote_submitted_at.isoformat() if client.quote_submitted_at else None,
+                "form_data": client.form_data,
+            }
+            for client in clients
+        ],
+        "count": len(clients),
+    }
+
+
+@router.get("/{client_id}/quote-review")
+async def get_quote_review_details(
+    client_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Get detailed quote information for provider review.
+    Includes client details, form data, and quote history.
+    """
+    client = db.query(Client).filter(
+        Client.id == client_id,
+        Client.user_id == current_user.id
+    ).first()
+
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    # Get quote history
+    from ..models import QuoteHistory
+    history = (
+        db.query(QuoteHistory)
+        .filter(QuoteHistory.client_id == client_id)
+        .order_by(QuoteHistory.created_at.desc())
+        .all()
+    )
+
+    return {
+        "client": {
+            "id": client.id,
+            "public_id": client.public_id,
+            "business_name": client.business_name,
+            "contact_name": client.contact_name,
+            "email": client.email,
+            "phone": client.phone,
+            "property_type": client.property_type,
+            "property_size": client.property_size,
+            "frequency": client.frequency,
+            "status": client.status,
+            "quote_status": client.quote_status,
+            "original_quote_amount": client.original_quote_amount,
+            "adjusted_quote_amount": client.adjusted_quote_amount,
+            "quote_adjustment_notes": client.quote_adjustment_notes,
+            "quote_submitted_at": client.quote_submitted_at.isoformat() if client.quote_submitted_at else None,
+            "quote_approved_at": client.quote_approved_at.isoformat() if client.quote_approved_at else None,
+            "form_data": client.form_data,
+            "notes": client.notes,
+            "created_at": client.created_at.isoformat(),
+        },
+        "history": [
+            {
+                "id": h.id,
+                "action": h.action,
+                "amount": h.amount,
+                "notes": h.notes,
+                "created_by": h.created_by,
+                "created_at": h.created_at.isoformat(),
+            }
+            for h in history
+        ],
+    }
+
+
+@router.post("/{client_id}/approve-quote")
+async def approve_quote(
+    client_id: int,
+    data: QuoteApprovalRequest,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Provider approves the automated quote as-is.
+    Updates quote status, sends approval email to client, and prepares for scheduling.
+    """
+    client = db.query(Client).filter(
+        Client.id == client_id,
+        Client.user_id == current_user.id
+    ).first()
+
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    if client.quote_status != "pending_review":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Quote is not pending review (current status: {client.quote_status})"
+        )
+
+    # Update client quote status
+    client.quote_status = "approved"
+    client.quote_approved_at = func.now()
+    client.quote_approved_by = current_user.email or str(current_user.id)
+
+    # Create quote history entry
+    from ..models import QuoteHistory
+    history_entry = QuoteHistory(
+        client_id=client.id,
+        action="approved",
+        amount=client.original_quote_amount,
+        notes=data.notes or "Provider approved quote as-is",
+        created_by=f"provider:{current_user.email or current_user.id}",
+    )
+    db.add(history_entry)
+    db.commit()
+    db.refresh(client)
+
+    logger.info(
+        f"✅ Quote approved for client {client.id} by provider {current_user.id}"
+    )
+
+    # Send approval email to client
+    if client.email:
+        from ..email_service import send_quote_approved_email
+        background_tasks.add_task(
+            send_quote_approved_email,
+            to=client.email,
+            client_name=client.contact_name or client.business_name,
+            business_name=current_user.business_name or "Service Provider",
+            final_quote_amount=client.original_quote_amount or 0,
+            was_adjusted=False,
+            adjustment_notes=None,
+            client_public_id=client.public_id,
+        )
+
+    return {
+        "message": "Quote approved successfully",
+        "client_id": client.id,
+        "client_public_id": client.public_id,
+        "quote_status": client.quote_status,
+        "approved_amount": client.original_quote_amount,
+    }
+
+
+@router.post("/{client_id}/adjust-quote")
+async def adjust_quote(
+    client_id: int,
+    data: QuoteAdjustmentRequest,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Provider adjusts the automated quote with a new amount and explanation.
+    Updates quote status, stores adjustment, sends email to client.
+    """
+    client = db.query(Client).filter(
+        Client.id == client_id,
+        Client.user_id == current_user.id
+    ).first()
+
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    if client.quote_status != "pending_review":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Quote is not pending review (current status: {client.quote_status})"
+        )
+
+    # Validate adjustment notes
+    if not data.adjustment_notes or len(data.adjustment_notes.strip()) < 10:
+        raise HTTPException(
+            status_code=400,
+            detail="Adjustment notes must be at least 10 characters"
+        )
+
+    # Update client with adjusted quote
+    client.quote_status = "adjusted"
+    client.adjusted_quote_amount = data.adjusted_amount
+    client.quote_adjustment_notes = data.adjustment_notes
+    client.quote_approved_at = func.now()
+    client.quote_approved_by = current_user.email or str(current_user.id)
+
+    # Create quote history entry
+    from ..models import QuoteHistory
+    history_entry = QuoteHistory(
+        client_id=client.id,
+        action="adjusted",
+        amount=data.adjusted_amount,
+        notes=data.adjustment_notes,
+        created_by=f"provider:{current_user.email or current_user.id}",
+    )
+    db.add(history_entry)
+    db.commit()
+    db.refresh(client)
+
+    logger.info(
+        f"✅ Quote adjusted for client {client.id} by provider {current_user.id}: "
+        f"${client.original_quote_amount} → ${data.adjusted_amount}"
+    )
+
+    # Send adjustment email to client
+    if client.email:
+        from ..email_service import send_quote_approved_email
+        background_tasks.add_task(
+            send_quote_approved_email,
+            to=client.email,
+            client_name=client.contact_name or client.business_name,
+            business_name=current_user.business_name or "Service Provider",
+            final_quote_amount=data.adjusted_amount,
+            was_adjusted=True,
+            adjustment_notes=data.adjustment_notes,
+            client_public_id=client.public_id,
+        )
+
+    return {
+        "message": "Quote adjusted successfully",
+        "client_id": client.id,
+        "client_public_id": client.public_id,
+        "quote_status": client.quote_status,
+        "original_amount": client.original_quote_amount,
+        "adjusted_amount": data.adjusted_amount,
+        "adjustment_notes": data.adjustment_notes,
+    }
+
+
+@router.post("/{client_id}/reject-quote")
+async def reject_quote(
+    client_id: int,
+    data: QuoteApprovalRequest,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Provider rejects the quote request.
+    Updates status and optionally notifies client.
+    """
+    client = db.query(Client).filter(
+        Client.id == client_id,
+        Client.user_id == current_user.id
+    ).first()
+
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    if client.quote_status != "pending_review":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Quote is not pending review (current status: {client.quote_status})"
+        )
+
+    # Update client quote status
+    client.quote_status = "rejected"
+    client.quote_approved_at = func.now()
+    client.quote_approved_by = current_user.email or str(current_user.id)
+    if data.notes:
+        client.quote_adjustment_notes = data.notes
+
+    # Create quote history entry
+    from ..models import QuoteHistory
+    history_entry = QuoteHistory(
+        client_id=client.id,
+        action="rejected",
+        amount=client.original_quote_amount,
+        notes=data.notes or "Provider rejected quote request",
+        created_by=f"provider:{current_user.email or current_user.id}",
+    )
+    db.add(history_entry)
+    db.commit()
+    db.refresh(client)
+
+    logger.info(
+        f"❌ Quote rejected for client {client.id} by provider {current_user.id}"
+    )
+
+    return {
+        "message": "Quote rejected",
+        "client_id": client.id,
+        "quote_status": client.quote_status,
+    }
