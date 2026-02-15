@@ -1951,7 +1951,7 @@ async def send_quote_review_notification(
 ) -> dict:
     """Send notification email to provider when client approves a quote"""
     # Generate review link
-    review_link = f"{os.getenv('FRONTEND_URL', 'https://app.cleanenroll.com')}/dashboard/clients?review={client_public_id}"
+    review_link = f"{FRONTEND_URL}/dashboard/clients?review={client_public_id}"
     
     content = f"""
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
