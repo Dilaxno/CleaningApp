@@ -2015,7 +2015,8 @@ async def send_quote_review_notification(
     return await send_email(
         to=to,
         subject=f"New Quote Approval Request from {client_name}",
-        html_content=content,
+        title="New Quote Approval Request",
+        content_html=content,
     )
 
 
@@ -2104,5 +2105,6 @@ async def send_quote_approved_email(
     return await send_email(
         to=to,
         subject=f"{subject} - {business_name}",
-        html_content=content,
+        title=subject,
+        content_html=content,
     )
