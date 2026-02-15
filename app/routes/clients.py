@@ -999,6 +999,10 @@ async def submit_public_form(
     is_first_cleaning = existing_signed_contract is None
     if data.formData:
         data.formData["isFirstCleaning"] = is_first_cleaning
+        # Log selectedPackage for debugging
+        logger.info(
+            f"📦 FormData keys: {list(data.formData.keys())}, selectedPackage: {data.formData.get('selectedPackage')}"
+        )
 
     logger.info(
         f"🔍 First cleaning check for IP {client_ip}: {is_first_cleaning} (existing signed contracts: {'none' if is_first_cleaning else 'found'})"

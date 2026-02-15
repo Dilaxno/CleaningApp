@@ -166,6 +166,9 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
     elif pricing_model == "packages":
         # Custom packages pricing
         selected_package_id = form_data.get("selectedPackage")
+        logger.info(
+            f"📦 Package pricing - selectedPackage from formData: {selected_package_id}, available packages: {len(config.custom_packages) if config.custom_packages else 0}"
+        )
         if selected_package_id and config.custom_packages:
             # Find the selected package
             selected_package = None
