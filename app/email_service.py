@@ -38,11 +38,11 @@ except Exception:
 def decrypt_password(encrypted: str) -> str:
  """Decrypt SMTP password"""
  if not fernet or not encrypted:
-  return encrypted or ""
+ return encrypted or ""
  try:
-  return fernet.decrypt(encrypted.encode()).decode()
+ return fernet.decrypt(encrypted.encode()).decode()
  except Exception:
-  return encrypted
+ return encrypted
 
 
 def get_sender_email(business_config=None, business_name: str = "CleanEnroll") -> str:
@@ -223,7 +223,6 @@ THEME = {
  "warning": "#f59e0b", # Amber
  "warning_light": "#fef3c7", # Light amber background
  "danger": "#ef4444", # Red
- "danger_light": "#fee2e2", # Light red background
  "info": "#14b8a6", # Teal for info
  "info_light": "#ccfbf1", # Light teal background
 }
@@ -555,10 +554,10 @@ async def send_new_client_notification(
  {"filename": filename, "content": zip_data, "content_type": "application/zip"}
  ]
 
- property_shots_info = f"<div style='background: {THEME['success_light']}; border-left: 3px solid {THEME['success']}; padding: 16px; margin: 24px 0; border-radius: 4px;'><p style='margin: 0; color: {THEME['text_primary']}; font-size: 14px; font-weight: 600;'>Property photos attached as ZIP file ({len(property_shots_keys)} images)</p></div>"
+ property_shots_info = f"<div style='background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;'><p style='margin: 0; color: #166534; font-size: 14px; font-weight: 600;'>Property photos attached as ZIP file ({len(property_shots_keys)} images)</p></div>"
  except Exception as e:
  logger.warning(f"Failed to create property shots zip for {client_name}: {e}")
- property_shots_info = f"<div style='background: {THEME['warning_light']}; border-left: 3px solid {THEME['warning']}; padding: 16px; margin: 24px 0; border-radius: 4px;'><p style='margin: 0; color: {THEME['text_primary']}; font-size: 14px;'>Property photos available in dashboard ({len(property_shots_keys)} images)</p></div>"
+ property_shots_info = f"<div style='background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;'><p style='margin: 0; color: #92400e; font-size: 14px;'>Property photos available in dashboard ({len(property_shots_keys)} images)</p></div>"
 
  content = f"""
  <p>Hi {business_name},</p>
@@ -691,8 +690,8 @@ async def send_subscription_expiring_email(
  <p>Hi {user_name},</p>
  <p>Your <strong>{plan_name}</strong> subscription is expiring on <strong>{expiry_date}</strong>.</p>
  <p>To continue enjoying all features without interruption, please update your payment method or renew your subscription.</p>
- <div style="background: {THEME['warning_light']}; border-left: 3px solid {THEME['warning']}; padding: 16px; margin: 24px 0; border-radius: 4px;">
- <p style="margin: 0; color: {THEME['text_primary']}; font-size: 14px;">
+ <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;">
+ <p style="margin: 0; color: #92400e; font-size: 14px;">
  After expiration, you'll lose access to premium features.
  </p>
  </div>
@@ -772,15 +771,15 @@ async def send_contract_signed_notification(
  </div>
  <div>
  <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 4px;">Status</div>
- <div style="display: inline-flex; align-items: center; gap: 6px; background: {THEME['warning_light']}; color: {THEME['text_primary']}; padding: 4px 12px; border-radius: 9999px; font-size: 13px; font-weight: 600;">
+ <div style="display: inline-flex; align-items: center; gap: 6px; background: #fef3c7; color: #92400e; padding: 4px 12px; border-radius: 9999px; font-size: 13px; font-weight: 600;">
  Awaiting Your Signature
  </div>
  </div>
  </div>
 
- <div style="background: {THEME['info_light']}; border-left: 3px solid {THEME['info']}; padding: 16px; margin: 24px 0; border-radius: 4px;">
- <p style="margin: 0; color: {THEME['text_primary']}; font-weight: 600; font-size: 14px;">Next Steps:</p>
- <ul style="margin: 12px 0 0 0; padding-left: 20px; color: {THEME['text_secondary']};">
+ <div style="background: #e0f2fe; border-left: 4px solid #0ea5e9; padding: 16px; margin: 20px 0; border-radius: 8px;">
+ <p style="margin: 0; color: #0369a1; font-weight: 600; font-size: 14px;">Next Steps:</p>
+ <ul style="margin: 12px 0 0 0; padding-left: 20px; color: #0369a1;">
  <li style="margin-bottom: 8px;">Review the schedule submitted by the client</li>
  <li style="margin-bottom: 8px;">Accept the proposed time or suggest an alternative</li>
  <li style="margin-bottom: 8px;">Sign the contract to finalize the agreement</li>
@@ -819,7 +818,7 @@ async def send_client_signature_confirmation(
  </div>
  <div>
  <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 4px;">Status</div>
- <div style="display: inline-flex; align-items: center; gap: 6px; background: {THEME['info_light']}; color: {THEME['text_primary']}; padding: 4px 12px; border-radius: 9999px; font-size: 13px; font-weight: 600;">
+ <div style="display: inline-flex; align-items: center; gap: 6px; background: #dbeafe; color: #1e40af; padding: 4px 12px; border-radius: 9999px; font-size: 13px; font-weight: 600;">
  Awaiting Provider Signature
  </div>
  </div>
@@ -827,9 +826,9 @@ async def send_client_signature_confirmation(
 
  <p>Your signature has been recorded successfully. The service provider will review and sign the contract shortly.</p>
 
- <div style="background: {THEME['success_light']}; border-left: 3px solid {THEME['success']}; padding: 16px; margin: 24px 0; border-radius: 4px;">
- <p style="margin: 0; color: {THEME['text_primary']}; font-weight: 600; font-size: 14px;">What happens next?</p>
- <ul style="margin: 12px 0 0 0; padding-left: 20px; color: {THEME['text_secondary']};">
+ <div style="background: #f0fdf4; border-left: 4px solid #22c55e; padding: 16px; margin: 20px 0; border-radius: 8px;">
+ <p style="margin: 0; color: #166534; font-weight: 600; font-size: 14px;">What happens next?</p>
+ <ul style="margin: 12px 0 0 0; padding-left: 20px; color: #166534;">
  <li style="margin-bottom: 8px;">The provider will review your proposed schedule</li>
  <li style="margin-bottom: 8px;">They will either accept your time or suggest an alternative</li>
  <li style="margin-bottom: 8px;">Once they sign, you'll receive a confirmation email</li>
@@ -877,27 +876,27 @@ async def send_contract_fully_executed_email(
  schedule_section = ""
  if scheduled_time_confirmed and scheduled_start_time:
  schedule_section = f"""
- <div style="background: {THEME['success_light']}; border-left: 3px solid {THEME['success']}; padding: 16px; margin: 24px 0; border-radius: 4px;">
- <p style="margin: 0 0 8px 0; color: {THEME['text_primary']}; font-size: 14px; font-weight: 600;">
+ <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
+ <p style="margin: 0 0 8px 0; color: #166534; font-size: 14px; font-weight: 600;">
  First Cleaning Confirmed
  </p>
- <p style="margin: 0; color: {THEME['text_primary']}; font-size: 14px;">
+ <p style="margin: 0; color: #166534; font-size: 14px;">
  {scheduled_start_time}
  </p>
  </div>
  """
  elif start_date:
  schedule_section = f"""
- <div style="background: {THEME['success_light']}; border-left: 3px solid {THEME['success']}; padding: 16px; margin: 24px 0; border-radius: 4px; text-align: center;">
- <p style="margin: 0; color: {THEME['text_primary']}; font-size: 14px; font-weight: 600;">
+ <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0; text-align: center;">
+ <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
  Your signed contract PDF is attached. Your schedule has been confirmed!
  </p>
  </div>
  """
  else:
  schedule_section = f"""
- <div style="background: {THEME['success_light']}; border-left: 3px solid {THEME['success']}; padding: 16px; margin: 24px 0; border-radius: 4px; text-align: center;">
- <p style="margin: 0; color: {THEME['text_primary']}; font-size: 14px; font-weight: 600;">
+ <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0; text-align: center;">
+ <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
  Your signed contract PDF is attached. Your schedule has been confirmed!
  </p>
  </div>
@@ -965,8 +964,8 @@ async def send_provider_contract_signed_confirmation(
  {f'<div><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 4px;">Property</div><div style="font-size: 15px; color: {THEME["text_primary"]};">{property_address}</div></div>' if property_address else ''}
  </div>
 
- <div style="background: {THEME['success_light']}; border-left: 3px solid {THEME['success']}; padding: 16px; margin: 24px 0; border-radius: 4px;">
- <p style="margin: 0; color: {THEME['text_primary']}; font-size: 14px; font-weight: 600;">
+ <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
+ <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
  Schedule confirmed - Ready to start service
  </p>
  </div>
@@ -998,7 +997,7 @@ async def send_scheduling_proposal_email(
  slots_html = ""
  for i, slot in enumerate(time_slots, 1):
  recommended = (
- f" <span style='color: {THEME['primary']}; font-weight: 600;'> Recommended</span>"
+ " <span style='color: #00C4B4; font-weight: 600;'> Recommended</span>"
  if slot.get("recommended")
  else ""
  )
@@ -1022,8 +1021,8 @@ async def send_scheduling_proposal_email(
  {slots_html}
  </div>
 
- <div style="background: {THEME['success_light']}; border-left: 3px solid {THEME['success']}; padding: 16px; margin: 24px 0; border-radius: 4px;">
- <p style="margin: 0; color: {THEME['text_primary']}; font-size: 14px; font-weight: 600;">
+ <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
+ <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
  Tip: Click the button below to select a time slot or suggest your own preferred times!
  </p>
  </div>
@@ -1069,8 +1068,8 @@ async def send_scheduling_accepted_email(
  {f'<div><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 4px;">Location</div><div style="font-size: 15px; color: {THEME["text_primary"]};">{property_address}</div></div>' if property_address else ''}
  </div>
 
- <div style="background: {THEME['success_light']}; border-left: 3px solid {THEME['success']}; padding: 16px; margin: 24px 0; border-radius: 4px;">
- <p style="margin: 0; color: {THEME['text_primary']}; font-size: 14px; font-weight: 600;">
+ <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
+ <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
  Appointment confirmed
  </p>
  </div>
@@ -1106,8 +1105,8 @@ async def send_scheduling_counter_proposal_email(
  {f'<div><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 4px;">Client Notes</div><div style="font-size: 15px; color: {THEME["text_primary"]}; font-style: italic;">"{client_notes}"</div></div>' if client_notes else ''}
  </div>
 
- <div style="background: {THEME['warning_light']}; border-left: 3px solid {THEME['warning']}; padding: 16px; margin: 24px 0; border-radius: 4px;">
- <p style="margin: 0; color: {THEME['text_primary']}; font-size: 14px; font-weight: 600;">
+ <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;">
+ <p style="margin: 0; color: #92400e; font-size: 14px; font-weight: 600;">
  Counter-proposal received - Please review and respond
  </p>
  </div>
@@ -1141,8 +1140,8 @@ async def send_email_verification_otp(to: str, user_name: str, otp: str) -> dict
  Enter this code in the verification page to confirm your email address.
  </p>
 
- <div style="background: {THEME['warning_light']}; border-left: 3px solid {THEME['warning']}; padding: 16px; margin: 24px 0; border-radius: 4px;">
- <p style="margin: 0; color: {THEME['text_primary']}; font-size: 13px;">
+ <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;">
+ <p style="margin: 0; color: #92400e; font-size: 13px;">
  If you didn't request this code, you can safely ignore this email.
  </p>
  </div>
@@ -1184,8 +1183,8 @@ async def send_appointment_notification(
  </div>
  </div>
 
- <div style="background: {THEME['warning_light']}; border-left: 3px solid {THEME['warning']}; padding: 16px; margin: 24px 0; border-radius: 4px;">
- <p style="margin: 0; color: {THEME['text_primary']}; font-size: 14px; font-weight: 600;">
+ <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;">
+ <p style="margin: 0; color: #92400e; font-size: 14px; font-weight: 600;">
  Action Required: Please review and accept or request a different time
  </p>
  </div>
@@ -1232,8 +1231,8 @@ async def send_appointment_confirmation(
  </div>
  </div>
 
- <div style="background: {THEME['success_light']}; border-left: 3px solid {THEME['success']}; padding: 16px; margin: 24px 0; border-radius: 4px;">
- <p style="margin: 0; color: {THEME['text_primary']}; font-size: 14px; font-weight: 600;">
+ <div style="background: #d1fae5; border: 1px solid #10b981; border-radius: 12px; padding: 16px; margin: 20px 0;">
+ <p style="margin: 0; color: #065f46; font-size: 14px; font-weight: 600;">
  Your appointment is confirmed and has been added to your calendar
  </p>
  </div>
@@ -1290,8 +1289,8 @@ async def send_schedule_change_request(
  </div>
  </div>
 
- <div style="background: {THEME['warning_light']}; border-left: 3px solid {THEME['warning']}; padding: 16px; margin: 24px 0; border-radius: 4px;">
- <p style="margin: 0; color: {THEME['text_primary']}; font-size: 14px; font-weight: 600;">
+ <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;">
+ <p style="margin: 0; color: #92400e; font-size: 14px; font-weight: 600;">
  Response Needed: Please confirm or suggest another time
  </p>
  </div>
@@ -1328,10 +1327,10 @@ async def send_client_accepted_proposal(
  <p>Hi {provider_name},</p>
  <p>Great news! <strong>{client_name}</strong> has accepted your proposed appointment time.</p>
 
- <div style="background: {THEME['success_light']}; border-left: 3px solid {THEME['success']}; padding: 24px; margin: 24px 0; border-radius: 4px;">
- <div style="color: {THEME['text_primary']}; font-size: 13px; margin-bottom: 6px;">Confirmed Appointment</div>
- <div style="font-size: 18px; color: {THEME['text_primary']}; font-weight: 600;">{date_formatted}</div>
- <div style="font-size: 15px; color: {THEME['text_primary']}; margin-top: 4px;">{accepted_start_time} - {accepted_end_time}</div>
+ <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 24px; margin: 24px 0;">
+ <div style="color: #166534; font-size: 13px; margin-bottom: 6px;">Confirmed Appointment</div>
+ <div style="font-size: 18px; color: #166534; font-weight: 600;">{date_formatted}</div>
+ <div style="font-size: 15px; color: #166534; margin-top: 4px;">{accepted_start_time} - {accepted_end_time}</div>
  </div>
 
  <p style="color: {THEME['text_muted']}; font-size: 14px;">
@@ -1341,7 +1340,7 @@ async def send_client_accepted_proposal(
 
  return await send_email(
  to=provider_email,
- subject=f"{client_name} Accepted Your Proposed Time",
+ subject=f" {client_name} Accepted Your Proposed Time",
  title="Appointment Confirmed!",
  intro=f"{client_name} has confirmed the appointment.",
  content_html=content,
@@ -1366,10 +1365,10 @@ async def send_appointment_confirmed_to_client(
  <p>Hi {client_name},</p>
  <p>Your appointment with <strong>{provider_name}</strong> has been confirmed!</p>
 
- <div style="background: {THEME['success_light']}; border-left: 3px solid {THEME['success']}; padding: 24px; margin: 24px 0; border-radius: 4px;">
- <div style="color: {THEME['text_primary']}; font-size: 13px; margin-bottom: 6px;">Confirmed Appointment</div>
- <div style="font-size: 18px; color: {THEME['text_primary']}; font-weight: 600;">{date_formatted}</div>
- <div style="font-size: 15px; color: {THEME['text_primary']}; margin-top: 4px;">{confirmed_start_time} - {confirmed_end_time}</div>
+ <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 24px; margin: 24px 0;">
+ <div style="color: #166534; font-size: 13px; margin-bottom: 6px;">Confirmed Appointment</div>
+ <div style="font-size: 18px; color: #166534; font-weight: 600;">{date_formatted}</div>
+ <div style="font-size: 15px; color: #166534; margin-top: 4px;">{confirmed_start_time} - {confirmed_end_time}</div>
  </div>
 
  <p style="color: {THEME['text_muted']}; font-size: 14px;">
@@ -1379,7 +1378,7 @@ async def send_appointment_confirmed_to_client(
 
  return await send_email(
  to=client_email,
- subject=f"Appointment Confirmed with {provider_name}",
+ subject=f" Appointment Confirmed with {provider_name}",
  title="Appointment Confirmed!",
  intro="Your appointment has been scheduled.",
  content_html=content,
@@ -1418,8 +1417,8 @@ async def send_schedule_accepted_confirmation_to_provider(
  {f'<div><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 6px;">Location</div><div style="font-size: 15px; color: {THEME["text_primary"]};">{client_address}</div></div>' if client_address else ''}
  </div>
 
- <div style="background: {THEME['success_light']}; border-left: 3px solid {THEME['success']}; padding: 16px; margin: 24px 0; border-radius: 4px;">
- <p style="margin: 0; color: {THEME['text_primary']}; font-size: 14px; font-weight: 600;">
+ <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
+ <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
  Appointment confirmed and client notified
  </p>
  </div>
@@ -1472,9 +1471,9 @@ async def send_client_counter_proposal(
  </div>
  </div>
 
- <div style="background: {THEME['warning_light']}; border-left: 3px solid {THEME['warning']}; padding: 16px; margin: 24px 0; border-radius: 4px;">
- <p style="margin: 0 0 8px 0; color: {THEME['text_primary']}; font-size: 13px; font-weight: 600;">Client's Reason:</p>
- <p style="margin: 0; color: {THEME['text_secondary']}; font-size: 14px; font-style: italic;">"{client_reason}"</p>
+ <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;">
+ <p style="margin: 0 0 8px 0; color: #92400e; font-size: 13px; font-weight: 600;">Client's Reason:</p>
+ <p style="margin: 0; color: #92400e; font-size: 14px; font-style: italic;">"{client_reason}"</p>
  </div>
 
  <p style="color: {THEME['text_muted']}; font-size: 14px;">
@@ -1513,8 +1512,8 @@ async def send_invoice_payment_link_email(
  recurring_info = ""
  if is_recurring and recurrence_pattern:
  recurring_info = f"""
- <div style="background: {THEME['info_light']}; border-left: 3px solid {THEME['info']}; padding: 16px; margin: 24px 0; border-radius: 4px;">
- <p style="margin: 0; color: {THEME['text_primary']}; font-size: 14px; font-weight: 600;">
+ <div style="background: #e0f2fe; border: 1px solid #0ea5e9; border-radius: 12px; padding: 16px; margin: 20px 0;">
+ <p style="margin: 0; color: #0369a1; font-size: 14px; font-weight: 600;">
  This is a recurring payment ({recurrence_pattern}). Your card will be charged automatically.
  </p>
  </div>
@@ -1542,8 +1541,8 @@ async def send_invoice_payment_link_email(
 
  {recurring_info}
 
- <div style="background: {THEME['success_light']}; border-left: 3px solid {THEME['success']}; padding: 16px; margin: 24px 0; border-radius: 4px;">
- <p style="margin: 0; color: {THEME['text_primary']}; font-size: 14px; font-weight: 600;">
+ <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
+ <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
  Click the button below to pay securely online
  </p>
  </div>
@@ -1649,8 +1648,8 @@ async def send_payment_thank_you_email(
  {f'<div><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 6px;">Service Date</div><div style="font-size: 15px; color: {THEME["text_primary"]};">{service_date}</div></div>' if service_date else ''}
  </div>
 
- <div style="background: {THEME['success_light']}; border-left: 3px solid {THEME['success']}; padding: 16px; margin: 24px 0; border-radius: 4px;">
- <p style="margin: 0; color: {THEME['text_primary']}; font-size: 14px; font-weight: 600;">
+ <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
+ <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
  Your payment has been processed successfully
  </p>
  </div>
@@ -1684,19 +1683,19 @@ async def send_contract_cancelled_email(
  <p>Dear {client_name},</p>
  <p>We're writing to inform you that your service contract has been cancelled.</p>
 
- <div style="background: {THEME['background']}; border-radius: 8px; padding: 24px; margin: 24px 0;">
- <div style="font-weight: 600; color: {THEME['text_primary']}; margin-bottom: 16px;">Contract Details</div>
+ <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 20px; margin: 24px 0;">
+ <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #dc2626;">Contract Details</h3>
  <div style="margin-bottom: 12px;">
- <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 4px;">Contract</div>
- <div style="font-size: 15px; color: {THEME['text_primary']}; font-weight: 600;">{contract_title}</div>
+ <div style="color: #7f1d1d; font-size: 13px; margin-bottom: 4px;">Contract</div>
+ <div style="font-size: 15px; color: #7f1d1d; font-weight: 600;">{contract_title}</div>
  </div>
  <div style="margin-bottom: 12px;">
- <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 4px;">Service Provider</div>
- <div style="font-size: 15px; color: {THEME['text_primary']};">{business_name}</div>
+ <div style="color: #7f1d1d; font-size: 13px; margin-bottom: 4px;">Service Provider</div>
+ <div style="font-size: 15px; color: #7f1d1d;">{business_name}</div>
  </div>
  <div>
- <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 4px;">Status</div>
- <div style="display: inline-flex; align-items: center; gap: 6px; background: {THEME['danger_light']}; color: {THEME['danger']}; padding: 4px 12px; border-radius: 9999px; font-size: 13px; font-weight: 600;">
+ <div style="color: #7f1d1d; font-size: 13px; margin-bottom: 4px;">Status</div>
+ <div style="display: inline-flex; align-items: center; gap: 6px; background: #fee2e2; color: #991b1b; padding: 4px 12px; border-radius: 9999px; font-size: 13px; font-weight: 600;">
  Cancelled
  </div>
  </div>
