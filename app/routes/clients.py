@@ -648,6 +648,11 @@ async def get_quote_preview(
         )
     else:
         is_first_cleaning = is_first_cleaning_by_ip
+
+    # Log formData keys for debugging
+    logger.info(
+        f"📦 Quote preview - FormData keys: {list(data.formData.keys())}, selectedPackage: {data.formData.get('selectedPackage')}"
+    )
         logger.info(
             f"🔍 Using IP-based first cleaning check for IP {client_ip}: {is_first_cleaning} (existing signed contracts: {'none' if is_first_cleaning else 'found'})"
         )

@@ -169,7 +169,22 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
         logger.info(
             f"📦 Package pricing - selectedPackage from formData: {selected_package_id}, available packages: {len(config.custom_packages) if config.custom_packages else 0}"
         )
-        if selected_package_id and config.custom_packages:
+        
+        # Log all formData keys for debugging
+        logger.info(f"📦 FormData keys: {list(form_data.keys())}")
+        
+        if not selected_package_id:
+            logger.error("❌ No package selected for packages pricing model")
+            # Return a quote_pending response instead of failing
+            base_price = 0.0
+            estimated_hours = 2.0
+            quote_pending = True
+        elif not config.custom_packages:
+            logger.error("❌ No packages configured in business config")
+            base_price = 0.0
+            estimated_hours = 2.0
+            quote_pending = True
+        elif selected_package_id and config.custom_packages:
             # Find the selected package
             selected_package = None
             for package in config.custom_packages:
