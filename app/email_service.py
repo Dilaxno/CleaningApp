@@ -1934,7 +1934,9 @@ async def send_quote_submitted_confirmation(
     return await send_email(
         to=to,
         subject=f"Your Quote Request Has Been Submitted - {business_name}",
-        html_content=content,
+        title="Quote Request Submitted",
+        content_html=content,
+        intro=f"Thank you for your interest in {business_name}'s services!",
     )
 
 

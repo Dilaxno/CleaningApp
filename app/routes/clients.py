@@ -985,8 +985,12 @@ async def submit_public_form(
     if data.formData and data.quoteAccepted:
         try:
             from .contracts_pdf import calculate_quote
-            quote_result = calculate_quote(user.id, data.formData, db)
-            quote_amount = quote_result.get("finalPrice", 0)
+            # Get business config for quote calculation
+            if user.business_config:
+                quote_result = calculate_quote(user.business_config, data.formData)
+                quote_amount = quote_result.get("finalPrice", 0)
+            else:
+                logger.warning(f"⚠️ No business config found for user {user.id}")
         except Exception as e:
             logger.warning(f"⚠️ Failed to calculate quote amount: {e}")
 
