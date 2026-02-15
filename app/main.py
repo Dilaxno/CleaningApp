@@ -90,7 +90,12 @@ async def lifespan(app: FastAPI):
         Base.metadata.create_all(bind=engine, checkfirst=True)
         logger.info("Database tables created successfully")
     except Exception as e:
-        logger.error(f"Failed to create database tables: {e}")
+        # Ignore "already exists" errors from race conditions between workers
+        error_msg = str(e)
+        if "already exists" in error_msg or "duplicate key" in error_msg:
+            logger.info("Database tables already exist (created by another worker)")
+        else:
+            logger.error(f"Failed to create database tables: {e}")
 
     try:
         from .rate_limiter import get_redis_client
