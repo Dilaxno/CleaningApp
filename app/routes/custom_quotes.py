@@ -427,6 +427,51 @@ async def send_custom_quote_request_notification(
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <meta http-equiv="X-UA-Compatible" content="IE=edge">
+                <style type="text/css">
+                    @media only screen and (max-width: 600px) {{
+                        .email-container {{
+                            width: 100% !important;
+                            margin: 0 !important;
+                        }}
+                        .header-padding {{
+                            padding: 30px 20px !important;
+                        }}
+                        .content-padding {{
+                            padding: 24px 20px !important;
+                        }}
+                        .header-title {{
+                            font-size: 24px !important;
+                        }}
+                        .header-icon {{
+                            width: 48px !important;
+                            height: 48px !important;
+                        }}
+                        .info-card {{
+                            padding: 16px !important;
+                        }}
+                        .info-row {{
+                            display: block !important;
+                        }}
+                        .info-label {{
+                            display: block !important;
+                            margin-bottom: 4px !important;
+                            text-align: left !important;
+                        }}
+                        .info-value {{
+                            display: block !important;
+                            text-align: left !important;
+                            padding-left: 0 !important;
+                        }}
+                        .cta-button {{
+                            padding: 14px 24px !important;
+                            font-size: 15px !important;
+                        }}
+                        .icon-container {{
+                            width: 36px !important;
+                            height: 36px !important;
+                        }}
+                    }}
+                </style>
                 <!--[if mso]>
                 <style type="text/css">
                     table {{border-collapse: collapse; border-spacing: 0; margin: 0;}}
@@ -438,14 +483,20 @@ async def send_custom_quote_request_notification(
             <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
                 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f8fafc;">
                     <tr>
-                        <td style="padding: 40px 20px;">
-                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);">
+                        <td style="padding: 20px;">
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" class="email-container" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);">
                                 
                                 <!-- Header -->
                                 <tr>
-                                    <td style="background: linear-gradient(135deg, #00C4B4 0%, #00A89A 100%); padding: 40px 30px; text-align: center;">
-                                        <div style="font-size: 48px; margin-bottom: 16px;">📋</div>
-                                        <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; line-height: 1.3;">
+                                    <td class="header-padding" style="background: linear-gradient(135deg, #00C4B4 0%, #00A89A 100%); padding: 40px 30px; text-align: center;">
+                                        <!-- Premium Icon using SVG -->
+                                        <div style="margin-bottom: 16px;">
+                                            <svg class="header-icon" width="56" height="56" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display: inline-block;">
+                                                <rect width="24" height="24" rx="6" fill="white" fill-opacity="0.2"/>
+                                                <path d="M9 11H15M9 15H12M7.2 20H16.8C17.9201 20 18.4802 20 18.908 19.782C19.2843 19.5903 19.5903 19.2843 19.782 18.908C20 18.4802 20 17.9201 20 16.8V7.2C20 6.0799 20 5.51984 19.782 5.09202C19.5903 4.71569 19.2843 4.40973 18.908 4.21799C18.4802 4 17.9201 4 16.8 4H7.2C6.0799 4 5.51984 4 5.09202 4.21799C4.71569 4.40973 4.40973 4.71569 4.21799 5.09202C4 5.51984 4 6.07989 4 7.2V16.8C4 17.9201 4 18.4802 4.21799 18.908C4.40973 19.2843 4.71569 19.5903 5.09202 19.782C5.51984 20 6.07989 20 7.2 20Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                            </svg>
+                                        </div>
+                                        <h1 class="header-title" style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; line-height: 1.3;">
                                             New Custom Quote Request
                                         </h1>
                                     </td>
@@ -453,7 +504,7 @@ async def send_custom_quote_request_notification(
 
                                 <!-- Content -->
                                 <tr>
-                                    <td style="padding: 40px 30px;">
+                                    <td class="content-padding" style="padding: 40px 30px;">
                                         <p style="margin: 0 0 24px 0; color: #1e293b; font-size: 16px; line-height: 1.6;">
                                             Hi <strong>{provider.full_name or 'there'}</strong>,
                                         </p>
@@ -465,32 +516,46 @@ async def send_custom_quote_request_notification(
                                         <!-- Client Info Card -->
                                         <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f8fafc; border-radius: 12px; margin-bottom: 32px; border: 1px solid #e2e8f0;">
                                             <tr>
-                                                <td style="padding: 24px;">
-                                                    <div style="display: flex; align-items: center; margin-bottom: 20px;">
-                                                        <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #00C4B4 0%, #00A89A 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-right: 12px;">
-                                                            <span style="font-size: 20px;">👤</span>
-                                                        </div>
-                                                        <h2 style="margin: 0; color: #00C4B4; font-size: 18px; font-weight: 600;">
-                                                            Client Information
-                                                        </h2>
-                                                    </div>
+                                                <td class="info-card" style="padding: 24px;">
+                                                    <!-- Card Header -->
+                                                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 20px;">
+                                                        <tr>
+                                                            <td>
+                                                                <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                                                                    <tr>
+                                                                        <td class="icon-container" style="width: 40px; height: 40px; background: linear-gradient(135deg, #00C4B4 0%, #00A89A 100%); border-radius: 10px; vertical-align: middle; text-align: center;">
+                                                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle;">
+                                                                                <path d="M20 21C20 19.6044 20 18.9067 19.8278 18.3389C19.44 17.0605 18.4395 16.06 17.1611 15.6722C16.5933 15.5 15.8956 15.5 14.5 15.5H9.5C8.10444 15.5 7.40665 15.5 6.83886 15.6722C5.56045 16.06 4.56004 17.0605 4.17224 18.3389C4 18.9067 4 19.6044 4 21M16.5 7.5C16.5 9.98528 14.4853 12 12 12C9.51472 12 7.5 9.98528 7.5 7.5C7.5 5.01472 9.51472 3 12 3C14.4853 3 16.5 5.01472 16.5 7.5Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                                                            </svg>
+                                                                        </td>
+                                                                        <td style="padding-left: 12px; vertical-align: middle;">
+                                                                            <h2 style="margin: 0; color: #00C4B4; font-size: 18px; font-weight: 600;">
+                                                                                Client Information
+                                                                            </h2>
+                                                                        </td>
+                                                                    </tr>
+                                                                </table>
+                                                            </td>
+                                                        </tr>
+                                                    </table>
                                                     
+                                                    <!-- Client Details -->
                                                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-                                                        <tr>
-                                                            <td style="padding: 10px 0; color: #64748b; font-size: 14px; font-weight: 600; width: 35%;">Name:</td>
-                                                            <td style="padding: 10px 0; color: #1e293b; font-size: 14px; text-align: right;">{client_name}</td>
+                                                        <tr class="info-row">
+                                                            <td class="info-label" style="padding: 10px 0; color: #64748b; font-size: 14px; font-weight: 600; width: 35%;">Name:</td>
+                                                            <td class="info-value" style="padding: 10px 0; color: #1e293b; font-size: 14px; text-align: right;">{client_name}</td>
                                                         </tr>
-                                                        <tr>
-                                                            <td style="padding: 10px 0; color: #64748b; font-size: 14px; font-weight: 600; border-top: 1px solid #e2e8f0;">Email:</td>
-                                                            <td style="padding: 10px 0; color: #1e293b; font-size: 14px; text-align: right; border-top: 1px solid #e2e8f0;">{client.email or 'N/A'}</td>
+                                                        <tr class="info-row">
+                                                            <td class="info-label" style="padding: 10px 0; color: #64748b; font-size: 14px; font-weight: 600; border-top: 1px solid #e2e8f0;">Email:</td>
+                                                            <td class="info-value" style="padding: 10px 0; color: #1e293b; font-size: 14px; text-align: right; border-top: 1px solid #e2e8f0;">{client.email or 'N/A'}</td>
                                                         </tr>
-                                                        <tr>
-                                                            <td style="padding: 10px 0; color: #64748b; font-size: 14px; font-weight: 600; border-top: 1px solid #e2e8f0;">Phone:</td>
-                                                            <td style="padding: 10px 0; color: #1e293b; font-size: 14px; text-align: right; border-top: 1px solid #e2e8f0;">{client.phone or 'N/A'}</td>
+                                                        <tr class="info-row">
+                                                            <td class="info-label" style="padding: 10px 0; color: #64748b; font-size: 14px; font-weight: 600; border-top: 1px solid #e2e8f0;">Phone:</td>
+                                                            <td class="info-value" style="padding: 10px 0; color: #1e293b; font-size: 14px; text-align: right; border-top: 1px solid #e2e8f0;">{client.phone or 'N/A'}</td>
                                                         </tr>
-                                                        {f'<tr><td style="padding: 10px 0; color: #64748b; font-size: 14px; font-weight: 600; border-top: 1px solid #e2e8f0;">Property Type:</td><td style="padding: 10px 0; color: #1e293b; font-size: 14px; text-align: right; border-top: 1px solid #e2e8f0;">{client.property_type}</td></tr>' if client.property_type else ''}
-                                                        {f'<tr><td style="padding: 10px 0; color: #64748b; font-size: 14px; font-weight: 600; border-top: 1px solid #e2e8f0;">Property Size:</td><td style="padding: 10px 0; color: #1e293b; font-size: 14px; text-align: right; border-top: 1px solid #e2e8f0;">{client.property_size} sqft</td></tr>' if client.property_size else ''}
-                                                        {f'<tr><td style="padding: 10px 0; color: #64748b; font-size: 14px; font-weight: 600; border-top: 1px solid #e2e8f0;">Frequency:</td><td style="padding: 10px 0; color: #1e293b; font-size: 14px; text-align: right; border-top: 1px solid #e2e8f0;">{client.frequency}</td></tr>' if client.frequency else ''}
+                                                        {f'<tr class="info-row"><td class="info-label" style="padding: 10px 0; color: #64748b; font-size: 14px; font-weight: 600; border-top: 1px solid #e2e8f0;">Property Type:</td><td class="info-value" style="padding: 10px 0; color: #1e293b; font-size: 14px; text-align: right; border-top: 1px solid #e2e8f0;">{client.property_type}</td></tr>' if client.property_type else ''}
+                                                        {f'<tr class="info-row"><td class="info-label" style="padding: 10px 0; color: #64748b; font-size: 14px; font-weight: 600; border-top: 1px solid #e2e8f0;">Property Size:</td><td class="info-value" style="padding: 10px 0; color: #1e293b; font-size: 14px; text-align: right; border-top: 1px solid #e2e8f0;">{client.property_size} sqft</td></tr>' if client.property_size else ''}
+                                                        {f'<tr class="info-row"><td class="info-label" style="padding: 10px 0; color: #64748b; font-size: 14px; font-weight: 600; border-top: 1px solid #e2e8f0;">Frequency:</td><td class="info-value" style="padding: 10px 0; color: #1e293b; font-size: 14px; text-align: right; border-top: 1px solid #e2e8f0;">{client.frequency}</td></tr>' if client.frequency else ''}
                                                     </table>
                                                 </td>
                                             </tr>
@@ -501,13 +566,20 @@ async def send_custom_quote_request_notification(
                                         <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 8px; margin-bottom: 32px;">
                                             <tr>
                                                 <td style="padding: 20px;">
-                                                    <div style="display: flex; align-items: flex-start;">
-                                                        <span style="font-size: 24px; margin-right: 12px;">💬</span>
-                                                        <div>
-                                                            <p style="margin: 0 0 8px 0; color: #92400e; font-size: 14px; font-weight: 600;">Client Notes:</p>
-                                                            <p style="margin: 0; color: #92400e; font-size: 14px; line-height: 1.6;">{quote_request.client_notes}</p>
-                                                        </div>
-                                                    </div>
+                                                    <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                                                        <tr>
+                                                            <td style="vertical-align: top; padding-right: 12px;">
+                                                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                                    <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 13.5997 2.37562 15.1116 3.04346 16.4525C3.22094 16.8088 3.28001 17.2161 3.17712 17.6006L2.58151 19.8267C2.32295 20.793 3.20701 21.677 4.17335 21.4185L6.39939 20.8229C6.78393 20.72 7.19121 20.7791 7.54753 20.9565C8.88837 21.6244 10.4003 22 12 22Z" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                                                    <path d="M8 12H8.01M12 12H12.01M16 12H16.01" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                                                </svg>
+                                                            </td>
+                                                            <td style="vertical-align: top;">
+                                                                <p style="margin: 0 0 8px 0; color: #92400e; font-size: 14px; font-weight: 600;">Client Notes:</p>
+                                                                <p style="margin: 0; color: #92400e; font-size: 14px; line-height: 1.6;">{quote_request.client_notes}</p>
+                                                            </td>
+                                                        </tr>
+                                                    </table>
                                                 </td>
                                             </tr>
                                         </table>
@@ -517,9 +589,25 @@ async def send_custom_quote_request_notification(
                                         <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 32px;">
                                             <tr>
                                                 <td style="text-align: center;">
-                                                    <a href="{FRONTEND_URL}/dashboard/custom-quotes/{quote_request.id}" 
-                                                       style="display: inline-block; background: linear-gradient(135deg, #00C4B4 0%, #00A89A 100%); color: #ffffff; padding: 16px 32px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(0, 196, 180, 0.3);">
-                                                        Review & Send Quote →
+                                                    <a href="{FRONTEND_URL}/dashboard/custom-quotes/{quote_request.id}" class="cta-button" style="display: inline-block; background: linear-gradient(135deg, #00C4B4 0%, #00A89A 100%); color: #ffffff; padding: 16px 32px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(0, 196, 180, 0.3);">
+                                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="display: inline-block;">
+                                                            <tr>
+                                                                <td style="vertical-align: middle; padding-right: 8px;">
+                                                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                                        <path d="M2.42012 12.7132C2.28394 12.4975 2.21584 12.3897 2.17772 12.2234C2.14909 12.0985 2.14909 11.9015 2.17772 11.7766C2.21584 11.6103 2.28394 11.5025 2.42012 11.2868C3.54553 9.50484 6.8954 5 12.0004 5C17.1054 5 20.4553 9.50484 21.5807 11.2868C21.7169 11.5025 21.785 11.6103 21.8231 11.7766C21.8517 11.9015 21.8517 12.0985 21.8231 12.2234C21.785 12.3897 21.7169 12.4975 21.5807 12.7132C20.4553 14.4952 17.1054 19 12.0004 19C6.8954 19 3.54553 14.4952 2.42012 12.7132Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                                                        <path d="M12.0004 15C13.6573 15 15.0004 13.6569 15.0004 12C15.0004 10.3431 13.6573 9 12.0004 9C10.3435 9 9.0004 10.3431 9.0004 12C9.0004 13.6569 10.3435 15 12.0004 15Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                                                    </svg>
+                                                                </td>
+                                                                <td style="vertical-align: middle; color: white;">
+                                                                    Review & Send Quote
+                                                                </td>
+                                                                <td style="vertical-align: middle; padding-left: 8px;">
+                                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                                        <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                                                    </svg>
+                                                                </td>
+                                                            </tr>
+                                                        </table>
                                                     </a>
                                                 </td>
                                             </tr>
@@ -529,9 +617,20 @@ async def send_custom_quote_request_notification(
                                         <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #dbeafe; border-left: 4px solid #3b82f6; border-radius: 8px;">
                                             <tr>
                                                 <td style="padding: 16px;">
-                                                    <p style="margin: 0; color: #1e40af; font-size: 14px; line-height: 1.6;">
-                                                        <strong>💡 Quick Tip:</strong> Respond quickly to provide excellent customer service and increase your booking rate!
-                                                    </p>
+                                                    <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                                                        <tr>
+                                                            <td style="vertical-align: top; padding-right: 12px;">
+                                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                                    <path d="M12 16V12M12 8H12.01M22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12Z" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                                                </svg>
+                                                            </td>
+                                                            <td style="vertical-align: top;">
+                                                                <p style="margin: 0; color: #1e40af; font-size: 14px; line-height: 1.6;">
+                                                                    <strong>Quick Tip:</strong> Respond quickly to provide excellent customer service and increase your booking rate!
+                                                                </p>
+                                                            </td>
+                                                        </tr>
+                                                    </table>
                                                 </td>
                                             </tr>
                                         </table>
