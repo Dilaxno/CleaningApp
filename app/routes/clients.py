@@ -653,9 +653,9 @@ async def get_quote_preview(
     logger.info(
         f"📦 Quote preview - FormData keys: {list(data.formData.keys())}, selectedPackage: {data.formData.get('selectedPackage')}"
     )
-        logger.info(
-            f"🔍 Using IP-based first cleaning check for IP {client_ip}: {is_first_cleaning} (existing signed contracts: {'none' if is_first_cleaning else 'found'})"
-        )
+    logger.info(
+        f"🔍 Using IP-based first cleaning check for IP {client_ip}: {is_first_cleaning} (existing signed contracts: {'none' if is_first_cleaning else 'found'})"
+    )
 
     data.formData["isFirstCleaning"] = is_first_cleaning
 
