@@ -9,7 +9,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, field_validator
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 
 from ..auth import get_current_user
@@ -930,8 +930,13 @@ async def submit_public_form(
             detail={"message": "Validation failed", "errors": validation_errors},
         )
 
-    # Find the user by Firebase UID
-    user = db.query(User).filter(User.firebase_uid == data.ownerUid).first()
+    # Find the user by Firebase UID (with business_config for business name)
+    user = (
+        db.query(User)
+        .filter(User.firebase_uid == data.ownerUid)
+        .options(joinedload(User.business_config))
+        .first()
+    )
     if not user:
         logger.error(f"❌ User not found for Firebase UID: {data.ownerUid}")
         raise HTTPException(status_code=404, detail="Business not found")
@@ -1025,12 +1030,19 @@ async def submit_public_form(
     if data.quoteAccepted and data.email:
         from ..email_service import send_quote_submitted_confirmation, send_quote_review_notification
         
+        # Get business name from business_config
+        business_name = (
+            user.business_config.business_name 
+            if user.business_config and user.business_config.business_name 
+            else "Service Provider"
+        )
+        
         # Send confirmation email to client (background task)
         background_tasks.add_task(
             send_quote_submitted_confirmation,
             to=data.email,
             client_name=data.contactName or data.businessName,
-            business_name=user.business_name or "Service Provider",
+            business_name=business_name,
             quote_amount=quote_amount or 0,
         )
         
@@ -1039,7 +1051,7 @@ async def submit_public_form(
             background_tasks.add_task(
                 send_quote_review_notification,
                 to=user.email,
-                provider_name=user.business_name or "Provider",
+                provider_name=business_name,
                 client_name=data.contactName or data.businessName,
                 client_email=data.email,
                 quote_amount=quote_amount or 0,
@@ -2141,11 +2153,19 @@ async def approve_quote(
     # Send approval email to client
     if client.email:
         from ..email_service import send_quote_approved_email
+        
+        # Get business name from business_config
+        business_name = (
+            current_user.business_config.business_name 
+            if current_user.business_config and current_user.business_config.business_name 
+            else "Service Provider"
+        )
+        
         background_tasks.add_task(
             send_quote_approved_email,
             to=client.email,
             client_name=client.contact_name or client.business_name,
-            business_name=current_user.business_name or "Service Provider",
+            business_name=business_name,
             final_quote_amount=client.original_quote_amount or 0,
             was_adjusted=False,
             adjustment_notes=None,
@@ -2222,11 +2242,19 @@ async def adjust_quote(
     # Send adjustment email to client
     if client.email:
         from ..email_service import send_quote_approved_email
+        
+        # Get business name from business_config
+        business_name = (
+            current_user.business_config.business_name 
+            if current_user.business_config and current_user.business_config.business_name 
+            else "Service Provider"
+        )
+        
         background_tasks.add_task(
             send_quote_approved_email,
             to=client.email,
             client_name=client.contact_name or client.business_name,
-            business_name=current_user.business_name or "Service Provider",
+            business_name=business_name,
             final_quote_amount=data.adjusted_amount,
             was_adjusted=True,
             adjustment_notes=data.adjustment_notes,

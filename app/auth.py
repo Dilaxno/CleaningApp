@@ -4,7 +4,7 @@ import logging
 import httpx
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from .config import FIREBASE_PROJECT_ID
 from .database import get_db
@@ -237,7 +237,12 @@ async def get_current_user(
             raise HTTPException(status_code=401, detail="Invalid token claims")
 
         # Find or create user in our database
-        user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
+        user = (
+            db.query(User)
+            .filter(User.firebase_uid == firebase_uid)
+            .options(joinedload(User.business_config))
+            .first()
+        )
 
         if not user:
             # Check if email is already registered with a different Firebase UID
