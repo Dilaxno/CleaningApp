@@ -34,7 +34,7 @@ from .routes.clients import router as clients_router
 from .routes.contract_revisions import router as contract_revisions_router
 from .routes.contracts import router as contracts_router
 from .routes.contracts_pdf import router as contracts_pdf_router
-from .routes.custom_quotes import router as custom_quotes_router
+
 from .routes.email import router as email_router
 from .routes.geocoding import router as geocoding_router
 from .routes.google_calendar import router as google_calendar_router
@@ -277,7 +277,6 @@ app.include_router(square_webhooks_router)
 app.include_router(google_calendar_router)
 app.include_router(quickbooks_router)
 app.include_router(intercom_router)
-app.include_router(custom_quotes_router)
 
 
 # Square OAuth callback routes (must match redirect URI exactly)

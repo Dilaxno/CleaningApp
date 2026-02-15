@@ -1424,9 +1424,6 @@ async def sign_contract(
             payment_terms=client.pending_contract_payment_terms,
             terms_conditions=client.pending_contract_terms_conditions,
             status="new",
-            custom_quote_request_id=(
-                data.customQuoteRequestId if hasattr(data, "customQuoteRequestId") else None
-            ),
         )
         db.add(contract)
         db.flush()  # Get the ID without committing

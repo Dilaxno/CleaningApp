@@ -1,5 +1,6 @@
 """
-Run custom quote requests migration
+Generic migration runner script
+Usage: python run_migration.py <migration_file.sql>
 """
 import sys
 import logging
@@ -13,9 +14,13 @@ from sqlalchemy import text
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 logger = logging.getLogger(__name__)
 
-def run_migration():
-    """Run the custom quote requests migration"""
-    migration_file = Path(__file__).parent / "migrations" / "add_custom_quote_requests.sql"
+def run_migration(migration_file_path: str):
+    """Run a SQL migration file"""
+    migration_file = Path(migration_file_path)
+    
+    if not migration_file.exists():
+        logger.error(f"Migration file not found: {migration_file}")
+        sys.exit(1)
     
     logger.info(f"Reading migration file: {migration_file}")
     with open(migration_file, 'r') as f:
@@ -34,8 +39,12 @@ def run_migration():
     logger.info("✅ Migration completed successfully!")
 
 if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        logger.error("Usage: python run_migration.py <migration_file.sql>")
+        sys.exit(1)
+    
     try:
-        run_migration()
+        run_migration(sys.argv[1])
     except Exception as e:
         logger.error(f"❌ Migration failed: {e}")
         sys.exit(1)

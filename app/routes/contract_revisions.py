@@ -18,7 +18,6 @@ router = APIRouter(prefix="/contracts", tags=["Contract Revisions"])
 class RevisionRequest(BaseModel):
     revision_type: str  # 'pricing', 'scope', 'both'
     revision_notes: str
-    custom_quote: Optional[dict[str, Any]] = None
     custom_scope: Optional[dict[str, Any]] = None
 
 
@@ -28,7 +27,6 @@ class RevisionResponse(BaseModel):
     revision_type: Optional[str]
     revision_notes: Optional[str]
     revision_count: int
-    custom_quote: Optional[dict[str, Any]]
     custom_scope: Optional[dict[str, Any]]
     revision_requested_at: Optional[datetime]
 
@@ -75,13 +73,6 @@ async def request_contract_revision(
             status_code=400, detail="revision_type must be 'pricing', 'scope', or 'both'"
         )
 
-    # Validate custom quote if pricing revision
-    if revision.revision_type in ["pricing", "both"]:
-        if not revision.custom_quote:
-            raise HTTPException(
-                status_code=400, detail="custom_quote required when requesting pricing changes"
-            )
-
     # Validate custom scope if scope revision
     if revision.revision_type in ["scope", "both"]:
         if not revision.custom_scope:
@@ -95,9 +86,6 @@ async def request_contract_revision(
     contract.revision_notes = revision.revision_notes
     contract.revision_requested_at = datetime.now()
     contract.revision_count += 1
-
-    if revision.custom_quote:
-        contract.custom_quote = revision.custom_quote
 
     if revision.custom_scope:
         contract.custom_scope = revision.custom_scope
@@ -115,7 +103,6 @@ async def request_contract_revision(
         revision_type=contract.revision_type,
         revision_notes=contract.revision_notes,
         revision_count=contract.revision_count,
-        custom_quote=contract.custom_quote,
         custom_scope=contract.custom_scope,
         revision_requested_at=contract.revision_requested_at,
     )
@@ -178,8 +165,7 @@ async def reject_contract_revision(
 
     contract.revision_notes = (contract.revision_notes or "") + rejection_msg
 
-    # Clear custom quote/scope since they were rejected
-    contract.custom_quote = None
+    # Clear custom scope since it was rejected
     contract.custom_scope = None
 
     db.commit()
@@ -212,6 +198,5 @@ async def get_revision_history(
         "revision_type": contract.revision_type,
         "revision_notes": contract.revision_notes,
         "revision_requested_at": contract.revision_requested_at,
-        "custom_quote": contract.custom_quote,
         "custom_scope": contract.custom_scope,
     }

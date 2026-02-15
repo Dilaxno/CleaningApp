@@ -433,8 +433,6 @@ class Contract(Base):
     both_parties_signed_at = Column(DateTime, nullable=True)  # When both parties signed
     invoice_auto_generated = Column(Boolean, default=False)  # Whether invoice was auto-generated
 
-    # Custom quote workflow
-    custom_quote_request_id = Column(Integer, ForeignKey("custom_quote_requests.id"), nullable=True)
     invoice_auto_sent = Column(Boolean, default=False)  # Whether Square invoice was auto-sent
     invoice_auto_sent_at = Column(DateTime, nullable=True)  # When invoice was auto-sent
 
@@ -443,9 +441,6 @@ class Contract(Base):
 
     user = relationship("User", back_populates="contracts")
     client = relationship("Client", back_populates="contracts")
-    custom_quote_request = relationship(
-        "CustomQuoteRequest", foreign_keys=[custom_quote_request_id], uselist=False
-    )
     invoices = relationship("Invoice", back_populates="contract", cascade="all, delete-orphan")
 
 
@@ -625,59 +620,3 @@ class UserTemplateCustomization(Base):
 
     user = relationship("User")
     template = relationship("FormTemplate")
-
-
-class CustomQuoteRequest(Base):
-    __tablename__ = "custom_quote_requests"
-
-    id = Column(Integer, primary_key=True, index=True)
-    public_id = Column(
-        String(36), unique=True, nullable=False, index=True, default=generate_public_id
-    )
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # Provider
-    client_id = Column(Integer, ForeignKey("clients.id"), nullable=False)
-
-    # Client request details
-    client_notes = Column(Text, nullable=True)  # Client-provided notes describing their needs
-
-    # Video details
-    video_r2_key = Column(String(500), nullable=False)  # R2 storage key
-    video_filename = Column(String(255), nullable=False)  # Original filename
-    video_size_bytes = Column(Integer, nullable=False)  # File size in bytes
-    video_duration_seconds = Column(Float, nullable=True)  # Video duration
-    video_mime_type = Column(String(100), nullable=False)  # e.g., video/mp4
-
-    # Request status
-    status = Column(
-        String(50), default="pending", nullable=False
-    )  # pending, quoted, approved, rejected, expired
-
-    # Custom quote from provider
-    custom_quote_amount = Column(Float, nullable=True)
-    custom_quote_currency = Column(String(10), default="USD")
-    custom_quote_description = Column(Text, nullable=True)
-    custom_quote_line_items = Column(JSON, nullable=True)  # Detailed breakdown
-    custom_quote_notes = Column(Text, nullable=True)  # Provider notes to client
-    quoted_at = Column(DateTime, nullable=True)
-
-    # Client response
-    client_response = Column(String(50), nullable=True)  # approved, rejected
-    client_response_notes = Column(Text, nullable=True)
-    responded_at = Column(DateTime, nullable=True)
-
-    # Link to generated contract after approval
-    contract_id = Column(Integer, ForeignKey("contracts.id"), nullable=True)
-
-    # Metadata
-    client_ip = Column(String(45), nullable=True)  # IP when video uploaded
-    client_user_agent = Column(String(500), nullable=True)
-    expires_at = Column(DateTime, nullable=True)  # Quote expiration (optional)
-    provider_viewed_at = Column(DateTime, nullable=True)  # When provider first viewed
-
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-
-    # Relationships
-    user = relationship("User")
-    client = relationship("Client")
-    contract = relationship("Contract", foreign_keys=[contract_id], uselist=False)
