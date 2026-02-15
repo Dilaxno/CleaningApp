@@ -383,6 +383,9 @@ async def create_client_booking(data: ClientBookingRequest, db: Session = Depend
                     else None
                 ),
                 schedule_id=schedule.id,
+                client_email=client.email,
+                client_phone=client.phone,
+                duration_minutes=data.duration_minutes if hasattr(data, 'duration_minutes') else None,
             )
     except Exception as e:
         logger.error(f"Failed to send pending booking notification: {e}")
@@ -1158,6 +1161,9 @@ async def create_direct_booking(data: DirectBookingRequest, db: Session = Depend
                     else None
                 ),
                 schedule_id=schedule.id,
+                client_email=client.email,
+                client_phone=client.phone,
+                duration_minutes=estimated_duration,
             )
     except Exception as e:
         logger.error(f"Failed to send pending booking notification: {e}")

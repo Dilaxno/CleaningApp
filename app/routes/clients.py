@@ -2331,3 +2331,165 @@ async def reject_quote(
         "client_id": client.id,
         "quote_status": client.quote_status,
     }
+
+
+# ============================================
+# Quote Requests Dashboard Endpoints
+# ============================================
+
+
+@router.get("/quote-requests")
+async def get_quote_requests(
+    status: Optional[str] = Query(None, description="Filter by quote status"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Get all quote requests for the provider dashboard.
+    Returns clients with quote_status = 'pending_review' or other specified status.
+    """
+    query = db.query(Client).filter(Client.user_id == current_user.id)
+
+    # Filter by status if provided
+    if status:
+        query = query.filter(Client.quote_status == status)
+    else:
+        # Default to pending review
+        query = query.filter(Client.quote_status == "pending_review")
+
+    # Order by most recent first
+    query = query.order_by(Client.quote_submitted_at.desc())
+
+    clients = query.all()
+
+    # Format response
+    quote_requests = []
+    for client in clients:
+        quote_requests.append({
+            "id": client.id,
+            "public_id": client.public_id,
+            "business_name": client.business_name,
+            "contact_name": client.contact_name,
+            "email": client.email,
+            "phone": client.phone,
+            "property_type": client.property_type,
+            "property_size": client.property_size,
+            "frequency": client.frequency,
+            "quote_status": client.quote_status,
+            "quote_submitted_at": client.quote_submitted_at.isoformat() if client.quote_submitted_at else None,
+            "quote_approved_at": client.quote_approved_at.isoformat() if client.quote_approved_at else None,
+            "original_quote_amount": client.original_quote_amount,
+            "adjusted_quote_amount": client.adjusted_quote_amount,
+            "quote_adjustment_notes": client.quote_adjustment_notes,
+            "form_data": client.form_data,
+            "created_at": client.created_at.isoformat() if client.created_at else None,
+        })
+
+    return {
+        "quote_requests": quote_requests,
+        "total": len(quote_requests),
+    }
+
+
+@router.get("/quote-requests/{client_id}")
+async def get_quote_request_detail(
+    client_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Get detailed information about a specific quote request.
+    """
+    client = db.query(Client).filter(
+        Client.id == client_id,
+        Client.user_id == current_user.id
+    ).first()
+
+    if not client:
+        raise HTTPException(status_code=404, detail="Quote request not found")
+
+    # Get quote history if available
+    from ..models import QuoteHistory
+    history = db.query(QuoteHistory).filter(
+        QuoteHistory.client_id == client_id
+    ).order_by(QuoteHistory.created_at.desc()).all()
+
+    history_entries = []
+    for entry in history:
+        history_entries.append({
+            "id": entry.id,
+            "action": entry.action,
+            "amount": entry.amount,
+            "notes": entry.notes,
+            "created_by": entry.created_by,
+            "created_at": entry.created_at.isoformat() if entry.created_at else None,
+        })
+
+    return {
+        "id": client.id,
+        "public_id": client.public_id,
+        "business_name": client.business_name,
+        "contact_name": client.contact_name,
+        "email": client.email,
+        "phone": client.phone,
+        "property_type": client.property_type,
+        "property_size": client.property_size,
+        "frequency": client.frequency,
+        "status": client.status,
+        "quote_status": client.quote_status,
+        "quote_submitted_at": client.quote_submitted_at.isoformat() if client.quote_submitted_at else None,
+        "quote_approved_at": client.quote_approved_at.isoformat() if client.quote_approved_at else None,
+        "quote_approved_by": client.quote_approved_by,
+        "original_quote_amount": client.original_quote_amount,
+        "adjusted_quote_amount": client.adjusted_quote_amount,
+        "quote_adjustment_notes": client.quote_adjustment_notes,
+        "form_data": client.form_data,
+        "notes": client.notes,
+        "created_at": client.created_at.isoformat() if client.created_at else None,
+        "updated_at": client.updated_at.isoformat() if client.updated_at else None,
+        "history": history_entries,
+    }
+
+
+@router.get("/quote-requests/stats/summary")
+async def get_quote_requests_stats(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Get summary statistics for quote requests.
+    """
+    # Count by status
+    pending_count = db.query(func.count(Client.id)).filter(
+        Client.user_id == current_user.id,
+        Client.quote_status == "pending_review"
+    ).scalar()
+
+    approved_count = db.query(func.count(Client.id)).filter(
+        Client.user_id == current_user.id,
+        Client.quote_status == "approved"
+    ).scalar()
+
+    adjusted_count = db.query(func.count(Client.id)).filter(
+        Client.user_id == current_user.id,
+        Client.quote_status == "adjusted"
+    ).scalar()
+
+    rejected_count = db.query(func.count(Client.id)).filter(
+        Client.user_id == current_user.id,
+        Client.quote_status == "rejected"
+    ).scalar()
+
+    # Total quote value pending
+    total_pending_value = db.query(func.sum(Client.original_quote_amount)).filter(
+        Client.user_id == current_user.id,
+        Client.quote_status == "pending_review"
+    ).scalar() or 0
+
+    return {
+        "pending_count": pending_count,
+        "approved_count": approved_count,
+        "adjusted_count": adjusted_count,
+        "rejected_count": rejected_count,
+        "total_pending_value": float(total_pending_value),
+    }
