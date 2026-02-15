@@ -592,7 +592,7 @@ async def send_welcome_email(to: str, user_name: str) -> dict:
     """
     return await send_email(
         to=to,
-        subject="Welcome to CleanEnroll! 🎉",
+        subject="Welcome to CleanEnroll",
         title="Welcome to CleanEnroll!",
         intro="Your account has been created successfully.",
         content_html=content,
@@ -660,7 +660,7 @@ async def send_new_client_notification(
     """
     return await send_email(
         to=to,
-        subject=f"New {property_type} Property Intake: {client_name} Ready to Review 📋",
+        subject=f"New {property_type} Property Intake: {client_name} Ready to Review",
         title="New Client Property Intake Submission",
         content_html=content,
         is_user_email=True,
@@ -822,8 +822,8 @@ async def send_form_submission_confirmation(
     """
     return await send_email(
         to=to,
-        subject=f"Thank You for Your {property_type} Cleaning Intake, {client_name}! 📋",
-        title=f"Thank You for Your {property_type} Cleaning Intake, {client_name}! 📋",
+        subject=f"Thank You for Your {property_type} Cleaning Intake, {client_name}",
+        title=f"Thank You for Your {property_type} Cleaning Intake, {client_name}",
         content_html=content,
     )
 
@@ -867,7 +867,7 @@ async def send_contract_signed_notification(
     """
     return await send_email(
         to=to,
-        subject=f"🖊️ Contract Signed by {client_name} - Review Schedule & Sign",
+        subject=f"Contract Signed by {client_name} - Review Schedule & Sign",
         title="Client Has Signed!",
         intro=f"A contract for {business_name} requires your signature.",
         content_html=content,
@@ -922,7 +922,7 @@ async def send_client_signature_confirmation(
 
     return await send_email(
         to=to,
-        subject=f"✅ Contract Signed - Awaiting {business_name}",
+        subject=f"Contract Signed - Awaiting {business_name}",
         title="Thank You for Signing!",
         intro=f"Your contract with {business_name} has been signed successfully.",
         content_html=content,
@@ -1007,7 +1007,7 @@ async def send_contract_fully_executed_email(
     """
     return await send_email(
         to=to,
-        subject=f"Great News! Your Cleaning Contract is Fully Signed & Ready 🚀 [Contract {contract_id}]",
+        subject=f"Great News! Your Cleaning Contract is Fully Signed & Ready [Contract {contract_id}]",
         title="Contract Fully Signed!",
         intro=f"{business_name} has reviewed and signed your service agreement.",
         content_html=content,
@@ -1417,7 +1417,7 @@ async def send_client_accepted_proposal(
 
     return await send_email(
         to=provider_email,
-        subject=f"✅ {client_name} Accepted Your Proposed Time",
+        subject=f"{client_name} Accepted Your Proposed Time",
         title="Appointment Confirmed!",
         intro=f"{client_name} has confirmed the appointment.",
         content_html=content,
@@ -1455,7 +1455,7 @@ async def send_appointment_confirmed_to_client(
 
     return await send_email(
         to=client_email,
-        subject=f"✅ Appointment Confirmed with {provider_name}",
+        subject=f"Appointment Confirmed with {provider_name}",
         title="Appointment Confirmed!",
         intro="Your appointment has been scheduled.",
         content_html=content,
@@ -1507,7 +1507,7 @@ async def send_schedule_accepted_confirmation_to_provider(
 
     return await send_email(
         to=provider_email,
-        subject=f"✅ Appointment Confirmed - {client_name} on {formatted_date}",
+        subject=f"Appointment Confirmed - {client_name} on {formatted_date}",
         title="Appointment Confirmed!",
         intro="You've successfully confirmed the appointment.",
         content_html=content,
@@ -1560,7 +1560,7 @@ async def send_client_counter_proposal(
 
     return await send_email(
         to=provider_email,
-        subject=f"📅 {client_name} Suggested an Alternative Time",
+        subject=f"{client_name} Suggested an Alternative Time",
         title="Alternative Time Suggested",
         intro=f"{client_name} has suggested a different appointment time.",
         content_html=content,
@@ -1702,12 +1702,12 @@ async def send_payment_received_notification(
 
     return await send_email(
         to=provider_email,
-        subject=f"💰 Payment Received: ${amount:,.2f} from {client_name}",
-        title="Payment Received! 🎉",
+        subject=f"Payment Received: ${amount:,.2f} from {client_name}",
+        title="Payment Received",
         intro=f"Great news! {client_name} has paid invoice {invoice_number}.",
         content_html=content,
         cta_url=f"{FRONTEND_URL}/dashboard/payouts",
-        cta_label="💳 View Payouts Dashboard",
+        cta_label="View Payouts Dashboard",
         is_user_email=True,
     )
 
@@ -1856,7 +1856,7 @@ async def send_pending_booking_notification(
 
     return await send_email(
         to=provider_email,
-        subject=f"🗓️ New Booking Request from {client_name} - Action Needed",
+        subject=f"New Booking Request from {client_name} - Action Needed",
         title="New Appointment Request",
         intro=f"{client_name} has requested a cleaning appointment.",
         content_html=content,

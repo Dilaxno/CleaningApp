@@ -2338,6 +2338,52 @@ async def reject_quote(
 # ============================================
 
 
+# IMPORTANT: More specific routes must come BEFORE parameterized routes
+# to avoid FastAPI trying to parse "stats" as an integer client_id
+@router.get("/quote-requests/stats/summary")
+async def get_quote_requests_stats(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Get summary statistics for quote requests.
+    """
+    # Count by status
+    pending_count = db.query(func.count(Client.id)).filter(
+        Client.user_id == current_user.id,
+        Client.quote_status == "pending_review"
+    ).scalar()
+
+    approved_count = db.query(func.count(Client.id)).filter(
+        Client.user_id == current_user.id,
+        Client.quote_status == "approved"
+    ).scalar()
+
+    adjusted_count = db.query(func.count(Client.id)).filter(
+        Client.user_id == current_user.id,
+        Client.quote_status == "adjusted"
+    ).scalar()
+
+    rejected_count = db.query(func.count(Client.id)).filter(
+        Client.user_id == current_user.id,
+        Client.quote_status == "rejected"
+    ).scalar()
+
+    # Total quote value pending
+    total_pending_value = db.query(func.sum(Client.original_quote_amount)).filter(
+        Client.user_id == current_user.id,
+        Client.quote_status == "pending_review"
+    ).scalar() or 0
+
+    return {
+        "pending_count": pending_count,
+        "approved_count": approved_count,
+        "adjusted_count": adjusted_count,
+        "rejected_count": rejected_count,
+        "total_pending_value": float(total_pending_value),
+    }
+
+
 @router.get("/quote-requests")
 async def get_quote_requests(
     status: Optional[str] = Query(None, description="Filter by quote status"),
@@ -2448,48 +2494,4 @@ async def get_quote_request_detail(
         "created_at": client.created_at.isoformat() if client.created_at else None,
         "updated_at": client.updated_at.isoformat() if client.updated_at else None,
         "history": history_entries,
-    }
-
-
-@router.get("/quote-requests/stats/summary")
-async def get_quote_requests_stats(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """
-    Get summary statistics for quote requests.
-    """
-    # Count by status
-    pending_count = db.query(func.count(Client.id)).filter(
-        Client.user_id == current_user.id,
-        Client.quote_status == "pending_review"
-    ).scalar()
-
-    approved_count = db.query(func.count(Client.id)).filter(
-        Client.user_id == current_user.id,
-        Client.quote_status == "approved"
-    ).scalar()
-
-    adjusted_count = db.query(func.count(Client.id)).filter(
-        Client.user_id == current_user.id,
-        Client.quote_status == "adjusted"
-    ).scalar()
-
-    rejected_count = db.query(func.count(Client.id)).filter(
-        Client.user_id == current_user.id,
-        Client.quote_status == "rejected"
-    ).scalar()
-
-    # Total quote value pending
-    total_pending_value = db.query(func.sum(Client.original_quote_amount)).filter(
-        Client.user_id == current_user.id,
-        Client.quote_status == "pending_review"
-    ).scalar() or 0
-
-    return {
-        "pending_count": pending_count,
-        "approved_count": approved_count,
-        "adjusted_count": adjusted_count,
-        "rejected_count": rejected_count,
-        "total_pending_value": float(total_pending_value),
     }

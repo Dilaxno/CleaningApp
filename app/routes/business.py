@@ -767,6 +767,7 @@ def get_public_branding(firebase_uid: str, request: Request, db: Session = Depen
         "logoUrl": logo_presigned_url,
         "brandColor": config.brand_color,  # Brand color for intake forms
         "plan": user.plan,  # Include plan for conditional badge display
+        "contactEmail": user.email,  # Provider's email for client contact
     }
 
 
