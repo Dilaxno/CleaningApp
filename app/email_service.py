@@ -38,11 +38,11 @@ except Exception:
 def decrypt_password(encrypted: str) -> str:
  """Decrypt SMTP password"""
  if not fernet or not encrypted:
- return encrypted or ""
+  return encrypted or ""
  try:
- return fernet.decrypt(encrypted.encode()).decode()
+  return fernet.decrypt(encrypted.encode()).decode()
  except Exception:
- return encrypted
+  return encrypted
 
 
 def get_sender_email(business_config=None, business_name: str = "CleanEnroll") -> str:
