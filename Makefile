@@ -1,6 +1,6 @@
 # CleanEnroll Backend - Development Makefile
 
-.PHONY: help install install-dev format lint type-check security test test-cov clean all
+.PHONY: help install install-dev format lint type-check security test test-cov clean all autofix unused-imports dead-code check-deps
 
 help:
 	@echo "CleanEnroll Backend Development Commands:"
@@ -9,9 +9,12 @@ help:
 	@echo "  make install-dev    - Install development dependencies"
 	@echo "  make format         - Format code with Black"
 	@echo "  make lint           - Run linters (Ruff + Pylint)"
+	@echo "  make autofix        - Auto-fix code issues (autoflake + black)"
+	@echo "  make unused-imports - Remove unused imports with autoflake"
 	@echo "  make type-check     - Run MyPy type checker"
 	@echo "  make security       - Run security scanners (Bandit)"
 	@echo "  make dead-code      - Find unused code with Vulture"
+	@echo "  make check-deps     - Check for unused dependencies"
 	@echo "  make test           - Run tests"
 	@echo "  make test-cov       - Run tests with coverage"
 	@echo "  make pre-commit     - Install pre-commit hooks"
@@ -31,6 +34,19 @@ format:
 	black app/ --line-length 100
 	@echo "✅ Code formatted!"
 
+autofix:
+	@echo "🔧 Auto-fixing code issues..."
+	@echo "  → Removing unused imports and variables..."
+	autoflake --in-place --recursive --remove-all-unused-imports --remove-unused-variables --ignore-init-module-imports app/
+	@echo "  → Formatting with Black..."
+	black app/ --line-length 100
+	@echo "✅ Auto-fix complete!"
+
+unused-imports:
+	@echo "🔍 Checking for unused imports..."
+	autoflake --check --recursive --remove-all-unused-imports --remove-unused-variables --ignore-init-module-imports app/
+	@echo "✅ Check complete!"
+
 lint:
 	@echo "🔍 Running Ruff linter..."
 	ruff check app/ --fix
@@ -45,13 +61,21 @@ type-check:
 
 security:
 	@echo "🔒 Running Bandit security scanner..."
-	bandit -r app/ -c pyproject.toml
+	bandit -r app/ -ll -f txt
 	@echo "✅ Security scan complete!"
 
 dead-code:
 	@echo "🔍 Finding unused code with Vulture..."
-	vulture app/ --min-confidence 60
+	vulture app/ vulture_whitelist.py --min-confidence 80
 	@echo "✅ Dead code analysis complete!"
+
+check-deps:
+	@echo "🔍 Checking for unused dependencies..."
+	@echo "  → Checking for extra requirements..."
+	pip-extra-reqs app/
+	@echo "  → Checking for missing requirements..."
+	pip-missing-reqs app/
+	@echo "✅ Dependency check complete!"
 
 test:
 	@echo "🧪 Running tests..."

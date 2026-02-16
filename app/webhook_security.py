@@ -27,8 +27,6 @@ MAX_WEBHOOK_AGE_SECONDS = 300
 class WebhookSignatureError(Exception):
     """Raised when webhook signature verification fails"""
 
-    pass
-
 
 def constant_time_compare(a: str, b: str) -> bool:
     """

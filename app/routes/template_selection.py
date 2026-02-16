@@ -161,7 +161,7 @@ async def get_available_templates(
     """Get all available templates for selection during onboarding"""
 
     # Group templates by category
-    categories = list(set(template["category"] for template in AVAILABLE_TEMPLATES))
+    categories = list({template["category"] for template in AVAILABLE_TEMPLATES})
     categories.sort()
 
     templates = [TemplateInfo(**template) for template in AVAILABLE_TEMPLATES]

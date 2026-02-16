@@ -346,32 +346,22 @@ async def get_public_calendly_status(owner_uid: str, db: Session = Depends(get_d
     """
     # Find user by Firebase UID
     user = db.query(User).filter(User.firebase_uid == owner_uid).first()
-    
+
     if not user:
-        return {
-            "connected": False,
-            "scheduling_url": None,
-            "event_type_name": None
-        }
-    
+        return {"connected": False, "scheduling_url": None, "event_type_name": None}
+
     # Check if user has Calendly integration
     integration = (
-        db.query(CalendlyIntegration)
-        .filter(CalendlyIntegration.user_id == user.id)
-        .first()
+        db.query(CalendlyIntegration).filter(CalendlyIntegration.user_id == user.id).first()
     )
-    
+
     if not integration or not integration.default_event_type_url:
-        return {
-            "connected": False,
-            "scheduling_url": None,
-            "event_type_name": None
-        }
-    
+        return {"connected": False, "scheduling_url": None, "event_type_name": None}
+
     return {
         "connected": True,
         "scheduling_url": integration.default_event_type_url,
-        "event_type_name": integration.default_event_type_name or "Consultation"
+        "event_type_name": integration.default_event_type_name or "Consultation",
     }
 
 

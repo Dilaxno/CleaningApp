@@ -6,11 +6,11 @@ from datetime import datetime
 from io import StringIO
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, field_validator
-from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
+from sqlalchemy.orm import Session, joinedload
 
 from ..auth import get_current_user
 from ..database import get_db
@@ -280,6 +280,7 @@ async def export_clients_csv(
 # IMPORTANT: These must come BEFORE /{client_id} route to avoid path conflicts
 # ============================================================================
 
+
 @router.get("/quote-requests/stats/summary")
 async def get_quote_requests_stats(
     current_user: User = Depends(get_current_user),
@@ -289,31 +290,37 @@ async def get_quote_requests_stats(
     Get summary statistics for quote requests.
     """
     # Count by status
-    pending_count = db.query(func.count(Client.id)).filter(
-        Client.user_id == current_user.id,
-        Client.quote_status == "pending_review"
-    ).scalar()
+    pending_count = (
+        db.query(func.count(Client.id))
+        .filter(Client.user_id == current_user.id, Client.quote_status == "pending_review")
+        .scalar()
+    )
 
-    approved_count = db.query(func.count(Client.id)).filter(
-        Client.user_id == current_user.id,
-        Client.quote_status == "approved"
-    ).scalar()
+    approved_count = (
+        db.query(func.count(Client.id))
+        .filter(Client.user_id == current_user.id, Client.quote_status == "approved")
+        .scalar()
+    )
 
-    adjusted_count = db.query(func.count(Client.id)).filter(
-        Client.user_id == current_user.id,
-        Client.quote_status == "adjusted"
-    ).scalar()
+    adjusted_count = (
+        db.query(func.count(Client.id))
+        .filter(Client.user_id == current_user.id, Client.quote_status == "adjusted")
+        .scalar()
+    )
 
-    rejected_count = db.query(func.count(Client.id)).filter(
-        Client.user_id == current_user.id,
-        Client.quote_status == "rejected"
-    ).scalar()
+    rejected_count = (
+        db.query(func.count(Client.id))
+        .filter(Client.user_id == current_user.id, Client.quote_status == "rejected")
+        .scalar()
+    )
 
     # Total quote value pending
-    total_pending_value = db.query(func.sum(Client.original_quote_amount)).filter(
-        Client.user_id == current_user.id,
-        Client.quote_status == "pending_review"
-    ).scalar() or 0
+    total_pending_value = (
+        db.query(func.sum(Client.original_quote_amount))
+        .filter(Client.user_id == current_user.id, Client.quote_status == "pending_review")
+        .scalar()
+        or 0
+    )
 
     return {
         "pending_count": pending_count,
@@ -351,25 +358,31 @@ async def get_quote_requests(
     # Format response
     quote_requests = []
     for client in clients:
-        quote_requests.append({
-            "id": client.id,
-            "public_id": client.public_id,
-            "business_name": client.business_name,
-            "contact_name": client.contact_name,
-            "email": client.email,
-            "phone": client.phone,
-            "property_type": client.property_type,
-            "property_size": client.property_size,
-            "frequency": client.frequency,
-            "quote_status": client.quote_status,
-            "quote_submitted_at": client.quote_submitted_at.isoformat() if client.quote_submitted_at else None,
-            "quote_approved_at": client.quote_approved_at.isoformat() if client.quote_approved_at else None,
-            "original_quote_amount": client.original_quote_amount,
-            "adjusted_quote_amount": client.adjusted_quote_amount,
-            "quote_adjustment_notes": client.quote_adjustment_notes,
-            "form_data": client.form_data,
-            "created_at": client.created_at.isoformat() if client.created_at else None,
-        })
+        quote_requests.append(
+            {
+                "id": client.id,
+                "public_id": client.public_id,
+                "business_name": client.business_name,
+                "contact_name": client.contact_name,
+                "email": client.email,
+                "phone": client.phone,
+                "property_type": client.property_type,
+                "property_size": client.property_size,
+                "frequency": client.frequency,
+                "quote_status": client.quote_status,
+                "quote_submitted_at": (
+                    client.quote_submitted_at.isoformat() if client.quote_submitted_at else None
+                ),
+                "quote_approved_at": (
+                    client.quote_approved_at.isoformat() if client.quote_approved_at else None
+                ),
+                "original_quote_amount": client.original_quote_amount,
+                "adjusted_quote_amount": client.adjusted_quote_amount,
+                "quote_adjustment_notes": client.quote_adjustment_notes,
+                "form_data": client.form_data,
+                "created_at": client.created_at.isoformat() if client.created_at else None,
+            }
+        )
 
     return {
         "quote_requests": quote_requests,
@@ -386,39 +399,45 @@ async def get_quote_request_detail(
     """
     Get detailed information about a specific quote request.
     """
-    client = db.query(Client).filter(
-        Client.id == client_id,
-        Client.user_id == current_user.id
-    ).first()
+    client = (
+        db.query(Client).filter(Client.id == client_id, Client.user_id == current_user.id).first()
+    )
 
     if not client:
         raise HTTPException(status_code=404, detail="Quote request not found")
 
     # Get quote history if available
     from ..models import QuoteHistory
-    history = db.query(QuoteHistory).filter(
-        QuoteHistory.client_id == client_id
-    ).order_by(QuoteHistory.created_at.desc()).all()
+
+    history = (
+        db.query(QuoteHistory)
+        .filter(QuoteHistory.client_id == client_id)
+        .order_by(QuoteHistory.created_at.desc())
+        .all()
+    )
 
     history_entries = []
     for entry in history:
-        history_entries.append({
-            "id": entry.id,
-            "action": entry.action,
-            "amount": entry.amount,
-            "notes": entry.notes,
-            "created_by": entry.created_by,
-            "created_at": entry.created_at.isoformat() if entry.created_at else None,
-        })
+        history_entries.append(
+            {
+                "id": entry.id,
+                "action": entry.action,
+                "amount": entry.amount,
+                "notes": entry.notes,
+                "created_by": entry.created_by,
+                "created_at": entry.created_at.isoformat() if entry.created_at else None,
+            }
+        )
 
     # Convert property shot keys to presigned URLs
     form_data = client.form_data or {}
     if form_data.get("propertyShots"):
         from .upload import generate_presigned_url
+
         property_shots_keys = form_data.get("propertyShots", [])
         if isinstance(property_shots_keys, str):
             property_shots_keys = [property_shots_keys]
-        
+
         # Generate presigned URLs for each key
         property_shots_urls = []
         for key in property_shots_keys:
@@ -429,36 +448,25 @@ async def get_quote_request_detail(
                 logger.error(f"Failed to generate presigned URL for key {key}: {e}")
                 # Skip this image if URL generation fails
                 continue
-        
+
         # Replace keys with URLs in form_data
         form_data["propertyShots"] = property_shots_urls
 
     # Convert virtual walkthrough key to presigned URL
     if form_data.get("virtualWalkthrough"):
         from .upload import generate_presigned_url
-        video_key = form_data.get("virtualWalkthrough")
-        try:
-            video_url = generate_presigned_url(video_key, expiration=7200)  # 2 hours for video
-            form_data["virtualWalkthrough"] = video_url
-            logger.info(f"✅ Generated presigned URL for virtual walkthrough")
-        except Exception as e:
-            logger.error(f"Failed to generate presigned URL for virtual walkthrough {video_key}: {e}")
-            # Keep the key if URL generation fails
-            pass
-    
-    # Convert video walkthrough key to presigned URL
-    if form_data.get("virtualWalkthrough"):
-        from .upload import generate_presigned_url
+
         video_key = form_data.get("virtualWalkthrough")
         if isinstance(video_key, str):
             try:
-                video_url = generate_presigned_url(video_key, expiration=3600)  # 1 hour
+                video_url = generate_presigned_url(video_key, expiration=7200)  # 2 hours for video
                 form_data["virtualWalkthrough"] = video_url
-                logger.info(f"✅ Generated presigned URL for video walkthrough: {video_key}")
+                logger.info(f"✅ Generated presigned URL for virtual walkthrough: {video_key}")
             except Exception as e:
-                logger.error(f"Failed to generate presigned URL for video {video_key}: {e}")
+                logger.error(
+                    f"Failed to generate presigned URL for virtual walkthrough {video_key}: {e}"
+                )
                 # Keep the key if URL generation fails
-                pass
 
     return {
         "id": client.id,
@@ -472,8 +480,12 @@ async def get_quote_request_detail(
         "frequency": client.frequency,
         "status": client.status,
         "quote_status": client.quote_status,
-        "quote_submitted_at": client.quote_submitted_at.isoformat() if client.quote_submitted_at else None,
-        "quote_approved_at": client.quote_approved_at.isoformat() if client.quote_approved_at else None,
+        "quote_submitted_at": (
+            client.quote_submitted_at.isoformat() if client.quote_submitted_at else None
+        ),
+        "quote_approved_at": (
+            client.quote_approved_at.isoformat() if client.quote_approved_at else None
+        ),
         "quote_approved_by": client.quote_approved_by,
         "original_quote_amount": client.original_quote_amount,
         "adjusted_quote_amount": client.adjusted_quote_amount,
@@ -508,13 +520,10 @@ async def batch_delete_quote_requests(
     for client_id in data.quoteRequestIds:
         client = (
             db.query(Client)
-            .filter(
-                Client.id == client_id,
-                Client.user_id == current_user.id
-            )
+            .filter(Client.id == client_id, Client.user_id == current_user.id)
             .first()
         )
-        
+
         if client:
             # Delete the client (cascades to quote_history, contracts, schedules, etc.)
             db.delete(client)
@@ -967,7 +976,7 @@ async def get_quote_preview(
                 num_cleaners = config.cleaners_small_job or 1
                 if property_size > 2000:
                     num_cleaners = config.cleaners_large_job or 2
-                
+
                 # Generate explanation based on hourly rate mode
                 if config.hourly_rate_mode == "general":
                     # General hourly rate: Total = Hourly Rate × Job Duration
@@ -1240,20 +1249,29 @@ async def submit_public_form(
     if data.formData:
         try:
             from .contracts_pdf import calculate_quote
+
             # Get business config for quote calculation
             if user.business_config:
-                logger.info(f"📊 Calculating quote for {data.businessName} with formData keys: {list(data.formData.keys())}")
+                logger.info(
+                    f"📊 Calculating quote for {data.businessName} with formData keys: {list(data.formData.keys())}"
+                )
                 quote_result = calculate_quote(user.business_config, data.formData)
-                quote_amount = quote_result.get("final_price", 0)  # Use final_price from calculate_quote
+                quote_amount = quote_result.get(
+                    "final_price", 0
+                )  # Use final_price from calculate_quote
                 logger.info(f"💰 Quote calculation result: {quote_result}")
-                logger.info(f"💰 Final quote amount: ${quote_amount} for client {data.businessName}")
-                
+                logger.info(
+                    f"💰 Final quote amount: ${quote_amount} for client {data.businessName}"
+                )
+
                 # If quote is 0 or None, check if it's a quote_pending situation
                 if not quote_amount or quote_amount == 0:
                     if quote_result.get("quote_pending"):
                         logger.warning(f"⚠️ Quote is pending manual review for {data.businessName}")
                     else:
-                        logger.warning(f"⚠️ Quote amount is 0 but not marked as pending. Quote result: {quote_result}")
+                        logger.warning(
+                            f"⚠️ Quote amount is 0 but not marked as pending. Quote result: {quote_result}"
+                        )
             else:
                 logger.warning(f"⚠️ No business config found for user {user.id}")
         except Exception as e:
@@ -1277,7 +1295,9 @@ async def submit_public_form(
         status="pending_signature",  # Will change to "new_lead" after contract is signed
         quote_status=data.quoteStatus or "pending_review",  # Set quote status
         quote_submitted_at=func.now() if data.quoteAccepted else None,  # Track when client approved
-        original_quote_amount=quote_amount if quote_amount and quote_amount > 0 else None,  # Store original automated quote (None if 0 or not calculated)
+        original_quote_amount=(
+            quote_amount if quote_amount and quote_amount > 0 else None
+        ),  # Store original automated quote (None if 0 or not calculated)
     )
     db.add(client)
     db.commit()
@@ -1286,6 +1306,7 @@ async def submit_public_form(
     # Create quote history entry if quote was accepted
     if data.quoteAccepted and quote_amount:
         from ..models import QuoteHistory
+
         quote_history_entry = QuoteHistory(
             client_id=client.id,
             action="submitted",
@@ -1298,15 +1319,18 @@ async def submit_public_form(
 
     # Send emails if quote was accepted
     if data.quoteAccepted and data.email:
-        from ..email_service import send_quote_submitted_confirmation, send_quote_review_notification
-        
+        from ..email_service import (
+            send_quote_review_notification,
+            send_quote_submitted_confirmation,
+        )
+
         # Get business name from business_config
         business_name = (
-            user.business_config.business_name 
-            if user.business_config and user.business_config.business_name 
+            user.business_config.business_name
+            if user.business_config and user.business_config.business_name
             else "Service Provider"
         )
-        
+
         # Send confirmation email to client (background task)
         background_tasks.add_task(
             send_quote_submitted_confirmation,
@@ -1315,7 +1339,7 @@ async def submit_public_form(
             business_name=business_name,
             quote_amount=quote_amount or 0,
         )
-        
+
         # Send notification email to provider (background task)
         if user.email:
             background_tasks.add_task(
@@ -1567,6 +1591,8 @@ async def sign_contract(
     Rate limited to 10 per hour per IP.
     Uses UUID for secure access (prevents enumeration).
     """
+
+
 async def sign_contract(
     data: SignContractRequest,
     request: Request,
@@ -2242,7 +2268,6 @@ async def submit_client_schedule(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-
 # ============================================================================
 # QUOTE APPROVAL ENDPOINTS
 # ============================================================================
@@ -2250,11 +2275,13 @@ async def submit_client_schedule(
 
 class QuoteApprovalRequest(BaseModel):
     """Schema for provider approving a quote as-is"""
+
     notes: Optional[str] = None
 
 
 class QuoteAdjustmentRequest(BaseModel):
     """Schema for provider adjusting a quote"""
+
     adjusted_amount: float
     adjustment_notes: str
 
@@ -2279,10 +2306,7 @@ async def get_pending_review_clients(
     """
     clients = (
         db.query(Client)
-        .filter(
-            Client.user_id == current_user.id,
-            Client.quote_status == "pending_review"
-        )
+        .filter(Client.user_id == current_user.id, Client.quote_status == "pending_review")
         .order_by(Client.quote_submitted_at.desc())
         .all()
     )
@@ -2300,7 +2324,9 @@ async def get_pending_review_clients(
                 "property_size": client.property_size,
                 "frequency": client.frequency,
                 "original_quote_amount": client.original_quote_amount,
-                "quote_submitted_at": client.quote_submitted_at.isoformat() if client.quote_submitted_at else None,
+                "quote_submitted_at": (
+                    client.quote_submitted_at.isoformat() if client.quote_submitted_at else None
+                ),
                 "form_data": client.form_data,
             }
             for client in clients
@@ -2319,16 +2345,16 @@ async def get_quote_review_details(
     Get detailed quote information for provider review.
     Includes client details, form data, and quote history.
     """
-    client = db.query(Client).filter(
-        Client.id == client_id,
-        Client.user_id == current_user.id
-    ).first()
+    client = (
+        db.query(Client).filter(Client.id == client_id, Client.user_id == current_user.id).first()
+    )
 
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
 
     # Get quote history
     from ..models import QuoteHistory
+
     history = (
         db.query(QuoteHistory)
         .filter(QuoteHistory.client_id == client_id)
@@ -2352,8 +2378,12 @@ async def get_quote_review_details(
             "original_quote_amount": client.original_quote_amount,
             "adjusted_quote_amount": client.adjusted_quote_amount,
             "quote_adjustment_notes": client.quote_adjustment_notes,
-            "quote_submitted_at": client.quote_submitted_at.isoformat() if client.quote_submitted_at else None,
-            "quote_approved_at": client.quote_approved_at.isoformat() if client.quote_approved_at else None,
+            "quote_submitted_at": (
+                client.quote_submitted_at.isoformat() if client.quote_submitted_at else None
+            ),
+            "quote_approved_at": (
+                client.quote_approved_at.isoformat() if client.quote_approved_at else None
+            ),
             "form_data": client.form_data,
             "notes": client.notes,
             "created_at": client.created_at.isoformat(),
@@ -2384,10 +2414,9 @@ async def approve_quote(
     Provider approves the automated quote as-is.
     Updates quote status, sends approval email to client, and prepares for scheduling.
     """
-    client = db.query(Client).filter(
-        Client.id == client_id,
-        Client.user_id == current_user.id
-    ).first()
+    client = (
+        db.query(Client).filter(Client.id == client_id, Client.user_id == current_user.id).first()
+    )
 
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -2395,7 +2424,7 @@ async def approve_quote(
     if client.quote_status != "pending_review":
         raise HTTPException(
             status_code=400,
-            detail=f"Quote is not pending review (current status: {client.quote_status})"
+            detail=f"Quote is not pending review (current status: {client.quote_status})",
         )
 
     # Update client quote status
@@ -2405,6 +2434,7 @@ async def approve_quote(
 
     # Create quote history entry
     from ..models import QuoteHistory
+
     history_entry = QuoteHistory(
         client_id=client.id,
         action="approved",
@@ -2416,21 +2446,19 @@ async def approve_quote(
     db.commit()
     db.refresh(client)
 
-    logger.info(
-        f"✅ Quote approved for client {client.id} by provider {current_user.id}"
-    )
+    logger.info(f"✅ Quote approved for client {client.id} by provider {current_user.id}")
 
     # Send approval email to client
     if client.email:
         from ..email_service import send_quote_approved_email
-        
+
         # Get business name from business_config
         business_name = (
-            current_user.business_config.business_name 
-            if current_user.business_config and current_user.business_config.business_name 
+            current_user.business_config.business_name
+            if current_user.business_config and current_user.business_config.business_name
             else "Service Provider"
         )
-        
+
         background_tasks.add_task(
             send_quote_approved_email,
             to=client.email,
@@ -2463,10 +2491,9 @@ async def adjust_quote(
     Provider adjusts the automated quote with a new amount and explanation.
     Updates quote status, stores adjustment, sends email to client.
     """
-    client = db.query(Client).filter(
-        Client.id == client_id,
-        Client.user_id == current_user.id
-    ).first()
+    client = (
+        db.query(Client).filter(Client.id == client_id, Client.user_id == current_user.id).first()
+    )
 
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -2474,14 +2501,13 @@ async def adjust_quote(
     if client.quote_status != "pending_review":
         raise HTTPException(
             status_code=400,
-            detail=f"Quote is not pending review (current status: {client.quote_status})"
+            detail=f"Quote is not pending review (current status: {client.quote_status})",
         )
 
     # Validate adjustment notes
     if not data.adjustment_notes or len(data.adjustment_notes.strip()) < 10:
         raise HTTPException(
-            status_code=400,
-            detail="Adjustment notes must be at least 10 characters"
+            status_code=400, detail="Adjustment notes must be at least 10 characters"
         )
 
     # Update client with adjusted quote
@@ -2493,6 +2519,7 @@ async def adjust_quote(
 
     # Create quote history entry
     from ..models import QuoteHistory
+
     history_entry = QuoteHistory(
         client_id=client.id,
         action="adjusted",
@@ -2512,14 +2539,14 @@ async def adjust_quote(
     # Send adjustment email to client
     if client.email:
         from ..email_service import send_quote_approved_email
-        
+
         # Get business name from business_config
         business_name = (
-            current_user.business_config.business_name 
-            if current_user.business_config and current_user.business_config.business_name 
+            current_user.business_config.business_name
+            if current_user.business_config and current_user.business_config.business_name
             else "Service Provider"
         )
-        
+
         background_tasks.add_task(
             send_quote_approved_email,
             to=client.email,
@@ -2554,10 +2581,9 @@ async def reject_quote(
     Provider rejects the quote request.
     Updates status and optionally notifies client.
     """
-    client = db.query(Client).filter(
-        Client.id == client_id,
-        Client.user_id == current_user.id
-    ).first()
+    client = (
+        db.query(Client).filter(Client.id == client_id, Client.user_id == current_user.id).first()
+    )
 
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -2565,7 +2591,7 @@ async def reject_quote(
     if client.quote_status != "pending_review":
         raise HTTPException(
             status_code=400,
-            detail=f"Quote is not pending review (current status: {client.quote_status})"
+            detail=f"Quote is not pending review (current status: {client.quote_status})",
         )
 
     # Update client quote status
@@ -2577,6 +2603,7 @@ async def reject_quote(
 
     # Create quote history entry
     from ..models import QuoteHistory
+
     history_entry = QuoteHistory(
         client_id=client.id,
         action="rejected",
@@ -2588,9 +2615,7 @@ async def reject_quote(
     db.commit()
     db.refresh(client)
 
-    logger.info(
-        f"❌ Quote rejected for client {client.id} by provider {current_user.id}"
-    )
+    logger.info(f"❌ Quote rejected for client {client.id} by provider {current_user.id}")
 
     return {
         "message": "Quote rejected",

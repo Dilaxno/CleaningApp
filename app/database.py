@@ -41,11 +41,11 @@ except Exception as e:
 if ENABLE_QUERY_LOGGING:
 
     @event.listens_for(engine, "before_cursor_execute")
-    def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+    def before_cursor_execute(conn, _cursor, statement, _parameters, context, _executemany):
         conn.info.setdefault("query_start_time", []).append(time.time())
 
     @event.listens_for(engine, "after_cursor_execute")
-    def after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+    def after_cursor_execute(conn, _cursor, statement, _parameters, context, _executemany):
         total = time.time() - conn.info["query_start_time"].pop(-1)
         if total > SLOW_QUERY_THRESHOLD:
             # Log slow queries for optimization

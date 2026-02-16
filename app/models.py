@@ -300,7 +300,9 @@ class Client(Base):
     form_data = Column(JSON, nullable=True)  # Store structured form submission data
 
     # Quote approval workflow fields
-    quote_status = Column(String(50), default="pending_review")  # pending_review, approved, adjusted, rejected
+    quote_status = Column(
+        String(50), default="pending_review"
+    )  # pending_review, approved, adjusted, rejected
     quote_submitted_at = Column(DateTime, nullable=True)  # When client approved the automated quote
     quote_approved_at = Column(DateTime, nullable=True)  # When provider approved/adjusted
     quote_approved_by = Column(String(255), nullable=True)  # User ID who approved
@@ -333,11 +335,14 @@ class Client(Base):
     scheduling_proposals = relationship(
         "SchedulingProposal", back_populates="client", cascade="all, delete-orphan"
     )
-    quote_history = relationship("QuoteHistory", back_populates="client", cascade="all, delete-orphan")
+    quote_history = relationship(
+        "QuoteHistory", back_populates="client", cascade="all, delete-orphan"
+    )
 
 
 class QuoteHistory(Base):
     """Audit trail for quote approval workflow"""
+
     __tablename__ = "quote_history"
 
     id = Column(Integer, primary_key=True, index=True)

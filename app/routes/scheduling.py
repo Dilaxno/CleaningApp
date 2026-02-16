@@ -13,7 +13,7 @@ from ..email_service import (
     send_scheduling_counter_proposal_email,
     send_scheduling_proposal_email,
 )
-from ..models import Client, Contract, Schedule, SchedulingProposal, User, BusinessConfig
+from ..models import BusinessConfig, Client, Contract, Schedule, SchedulingProposal, User
 from ..utils.sanitization import sanitize_dict, sanitize_string
 
 logger = logging.getLogger(__name__)
@@ -385,7 +385,9 @@ async def create_client_booking(data: ClientBookingRequest, db: Session = Depend
                 schedule_id=schedule.id,
                 client_email=client.email,
                 client_phone=client.phone,
-                duration_minutes=data.duration_minutes if hasattr(data, 'duration_minutes') else None,
+                duration_minutes=(
+                    data.duration_minutes if hasattr(data, "duration_minutes") else None
+                ),
             )
     except Exception as e:
         logger.error(f"Failed to send pending booking notification: {e}")
@@ -503,9 +505,11 @@ async def create_scheduling_proposal(
     if client and client.email:
         try:
             # Get business name for client-facing email
-            config = db.query(BusinessConfig).filter(BusinessConfig.user_id == current_user.id).first()
+            config = (
+                db.query(BusinessConfig).filter(BusinessConfig.user_id == current_user.id).first()
+            )
             business_name = config.business_name if config else "Your Service Provider"
-            
+
             await send_scheduling_proposal_email(
                 client_email=client.email,
                 client_name=sanitize_string(client.contact_name or client.business_name),

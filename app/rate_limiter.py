@@ -7,7 +7,7 @@ import logging
 import os
 import time
 from threading import Lock
-from typing import Dict, Optional
+from typing import Optional
 
 import redis
 from fastapi import HTTPException, Request, status
@@ -19,7 +19,7 @@ redis_client: Optional[redis.Redis] = None
 
 # In-memory cache for rate limiting (dramatically reduces Redis usage)
 # Format: {key: {'count': int, 'reset_time': int, 'last_redis_sync': int}}
-memory_cache: dict[str, Dict] = {}
+memory_cache: dict[str, dict] = {}
 cache_lock = Lock()
 
 # Configuration

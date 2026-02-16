@@ -393,7 +393,6 @@ async def reset_monthly_client_limits_task(ctx):
                     before_count > 0 and user.clients_this_month == 0
                 ):
                     reset_count += 1
-                    pass
 
                 checked_count += 1
 

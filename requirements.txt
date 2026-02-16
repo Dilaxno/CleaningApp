@@ -28,12 +28,6 @@ zipcodes==1.2.0
 python-jose[cryptography]==3.3.0  # JWT token handling with cryptographic signing
 passlib[bcrypt]==1.7.4  # Password hashing with bcrypt
 slowapi==0.1.9  # Rate limiting middleware for FastAPI
-python-multipart==0.0.9  # Already included but needed for file upload security
-itsdangerous==2.2.0  # Secure token generation and validation
 bleach==6.1.0  # HTML sanitization to prevent XSS attacks
 pydantic[email]==2.9.2  # Email validation (already using pydantic)
-python-decouple==3.8  # Secure configuration management
-secure==0.3.0  # Security headers middleware
-argon2-cffi==23.1.0  # Modern password hashing (alternative to bcrypt)
-pyjwt==2.9.0  # JWT encoding/decoding
-python-magic==0.4.27  # File type validation by content (not just extension)
+

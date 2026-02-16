@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from ..auth import get_current_user
 from ..database import get_db
-from ..models import Client, Contract, Schedule, User, BusinessConfig
+from ..models import BusinessConfig, Client, Contract, Schedule, User
 
 logger = logging.getLogger(__name__)
 
@@ -489,9 +489,13 @@ async def approve_schedule(
         if client and client.email:
             try:
                 # Get business name for client-facing email
-                config = db.query(BusinessConfig).filter(BusinessConfig.user_id == current_user.id).first()
+                config = (
+                    db.query(BusinessConfig)
+                    .filter(BusinessConfig.user_id == current_user.id)
+                    .first()
+                )
                 business_name = config.business_name if config else current_user.email
-                
+
                 await email_service.send_appointment_confirmed_to_client(
                     client_email=client.email,
                     client_name=client.business_name or client.contact_name or "Client",
@@ -540,9 +544,13 @@ async def approve_schedule(
         if client and client.email:
             try:
                 # Get business name for client-facing email
-                config = db.query(BusinessConfig).filter(BusinessConfig.user_id == current_user.id).first()
+                config = (
+                    db.query(BusinessConfig)
+                    .filter(BusinessConfig.user_id == current_user.id)
+                    .first()
+                )
                 business_name = config.business_name if config else current_user.email
-                
+
                 await email_service.send_schedule_change_request(
                     client_email=client.email,
                     client_name=client.business_name or client.contact_name,

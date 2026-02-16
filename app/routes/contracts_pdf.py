@@ -144,12 +144,12 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
     elif pricing_model == "hourly" and config.hourly_rate:
         # Use new three-category time estimation system
         estimated_hours = calculate_estimated_hours(config, property_size)
-        
+
         # Determine number of cleaners based on property size
         num_cleaners = config.cleaners_small_job or 1
         if property_size > 2000:
             num_cleaners = config.cleaners_large_job or 2
-        
+
         # Calculate base price based on hourly rate mode
         if config.hourly_rate_mode == "general":
             # General hourly rate: Total = Hourly Rate × Job Duration (cleaner count doesn't multiply)
@@ -169,10 +169,10 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
         logger.info(
             f"📦 Package pricing - selectedPackage from formData: {selected_package_id}, available packages: {len(config.custom_packages) if config.custom_packages else 0}"
         )
-        
+
         # Log all formData keys for debugging
         logger.info(f"📦 FormData keys: {list(form_data.keys())}")
-        
+
         if not selected_package_id:
             logger.error("❌ No package selected for packages pricing model")
             # Return a quote_pending response instead of failing

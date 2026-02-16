@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
@@ -26,7 +26,7 @@ class BusinessConfigCreate(BaseModel):
     # White-label public form links
     customFormsDomain: Optional[str] = None  # e.g., forms.cleaningco.com
     # Service Areas
-    serviceAreas: Optional[list[Dict]] = None  # Service area configuration
+    serviceAreas: Optional[list[dict]] = None  # Service area configuration
     # Pricing
     pricingModel: Optional[str] = None
     meetingsRequired: Optional[bool] = None
@@ -35,9 +35,9 @@ class BusinessConfigCreate(BaseModel):
     workingDays: Optional[list[str]] = None
     workingHours: Optional[dict[str, str]] = None
     breakTimes: Optional[list[str]] = None
-    daySchedules: Optional[Dict] = None  # Per-day working hours
-    offWorkPeriods: Optional[list[Dict]] = None  # Off-work periods (vacations, holidays)
-    customAddons: Optional[list[Dict]] = None  # Custom add-on services
+    daySchedules: Optional[dict] = None  # Per-day working hours
+    offWorkPeriods: Optional[list[dict]] = None  # Off-work periods (vacations, holidays)
+    customAddons: Optional[list[dict]] = None  # Custom add-on services
     suppliesProvided: Optional[str] = None  # "provider" or "client"
     availableSupplies: Optional[list[str]] = None  # List of supply IDs
     ratePerSqft: Optional[str] = None
@@ -82,7 +82,7 @@ class BusinessConfigCreate(BaseModel):
     preferredUnits: Optional[str] = None
 
     # Custom packages for "packages" pricing model
-    customPackages: Optional[list[Dict]] = None
+    customPackages: Optional[list[dict]] = None
 
     # Active templates - list of template IDs that the business owner has selected to work with
     activeTemplates: Optional[list[str]] = None
@@ -881,9 +881,7 @@ def get_public_calendly_status(firebase_uid: str, request: Request, db: Session 
     from ..models import CalendlyIntegration
 
     calendly_integration = (
-        db.query(CalendlyIntegration)
-        .filter(CalendlyIntegration.user_id == user.id)
-        .first()
+        db.query(CalendlyIntegration).filter(CalendlyIntegration.user_id == user.id).first()
     )
 
     if not calendly_integration or not calendly_integration.default_event_type_url:

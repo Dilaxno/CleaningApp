@@ -34,7 +34,6 @@ from .routes.clients import router as clients_router
 from .routes.contract_revisions import router as contract_revisions_router
 from .routes.contracts import router as contracts_router
 from .routes.contracts_pdf import router as contracts_pdf_router
-
 from .routes.email import router as email_router
 from .routes.geocoding import router as geocoding_router
 from .routes.google_calendar import router as google_calendar_router

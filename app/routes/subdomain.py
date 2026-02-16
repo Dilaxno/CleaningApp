@@ -7,7 +7,7 @@ import logging
 import re
 import secrets
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Optional
 
 import dns.resolver
 from fastapi import APIRouter, Depends, HTTPException
@@ -27,7 +27,7 @@ class SubdomainSetupRequest(BaseModel):
     subdomain: str  # e.g., mail.preclean.com
 
     @validator("subdomain")
-    def validate_subdomain(cls, v):
+    def validate_subdomain(self, v):
         if not v:
             raise ValueError("Subdomain is required")
 
@@ -47,7 +47,7 @@ class SubdomainStatusResponse(BaseModel):
     configured: bool
     subdomain: Optional[str]
     verification_status: Optional[str]  # pending, verified, failed
-    dns_records: Optional[list[Dict]]
+    dns_records: Optional[list[dict]]
     verified_at: Optional[str]
     last_check_at: Optional[str]
     verification_token: Optional[str]
@@ -68,7 +68,7 @@ def generate_verification_token() -> str:
     return f"cleanenroll-verify-{secrets.token_urlsafe(32)}"
 
 
-def generate_dns_records(subdomain: str, verification_token: str) -> list[Dict]:
+def generate_dns_records(subdomain: str, verification_token: str) -> list[dict]:
     """
     Generate required DNS records for subdomain verification.
     Returns list of DNS records that user needs to configure.
@@ -141,7 +141,7 @@ def check_dns_record(
         return False
 
 
-def verify_subdomain_dns(subdomain: str, dns_records: list[Dict]) -> tuple[bool, list[Dict]]:
+def verify_subdomain_dns(subdomain: str, dns_records: list[dict]) -> tuple[bool, list[dict]]:
     """
     Verify all DNS records for a subdomain.
     Returns (all_verified, updated_records_with_status)

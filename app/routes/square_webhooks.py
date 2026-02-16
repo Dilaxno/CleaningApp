@@ -395,7 +395,7 @@ async def send_payment_confirmation_email(client: Client, contract: Contract, us
                         <td align="center">
                             <!-- Main Container -->
                             <table cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);">
-                                
+
                                 <!-- Header -->
                                 <tr>
                                     <td style="background: linear-gradient(135deg, #00C4B4 0%, #00A89A 100%); padding: 40px 30px; text-align: center;">

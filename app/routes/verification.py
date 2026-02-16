@@ -25,8 +25,6 @@ router = APIRouter(prefix="/verification", tags=["verification"])
 class SendOTPRequest(BaseModel):
     """Request to send OTP - no data needed, uses current user"""
 
-    pass
-
 
 class VerifyOTPRequest(BaseModel):
     """Request to verify OTP"""

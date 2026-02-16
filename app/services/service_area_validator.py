@@ -8,7 +8,7 @@ Uses zipcodes library for comprehensive US ZIP code data.
 
 import logging
 import re
-from typing import Dict, Optional
+from typing import Optional
 
 import zipcodes
 from sqlalchemy.orm import Session
@@ -194,7 +194,7 @@ class ServiceAreaValidator:
             logger.error(f"Error looking up ZIP code {zipcode}: {e}")
             return None
 
-    def _check_service_areas(self, zip_location: dict[str, str], service_areas: list[Dict]) -> bool:
+    def _check_service_areas(self, zip_location: dict[str, str], service_areas: list[dict]) -> bool:
         """
         Check if ZIP code location matches any configured service area.
 
@@ -230,7 +230,7 @@ class ServiceAreaValidator:
 
         return False
 
-    def get_service_areas_for_business(self, business_uid: str) -> list[Dict]:
+    def get_service_areas_for_business(self, business_uid: str) -> list[dict]:
         """Get configured service areas for a business."""
         try:
             user = self.db.query(User).filter(User.firebase_uid == business_uid).first()
@@ -244,7 +244,7 @@ class ServiceAreaValidator:
             return []
 
     def update_service_areas_for_business(
-        self, business_uid: str, service_areas: list[Dict]
+        self, business_uid: str, service_areas: list[dict]
     ) -> bool:
         """Update service areas for a business."""
         try:
@@ -270,7 +270,7 @@ class ServiceAreaValidator:
             self.db.rollback()
             return False
 
-    def _validate_service_area_format(self, area: Dict) -> bool:
+    def _validate_service_area_format(self, area: dict) -> bool:
         """Validate service area object format."""
         required_fields = ["type", "value", "name"]
 

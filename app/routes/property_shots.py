@@ -77,7 +77,7 @@ async def upload_video_walkthrough_public(
         raise HTTPException(status_code=400, detail="No file provided")
 
     content_type = (file.content_type or "").lower()
-    
+
     # Accept video MIME types
     allowed_video_types = {
         "video/mp4",
@@ -86,9 +86,11 @@ async def upload_video_walkthrough_public(
         "video/x-matroska",  # .mkv
         "video/webm",
     }
-    
+
     if not content_type.startswith("video/") and content_type not in allowed_video_types:
-        raise HTTPException(status_code=400, detail="Only video uploads are allowed (MP4, MOV, AVI, MKV, WebM)")
+        raise HTTPException(
+            status_code=400, detail="Only video uploads are allowed (MP4, MOV, AVI, MKV, WebM)"
+        )
 
     # Limit size (250MB default for videos)
     max_bytes = int(os.getenv("VIDEO_WALKTHROUGH_MAX_BYTES", "262144000"))  # 250MB
@@ -102,7 +104,7 @@ async def upload_video_walkthrough_public(
     ext = os.path.splitext(file.filename)[1].lower()
 
     allowed_exts = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
-    
+
     if not ext:
         guessed = mimetypes.guess_extension(content_type) or ".mp4"
         ext = (guessed or ".mp4").lower()
@@ -301,7 +303,6 @@ async def get_property_shot_signed_url(
         raise HTTPException(status_code=500, detail="Failed to generate signed URL") from e
 
 
-
 class VirtualWalkthroughUploadResponse(BaseModel):
     key: str
 
@@ -413,7 +414,9 @@ async def get_virtual_walkthrough_signed_url(
 ):
     """Authenticated endpoint for the business owner to get a signed URL for virtual walkthrough video."""
 
-    logger.info(f"🔍 Fetching signed URL for virtual walkthrough - client {payload.clientId}, key: {payload.key}")
+    logger.info(
+        f"🔍 Fetching signed URL for virtual walkthrough - client {payload.clientId}, key: {payload.key}"
+    )
 
     client = (
         db.query(Client)

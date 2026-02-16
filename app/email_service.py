@@ -417,7 +417,7 @@ BASE_TEMPLATE = """
 
         <!-- Main Content -->
         <h1>{{ title }}</h1>
-        
+
         {% if intro %}
         <p style="color: #64748b; margin-bottom: 24px;">{{ intro }}</p>
         {% endif %}
@@ -1051,7 +1051,7 @@ async def send_provider_contract_signed_confirmation(
     """
     return await send_email(
         to=to,
-        subject=f"You've Signed Contract - Client Notification Sent",
+        subject="You've Signed Contract - Client Notification Sent",
         title="Contract Signed Successfully",
         intro="The contract has been fully executed.",
         content_html=content,
@@ -1877,16 +1877,16 @@ async def send_quote_submitted_confirmation(
         <div style="background: linear-gradient(135deg, #14b8a6 0%, #059669 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
             <h1 style="color: white; margin: 0; font-size: 28px;">Quote Submitted!</h1>
         </div>
-        
+
         <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px;">
             <p style="font-size: 16px; color: #374151; margin-bottom: 20px;">
                 Hi {client_name},
             </p>
-            
+
             <p style="font-size: 16px; color: #374151; line-height: 1.6; margin-bottom: 20px;">
                 Thank you for submitting your quote request! We've received your approval and {business_name} will review it shortly.
             </p>
-            
+
             <div style="background: white; border: 2px solid #14b8a6; border-radius: 8px; padding: 20px; margin: 25px 0;">
                 <h3 style="color: #059669; margin-top: 0; font-size: 18px;">Estimated Quote</h3>
                 <p style="font-size: 32px; font-weight: bold; color: #1f2937; margin: 10px 0;">
@@ -1896,7 +1896,7 @@ async def send_quote_submitted_confirmation(
                     This is an automated estimate. Final pricing will be confirmed by {business_name}.
                 </p>
             </div>
-            
+
             <div style="background: #ccfbf1; border-left: 4px solid #14b8a6; padding: 15px; margin: 25px 0; border-radius: 4px;">
                 <h4 style="color: #0d9488; margin-top: 0; font-size: 16px;">What happens next?</h4>
                 <ol style="color: #0f766e; margin: 10px 0; padding-left: 20px; line-height: 1.8;">
@@ -1906,17 +1906,17 @@ async def send_quote_submitted_confirmation(
                     <li>The email will include a button to schedule your first cleaning</li>
                 </ol>
             </div>
-            
+
             <p style="font-size: 14px; color: #6b7280; margin-top: 25px;">
                 <strong>Expected response time:</strong> Within 24-48 hours
             </p>
-            
+
             <p style="font-size: 14px; color: #6b7280; margin-top: 20px;">
                 Questions? Contact {business_name} directly for assistance.
             </p>
-            
+
             <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
-            
+
             <p style="font-size: 12px; color: #9ca3af; text-align: center; margin: 0;">
                 This is an automated message from {business_name}
             </p>
@@ -1945,22 +1945,22 @@ async def send_quote_review_notification(
     """Send notification email to provider when client approves a quote"""
     # Generate review link - goes to quote requests detail page
     review_link = f"{FRONTEND_URL}/dashboard/quote-requests/{client_public_id}"
-    
+
     content = f"""
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
             <h1 style="color: white; margin: 0; font-size: 28px;">New Quote Approval Request</h1>
         </div>
-        
+
         <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px;">
             <p style="font-size: 16px; color: #374151; margin-bottom: 20px;">
                 Hi {provider_name},
             </p>
-            
+
             <p style="font-size: 16px; color: #374151; line-height: 1.6; margin-bottom: 20px;">
                 <strong>{client_name}</strong> has approved an automated quote and is waiting for your review.
             </p>
-            
+
             <div style="background: white; border: 2px solid #14b8a6; border-radius: 8px; padding: 20px; margin: 25px 0;">
                 <h3 style="color: #0d9488; margin-top: 0; font-size: 18px;">Client Details</h3>
                 <table style="width: 100%; border-collapse: collapse;">
@@ -1978,26 +1978,26 @@ async def send_quote_review_notification(
                     </tr>
                 </table>
             </div>
-            
+
             <div style="background: #f1f5f9; border-left: 4px solid #14b8a6; padding: 15px; margin: 25px 0; border-radius: 4px;">
                 <p style="color: #475569; margin: 0; font-size: 14px; line-height: 1.6;">
                     <strong>Action Required:</strong> Please review this quote and either approve it as-is or make adjustments based on the client's specific requirements.
                 </p>
             </div>
-            
+
             <div style="text-align: center; margin: 30px 0;">
-                <a href="{review_link}" 
+                <a href="{review_link}"
                    style="display: inline-block; background: #14b8a6; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                     Review & Approve Quote
                 </a>
             </div>
-            
+
             <p style="font-size: 14px; color: #64748b; margin-top: 25px;">
                 <strong>Recommended response time:</strong> Within 24-48 hours
             </p>
-            
+
             <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
-            
+
             <p style="font-size: 12px; color: #9ca3af; text-align: center; margin: 0;">
                 This is an automated notification from CleanEnroll
             </p>
@@ -2025,7 +2025,7 @@ async def send_quote_approved_email(
     """Send email to client when provider approves their quote"""
     # Generate scheduling link - goes to client schedule page which will handle contract generation
     schedule_link = f"{os.getenv('FRONTEND_URL', 'https://app.cleanenroll.com')}/client-schedule/{client_public_id}"
-    
+
     adjustment_section = ""
     if was_adjusted and adjustment_notes:
         adjustment_section = f"""
@@ -2036,22 +2036,22 @@ async def send_quote_approved_email(
             </p>
         </div>
         """
-    
+
     content = f"""
     <p>Hi {client_name},</p>
     <p>Great news! {business_name} has reviewed and approved your quote. You're ready to schedule your first cleaning.</p>
-    
+
     <div class="highlight">
         <p style="color: #64748b; font-size: 14px; margin: 0 0 8px 0; font-weight: 600;">Final Approved Quote</p>
         <div class="highlight-value">
             ${final_quote_amount:,.2f}
         </div>
     </div>
-    
+
     {adjustment_section}
-    
+
     <p style="margin-top: 24px;">Click the button below to choose your preferred date and time, review the service agreement, and complete your booking.</p>
-    
+
     <p style="color: #64748b; font-size: 14px; margin-top: 32px;">
         Questions? Contact {business_name} directly for assistance.
     </p>

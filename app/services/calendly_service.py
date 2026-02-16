@@ -1,7 +1,7 @@
 import logging
 import os
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 import httpx
 
@@ -223,7 +223,7 @@ class CalendlyService:
                 raise
 
     def generate_scheduling_link(
-        self, event_type_url: str, prefill_data: Optional[Dict] = None
+        self, event_type_url: str, prefill_data: Optional[dict] = None
     ) -> str:
         """
         Generate a scheduling link with prefilled data

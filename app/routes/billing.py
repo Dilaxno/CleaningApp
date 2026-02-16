@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Dict, Optional
+from typing import Optional
 
 # Prefer Async client for FastAPI per official docs
 # Reference: https://github.com/dodopayments/dodo-docs/blob/main/developer-resources/fastapi-boilerplate.mdx
@@ -520,7 +520,7 @@ async def change_subscription_plan(
 
 class PaymentMethodResponse(BaseModel):
     dodo_customer_id: Optional[str] = None
-    payment_method: Optional[Dict] = (
+    payment_method: Optional[dict] = (
         None  # {"id","type","brand","last4","exp_month","exp_year","is_default"}
     )
 
