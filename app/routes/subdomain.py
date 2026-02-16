@@ -27,7 +27,8 @@ class SubdomainSetupRequest(BaseModel):
     subdomain: str  # e.g., mail.preclean.com
 
     @validator("subdomain")
-    def validate_subdomain(self, v):
+    @classmethod
+    def validate_subdomain(cls, v):
         if not v:
             raise ValueError("Subdomain is required")
 
