@@ -4,7 +4,6 @@ Allows users to connect their own subdomains for automated email sending
 """
 
 import logging
-import re
 import secrets
 from datetime import datetime
 from typing import Optional
@@ -17,6 +16,7 @@ from sqlalchemy.orm import Session
 from ..auth import get_current_user
 from ..database import get_db
 from ..models import BusinessConfig, User
+from ..shared.validators import validate_subdomain as validate_subdomain_format
 
 logger = logging.getLogger(__name__)
 
@@ -29,19 +29,7 @@ class SubdomainSetupRequest(BaseModel):
     @validator("subdomain")
     @classmethod
     def validate_subdomain(cls, v):
-        if not v:
-            raise ValueError("Subdomain is required")
-
-        # Basic domain validation
-        domain_pattern = r"^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$"
-        if not re.match(domain_pattern, v):
-            raise ValueError("Invalid subdomain format")
-
-        # Must be a subdomain (contain at least one dot)
-        if "." not in v:
-            raise ValueError("Must be a subdomain (e.g., mail.yourdomain.com)")
-
-        return v.lower().strip()
+        return validate_subdomain_format(v)
 
 
 class SubdomainStatusResponse(BaseModel):

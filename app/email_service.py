@@ -272,10 +272,9 @@ BASE_TEMPLATE = """
     <meta name="x-apple-disable-message-reformatting" />
     <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
     <title>{{ subject }}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <style>
       body, table, td, a, h1, h2, h3, p, strong, em, span, div {
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
       }
@@ -823,7 +822,7 @@ async def send_form_submission_confirmation(
     return await send_email(
         to=to,
         subject=f"Thank You for Your {property_type} Cleaning Intake, {client_name}",
-        title=f"Thank You for Your {property_type} Cleaning Intake, {client_name}",
+        title=f"Thank You for Your {property_type} Cleaning Intake",
         content_html=content,
     )
 
@@ -1873,55 +1872,47 @@ async def send_quote_submitted_confirmation(
 ) -> dict:
     """Send confirmation email to client after they approve the automated quote"""
     content = f"""
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background: linear-gradient(135deg, #14b8a6 0%, #059669 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
-            <h1 style="color: white; margin: 0; font-size: 28px;">Quote Submitted!</h1>
-        </div>
+    <p style="font-size: 16px; color: #374151; margin-bottom: 20px;">
+        Hi {client_name},
+    </p>
 
-        <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px;">
-            <p style="font-size: 16px; color: #374151; margin-bottom: 20px;">
-                Hi {client_name},
-            </p>
+    <p style="font-size: 16px; color: #374151; line-height: 1.6; margin-bottom: 20px;">
+        Thank you for submitting your quote request! We've received your approval and {business_name} will review it shortly.
+    </p>
 
-            <p style="font-size: 16px; color: #374151; line-height: 1.6; margin-bottom: 20px;">
-                Thank you for submitting your quote request! We've received your approval and {business_name} will review it shortly.
-            </p>
-
-            <div style="background: white; border: 2px solid #14b8a6; border-radius: 8px; padding: 20px; margin: 25px 0;">
-                <h3 style="color: #059669; margin-top: 0; font-size: 18px;">Estimated Quote</h3>
-                <p style="font-size: 32px; font-weight: bold; color: #1f2937; margin: 10px 0;">
-                    ${quote_amount:,.2f}
-                </p>
-                <p style="font-size: 14px; color: #6b7280; margin: 0;">
-                    This is an automated estimate. Final pricing will be confirmed by {business_name}.
-                </p>
-            </div>
-
-            <div style="background: #ccfbf1; border-left: 4px solid #14b8a6; padding: 15px; margin: 25px 0; border-radius: 4px;">
-                <h4 style="color: #0d9488; margin-top: 0; font-size: 16px;">What happens next?</h4>
-                <ol style="color: #0f766e; margin: 10px 0; padding-left: 20px; line-height: 1.8;">
-                    <li>{business_name} will review your quote and service requirements</li>
-                    <li>They may approve it as-is or make adjustments based on your specific needs</li>
-                    <li>You'll receive an email with the final approved quote</li>
-                    <li>The email will include a button to schedule your first cleaning</li>
-                </ol>
-            </div>
-
-            <p style="font-size: 14px; color: #6b7280; margin-top: 25px;">
-                <strong>Expected response time:</strong> Within 24-48 hours
-            </p>
-
-            <p style="font-size: 14px; color: #6b7280; margin-top: 20px;">
-                Questions? Contact {business_name} directly for assistance.
-            </p>
-
-            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
-
-            <p style="font-size: 12px; color: #9ca3af; text-align: center; margin: 0;">
-                This is an automated message from {business_name}
-            </p>
-        </div>
+    <div style="background: white; border: 2px solid #14b8a6; border-radius: 8px; padding: 20px; margin: 25px 0;">
+        <h3 style="color: #059669; margin-top: 0; font-size: 18px;">Estimated Quote</h3>
+        <p style="font-size: 32px; font-weight: bold; color: #1f2937; margin: 10px 0;">
+            ${quote_amount:,.2f}
+        </p>
+        <p style="font-size: 14px; color: #6b7280; margin: 0;">
+            This is an automated estimate. Final pricing will be confirmed by {business_name}.
+        </p>
     </div>
+
+    <div style="background: #ccfbf1; border-left: 4px solid #14b8a6; padding: 15px; margin: 25px 0; border-radius: 4px;">
+        <h4 style="color: #0d9488; margin-top: 0; font-size: 16px;">What happens next?</h4>
+        <ol style="color: #0f766e; margin: 10px 0; padding-left: 20px; line-height: 1.8;">
+            <li>{business_name} will review your quote and service requirements</li>
+            <li>They may approve it as-is or make adjustments based on your specific needs</li>
+            <li>You'll receive an email with the final approved quote</li>
+            <li>The email will include a button to schedule your first cleaning</li>
+        </ol>
+    </div>
+
+    <p style="font-size: 14px; color: #6b7280; margin-top: 25px;">
+        <strong>Expected response time:</strong> Within 24-48 hours
+    </p>
+
+    <p style="font-size: 14px; color: #6b7280; margin-top: 20px;">
+        Questions? Contact {business_name} directly for assistance.
+    </p>
+
+    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+
+    <p style="font-size: 12px; color: #9ca3af; text-align: center; margin: 0;">
+        This is an automated message from {business_name}
+    </p>
     """
 
     return await send_email(
@@ -1947,62 +1938,47 @@ async def send_quote_review_notification(
     review_link = f"{FRONTEND_URL}/dashboard/quote-requests/{client_public_id}"
 
     content = f"""
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
-            <h1 style="color: white; margin: 0; font-size: 28px;">New Quote Approval Request</h1>
-        </div>
+    <p style="font-size: 16px; color: #374151; margin-bottom: 20px;">
+        Hi {provider_name},
+    </p>
 
-        <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px;">
-            <p style="font-size: 16px; color: #374151; margin-bottom: 20px;">
-                Hi {provider_name},
-            </p>
+    <p style="font-size: 16px; color: #374151; line-height: 1.6; margin-bottom: 20px;">
+        <strong>{client_name}</strong> has approved an automated quote and is waiting for your review.
+    </p>
 
-            <p style="font-size: 16px; color: #374151; line-height: 1.6; margin-bottom: 20px;">
-                <strong>{client_name}</strong> has approved an automated quote and is waiting for your review.
-            </p>
-
-            <div style="background: white; border: 2px solid #14b8a6; border-radius: 8px; padding: 20px; margin: 25px 0;">
-                <h3 style="color: #0d9488; margin-top: 0; font-size: 18px;">Client Details</h3>
-                <table style="width: 100%; border-collapse: collapse;">
-                    <tr>
-                        <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Name:</td>
-                        <td style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600;">{client_name}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Email:</td>
-                        <td style="padding: 8px 0; color: #1f2937; font-size: 14px;">{client_email}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Automated Quote:</td>
-                        <td style="padding: 8px 0; color: #1f2937; font-size: 18px; font-weight: bold;">${quote_amount:,.2f}</td>
-                    </tr>
-                </table>
-            </div>
-
-            <div style="background: #f1f5f9; border-left: 4px solid #14b8a6; padding: 15px; margin: 25px 0; border-radius: 4px;">
-                <p style="color: #475569; margin: 0; font-size: 14px; line-height: 1.6;">
-                    <strong>Action Required:</strong> Please review this quote and either approve it as-is or make adjustments based on the client's specific requirements.
-                </p>
-            </div>
-
-            <div style="text-align: center; margin: 30px 0;">
-                <a href="{review_link}"
-                   style="display: inline-block; background: #14b8a6; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                    Review & Approve Quote
-                </a>
-            </div>
-
-            <p style="font-size: 14px; color: #64748b; margin-top: 25px;">
-                <strong>Recommended response time:</strong> Within 24-48 hours
-            </p>
-
-            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
-
-            <p style="font-size: 12px; color: #9ca3af; text-align: center; margin: 0;">
-                This is an automated notification from CleanEnroll
-            </p>
-        </div>
+    <div style="background: white; border: 2px solid #14b8a6; border-radius: 8px; padding: 20px; margin: 25px 0;">
+        <h3 style="color: #0d9488; margin-top: 0; font-size: 18px;">Client Details</h3>
+        <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+                <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Name:</td>
+                <td style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600;">{client_name}</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Email:</td>
+                <td style="padding: 8px 0; color: #1f2937; font-size: 14px;">{client_email}</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Automated Quote:</td>
+                <td style="padding: 8px 0; color: #1f2937; font-size: 18px; font-weight: bold;">${quote_amount:,.2f}</td>
+            </tr>
+        </table>
     </div>
+
+    <div style="background: #f1f5f9; border-left: 4px solid #14b8a6; padding: 15px; margin: 25px 0; border-radius: 4px;">
+        <p style="color: #475569; margin: 0; font-size: 14px; line-height: 1.6;">
+            <strong>Action Required:</strong> Please review this quote and either approve it as-is or make adjustments based on the client's specific requirements.
+        </p>
+    </div>
+
+    <p style="font-size: 14px; color: #64748b; margin-top: 25px;">
+        <strong>Recommended response time:</strong> Within 24-48 hours
+    </p>
+
+    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+
+    <p style="font-size: 12px; color: #9ca3af; text-align: center; margin: 0;">
+        This is an automated notification from CleanEnroll
+    </p>
     """
 
     return await send_email(
@@ -2010,6 +1986,8 @@ async def send_quote_review_notification(
         subject=f"New Quote Approval Request from {client_name}",
         title="New Quote Approval Request",
         content_html=content,
+        cta_url=review_link,
+        cta_label="Review & Approve Quote",
     )
 
 

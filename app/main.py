@@ -21,18 +21,17 @@ from . import (
 from .csrf import CSRF_COOKIE_NAME, CSRFMiddleware, generate_csrf_token
 from .database import Base, engine, get_db
 from .routes import auth_router
-from .routes.billing import (
-    router as billing_router,
-)
-from .routes.billing import (
-    webhooks_router as dodopayments_webhooks_router,
-)
+# NEW: Use domain-driven billing router
+from .domain.billing import router as billing_router
+from .domain.billing import webhooks_router as dodopayments_webhooks_router
 from .routes.business import router as business_router
 from .routes.calendly import router as calendly_router
 from .routes.calendly_webhooks import router as calendly_webhooks_router
 from .routes.clients import router as clients_router
 from .routes.contract_revisions import router as contract_revisions_router
-from .routes.contracts import router as contracts_router
+# NEW: Use domain-driven contracts router for CRUD operations
+from .domain.contracts import router as contracts_router
+# Keep original contracts_pdf router for PDF generation (will be integrated later)
 from .routes.contracts_pdf import router as contracts_pdf_router
 from .routes.email import router as email_router
 from .routes.geocoding import router as geocoding_router
