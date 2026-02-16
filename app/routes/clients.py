@@ -433,6 +433,33 @@ async def get_quote_request_detail(
         # Replace keys with URLs in form_data
         form_data["propertyShots"] = property_shots_urls
 
+    # Convert virtual walkthrough key to presigned URL
+    if form_data.get("virtualWalkthrough"):
+        from .upload import generate_presigned_url
+        video_key = form_data.get("virtualWalkthrough")
+        try:
+            video_url = generate_presigned_url(video_key, expiration=7200)  # 2 hours for video
+            form_data["virtualWalkthrough"] = video_url
+            logger.info(f"✅ Generated presigned URL for virtual walkthrough")
+        except Exception as e:
+            logger.error(f"Failed to generate presigned URL for virtual walkthrough {video_key}: {e}")
+            # Keep the key if URL generation fails
+            pass
+    
+    # Convert video walkthrough key to presigned URL
+    if form_data.get("virtualWalkthrough"):
+        from .upload import generate_presigned_url
+        video_key = form_data.get("virtualWalkthrough")
+        if isinstance(video_key, str):
+            try:
+                video_url = generate_presigned_url(video_key, expiration=3600)  # 1 hour
+                form_data["virtualWalkthrough"] = video_url
+                logger.info(f"✅ Generated presigned URL for video walkthrough: {video_key}")
+            except Exception as e:
+                logger.error(f"Failed to generate presigned URL for video {video_key}: {e}")
+                # Keep the key if URL generation fails
+                pass
+
     return {
         "id": client.id,
         "public_id": client.public_id,
