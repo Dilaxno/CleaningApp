@@ -411,6 +411,28 @@ async def get_quote_request_detail(
             "created_at": entry.created_at.isoformat() if entry.created_at else None,
         })
 
+    # Convert property shot keys to presigned URLs
+    form_data = client.form_data or {}
+    if form_data.get("propertyShots"):
+        from .upload import generate_presigned_url
+        property_shots_keys = form_data.get("propertyShots", [])
+        if isinstance(property_shots_keys, str):
+            property_shots_keys = [property_shots_keys]
+        
+        # Generate presigned URLs for each key
+        property_shots_urls = []
+        for key in property_shots_keys:
+            try:
+                url = generate_presigned_url(key, expiration=3600)  # 1 hour
+                property_shots_urls.append(url)
+            except Exception as e:
+                logger.error(f"Failed to generate presigned URL for key {key}: {e}")
+                # Skip this image if URL generation fails
+                continue
+        
+        # Replace keys with URLs in form_data
+        form_data["propertyShots"] = property_shots_urls
+
     return {
         "id": client.id,
         "public_id": client.public_id,
@@ -429,7 +451,7 @@ async def get_quote_request_detail(
         "original_quote_amount": client.original_quote_amount,
         "adjusted_quote_amount": client.adjusted_quote_amount,
         "quote_adjustment_notes": client.quote_adjustment_notes,
-        "form_data": client.form_data,
+        "form_data": form_data,
         "notes": client.notes,
         "created_at": client.created_at.isoformat() if client.created_at else None,
         "updated_at": client.updated_at.isoformat() if client.updated_at else None,
