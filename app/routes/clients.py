@@ -1188,17 +1188,28 @@ async def submit_public_form(
 
     # Calculate quote amount if formData is provided
     quote_amount = None
-    if data.formData and data.quoteAccepted:
+    if data.formData:
         try:
             from .contracts_pdf import calculate_quote
             # Get business config for quote calculation
             if user.business_config:
+                logger.info(f"📊 Calculating quote for {data.businessName} with formData keys: {list(data.formData.keys())}")
                 quote_result = calculate_quote(user.business_config, data.formData)
-                quote_amount = quote_result.get("finalPrice", 0)
+                quote_amount = quote_result.get("final_price", 0)  # Use final_price from calculate_quote
+                logger.info(f"💰 Quote calculation result: {quote_result}")
+                logger.info(f"💰 Final quote amount: ${quote_amount} for client {data.businessName}")
+                
+                # If quote is 0 or None, check if it's a quote_pending situation
+                if not quote_amount or quote_amount == 0:
+                    if quote_result.get("quote_pending"):
+                        logger.warning(f"⚠️ Quote is pending manual review for {data.businessName}")
+                    else:
+                        logger.warning(f"⚠️ Quote amount is 0 but not marked as pending. Quote result: {quote_result}")
             else:
                 logger.warning(f"⚠️ No business config found for user {user.id}")
         except Exception as e:
-            logger.warning(f"⚠️ Failed to calculate quote amount: {e}")
+            logger.error(f"❌ Failed to calculate quote amount: {e}")
+            logger.exception(e)
 
     # Create the client associated with the business owner
     # Status is "pending_signature" until client signs the contract
@@ -1217,7 +1228,7 @@ async def submit_public_form(
         status="pending_signature",  # Will change to "new_lead" after contract is signed
         quote_status=data.quoteStatus or "pending_review",  # Set quote status
         quote_submitted_at=func.now() if data.quoteAccepted else None,  # Track when client approved
-        original_quote_amount=quote_amount,  # Store original automated quote
+        original_quote_amount=quote_amount if quote_amount and quote_amount > 0 else None,  # Store original automated quote (None if 0 or not calculated)
     )
     db.add(client)
     db.commit()
