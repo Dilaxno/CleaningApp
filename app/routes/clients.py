@@ -437,6 +437,50 @@ async def get_quote_request_detail(
     }
 
 
+class BatchDeleteQuoteRequestsRequest(BaseModel):
+    quoteRequestIds: list[int]
+
+
+@router.post("/quote-requests/batch-delete")
+async def batch_delete_quote_requests(
+    data: BatchDeleteQuoteRequestsRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Batch delete multiple quote requests (clients with quote_status).
+    Only deletes clients that belong to the current user.
+    """
+    if not data.quoteRequestIds:
+        raise HTTPException(status_code=400, detail="No quote request IDs provided")
+
+    deleted_count = 0
+
+    for client_id in data.quoteRequestIds:
+        client = (
+            db.query(Client)
+            .filter(
+                Client.id == client_id,
+                Client.user_id == current_user.id
+            )
+            .first()
+        )
+        
+        if client:
+            # Delete the client (cascades to quote_history, contracts, schedules, etc.)
+            db.delete(client)
+            deleted_count += 1
+
+    db.commit()
+
+    logger.info(f"✅ User {current_user.id} deleted {deleted_count} quote requests")
+
+    return {
+        "message": f"Successfully deleted {deleted_count} quote request(s)",
+        "deletedCount": deleted_count,
+    }
+
+
 @router.get("/{client_id}", response_model=ClientResponse)
 async def get_client(
     client_id: int,
