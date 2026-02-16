@@ -5,6 +5,7 @@ Provides a consistent email template for all automated emails
 
 import io
 import logging
+import os
 import smtplib
 import ssl
 import zipfile
@@ -206,25 +207,25 @@ async def create_property_shots_zip(
         return None
 
 
-# App theme colors - Modern, professional palette
+# App theme colors - Teal/Slate color scheme
 THEME = {
-    "primary": "#00C4B4",  # Teal - primary brand color
-    "primary_dark": "#00A89A",  # Darker teal for hover
-    "primary_light": "#E6FAF8",  # Light teal background
-    "background": "#F8FAFC",  # Soft gray background
-    "card_bg": "#FFFFFF",  # White card background
-    "text_primary": "#0F172A",  # Rich dark text
+    "primary": "#14b8a6",  # Teal - primary brand color
+    "primary_dark": "#0d9488",  # Darker teal for hover
+    "primary_light": "#ccfbf1",  # Light teal background
+    "background": "#f8fafc",  # Soft gray background
+    "card_bg": "#ffffff",  # White card background
+    "text_primary": "#0f172a",  # Rich dark text
     "text_secondary": "#334155",  # Secondary text
-    "text_muted": "#64748B",  # Muted gray text
-    "border": "#E2E8F0",  # Light border
-    "border_dark": "#CBD5E1",  # Darker border
-    "success": "#10B981",  # Modern green
-    "success_light": "#D1FAE5",  # Light green background
-    "warning": "#F59E0B",  # Amber
-    "warning_light": "#FEF3C7",  # Light amber background
-    "danger": "#EF4444",  # Red
-    "info": "#3B82F6",  # Blue
-    "info_light": "#DBEAFE",  # Light blue background
+    "text_muted": "#64748b",  # Muted gray text (slate)
+    "border": "#e2e8f0",  # Light border
+    "border_dark": "#cbd5e1",  # Darker border
+    "success": "#14b8a6",  # Teal for success
+    "success_light": "#ccfbf1",  # Light teal background
+    "warning": "#f59e0b",  # Amber for warnings
+    "warning_light": "#fef3c7",  # Light amber background
+    "danger": "#ef4444",  # Red for errors
+    "info": "#14b8a6",  # Teal for info
+    "info_light": "#ccfbf1",  # Light teal background
 }
 
 LOGO_URL = "https://cleanenroll.com/CleaningAPP%20logo%20black%20new.png"
@@ -235,7 +236,7 @@ ICONS = {
     "clock": """<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>""",
     "location": """<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="9" r="2.5" stroke="currentColor" stroke-width="2"/></svg>""",
     "user": """<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="2"/><path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>""",
-    "check": """<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="#22c55e"/><path d="M8 12l3 3 5-6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>""",
+    "check": """<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="#14b8a6"/><path d="M8 12l3 3 5-6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>""",
     "money": """<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="6" width="20" height="12" rx="2" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/><path d="M18 10v4M6 10v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>""",
     "document": """<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>""",
     "video": """<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="6" width="14" height="12" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 10l6-3v10l-6-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>""",
@@ -260,7 +261,7 @@ def icon(name: str, color: str = "currentColor", size: int = 20) -> str:
     )
 
 
-# Base HTML email template - Modern Akkio-style with clean top bar
+# Base HTML email template - Clean, minimal design inspired by modern SaaS emails
 BASE_TEMPLATE = """
 <!doctype html>
 <html lang="en" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
@@ -284,6 +285,7 @@ BASE_TEMPLATE = """
         -ms-text-size-adjust: 100%;
         margin: 0;
         padding: 0;
+        background: #f8fafc;
       }
       img {
         max-width: 100%;
@@ -304,147 +306,145 @@ BASE_TEMPLATE = """
         margin: 0 auto;
         width: 100%;
       }
-      .top-bar {
-        height: 4px;
-        background: {{ theme.primary }};
-        width: 100%;
-      }
-      .card {
-        background: {{ theme.card_bg }};
+      .content {
+        background: #ffffff;
+        padding: 48px 40px;
         border-radius: 8px;
-        padding: 40px;
-        border: 1px solid {{ theme.border }};
-        margin-top: 32px;
+        margin: 40px 20px;
       }
-      .muted { color: {{ theme.text_muted }}; }
+      .header {
+        text-align: center;
+        padding-bottom: 32px;
+        border-bottom: 1px solid #e2e8f0;
+        margin-bottom: 32px;
+      }
+      .logo {
+        max-width: 140px;
+        height: auto;
+      }
+      h1 {
+        font-size: 24px;
+        font-weight: 600;
+        color: #0f172a;
+        margin: 0 0 16px 0;
+        line-height: 1.3;
+        letter-spacing: -0.02em;
+      }
+      p {
+        font-size: 16px;
+        line-height: 1.6;
+        color: #475569;
+        margin: 0 0 16px 0;
+      }
+      .highlight {
+        background: #f1f5f9;
+        border-radius: 8px;
+        padding: 24px;
+        margin: 24px 0;
+        text-align: center;
+      }
+      .highlight-value {
+        font-size: 36px;
+        font-weight: 700;
+        color: #0f172a;
+        margin: 8px 0;
+        letter-spacing: -0.02em;
+      }
       .btn {
         display: inline-block;
-        background: {{ theme.primary }};
+        background: #14b8a6;
         color: #ffffff !important;
-        padding: 12px 32px;
+        padding: 14px 32px;
         border-radius: 6px;
         text-decoration: none;
         font-weight: 600;
-        font-size: 15px;
+        font-size: 16px;
         line-height: 1.5;
         text-align: center;
+        margin: 24px 0;
       }
       .btn:hover {
-        background: {{ theme.primary_dark }};
-        opacity: 0.9;
+        background: #0d9488;
+      }
+      .footer {
+        text-align: center;
+        padding: 32px 20px;
+        color: #94a3b8;
+        font-size: 14px;
+      }
+      .footer a {
+        color: #64748b;
+        text-decoration: none;
+      }
+      .divider {
+        border: none;
+        border-top: 1px solid #e2e8f0;
+        margin: 32px 0;
       }
 
-      /* Mobile Responsive Styles */
+      /* Mobile Responsive */
       @media only screen and (max-width: 600px) {
-        .container {
-          padding: 0 16px !important;
-          width: 100% !important;
+        .content {
+          padding: 32px 24px !important;
+          margin: 20px 12px !important;
         }
-        .card {
-          padding: 28px 20px !important;
-          border-radius: 6px !important;
-          margin-top: 24px !important;
+        h1 {
+          font-size: 20px !important;
+        }
+        p {
+          font-size: 15px !important;
+        }
+        .highlight-value {
+          font-size: 28px !important;
         }
         .btn {
           display: block !important;
           width: 100% !important;
-          padding: 14px 24px !important;
-          font-size: 15px !important;
           box-sizing: border-box;
-        }
-        img.logo {
-          max-width: 160px !important;
-          height: auto !important;
-        }
-        h1 {
-          font-size: 20px !important;
-          line-height: 1.3 !important;
-        }
-        h2 {
-          font-size: 17px !important;
-          line-height: 1.4 !important;
-        }
-        p, div, td {
-          font-size: 14px !important;
-          line-height: 1.6 !important;
-        }
-      }
-
-      /* Dark Mode Support */
-      @media (prefers-color-scheme: dark) {
-        .card {
-          background: #1e293b !important;
-          border-color: #334155 !important;
         }
       }
     </style>
-    <!--[if gte mso 9]>
-    <xml><o:OfficeDocumentSettings><o:AllowPNG/><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml>
-    <![endif]-->
   </head>
-  <body style="margin:0; padding:0; background:{{ theme.background }}; color:{{ theme.text_primary }};">
-    <!-- Top Colored Bar -->
-    <div class="top-bar"></div>
+  <body>
+    <div class="container">
+      <div class="content">
+        <!-- Header with Logo -->
+        <div class="header">
+          <a href="https://cleanenroll.com" target="_blank">
+            <img class="logo" src="{{ logo_url }}" alt="CleanEnroll" />
+          </a>
+        </div>
 
-    <div class="container" style="padding: 32px 20px;">
-      <!-- Logo -->
-      <div style="text-align:center; margin-bottom:8px;">
-        <a href="https://cleanenroll.com" target="_blank" style="text-decoration:none;">
-          <img class="logo" src="{{ logo_url }}" width="180" alt="CleanEnroll"
-               style="display:block; height:auto; border:0; margin:0 auto;" />
-        </a>
-      </div>
-
-      <!-- Card -->
-      <div class="card">
-        <h1 style="margin:0 0 12px 0; font-size:22px; font-weight:700; color:{{ theme.text_primary }}; letter-spacing:-0.01em;">
-          {{ title }}
-        </h1>
-
+        <!-- Main Content -->
+        <h1>{{ title }}</h1>
+        
         {% if intro %}
-        <p style="margin:0 0 24px 0; font-size:15px; line-height:1.6; color:{{ theme.text_muted }};">
-          {{ intro }}
-        </p>
+        <p style="color: #64748b; margin-bottom: 24px;">{{ intro }}</p>
         {% endif %}
 
-        <div style="font-size:15px; line-height:1.65; color:{{ theme.text_primary }};">
+        <div>
           {{ content_html|safe }}
         </div>
 
         {% if cta_url and cta_label %}
-        <!--[if mso]>
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 0 0;">
-          <tr><td>
-            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="{{ cta_url }}"
-                         style="height:44px; v-text-anchor:middle; width:180px;" arcsize="15%"
-                         stroke="f" fillcolor="{{ theme.primary }}">
-              <center style="color:#ffffff; font-family:Arial,sans-serif; font-size:15px; font-weight:600;">
-                {{ cta_label }}
-              </center>
-            </v:roundrect>
-          </td></tr>
-        </table>
-        <![endif]-->
-        <!--[if !mso]><!-->
-        <div style="margin:24px 0 0 0; text-align:center;">
+        <div style="text-align: center; margin: 32px 0;">
           <a class="btn" href="{{ cta_url }}">{{ cta_label }}</a>
         </div>
-        <!--<![endif]-->
         {% endif %}
       </div>
 
       <!-- Footer -->
-      <div style="text-align:center; margin-top:32px; padding-top:24px; border-top:1px solid {{ theme.border }};">
-        <p class="muted" style="font-size:13px; line-height:1.6; margin:0 0 8px 0; color:{{ theme.text_muted }};">
-          <a href="https://cleanenroll.com/legal#privacy-policy" style="color:{{ theme.text_muted }}; text-decoration:none; margin:0 8px;">Privacy Policy</a>
-          <span style="color:#cbd5e1;">•</span>
-          <a href="https://cleanenroll.com/legal#terms-of-service" style="color:{{ theme.text_muted }}; text-decoration:none; margin:0 8px;">Terms of Service</a>
+      <div class="footer">
+        <p style="margin: 0 0 12px 0;">
+          <a href="https://cleanenroll.com/legal#privacy-policy">Privacy Policy</a>
+          <span style="color: #cbd5e1; margin: 0 8px;">•</span>
+          <a href="https://cleanenroll.com/legal#terms-of-service">Terms of Service</a>
         </p>
-        <p class="muted" style="font-size:12px; margin:8px 0 0 0; color:#94a3b8;">
+        <p style="margin: 0; font-size: 13px;">
           © {{ year }} CleanEnroll. All rights reserved.
         </p>
         {% if is_user_email %}
-        <p style="color:#94a3b8; font-size:11px; margin:12px 0 0 0;">
+        <p style="margin: 12px 0 0 0; font-size: 12px; color: #94a3b8;">
           You're receiving this because you have an account with CleanEnroll.
         </p>
         {% endif %}
@@ -630,7 +630,7 @@ async def send_new_client_notification(
                     {"filename": filename, "content": zip_data, "content_type": "application/zip"}
                 ]
 
-                property_shots_info = f"<div style='background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;'><p style='margin: 0; color: #166534; font-size: 14px; font-weight: 600;'>{icon('image', '#22c55e', 18)} Property photos attached as ZIP file ({len(property_shots_keys)} images)</p></div>"
+                property_shots_info = f"<div style='background: #ccfbf1; border: 1px solid #14b8a6; border-radius: 12px; padding: 16px; margin: 20px 0;'><p style='margin: 0; color: #0d9488; font-size: 14px; font-weight: 600;'>{icon('image', '#14b8a6', 18)} Property photos attached as ZIP file ({len(property_shots_keys)} images)</p></div>"
         except Exception as e:
             logger.warning(f"Failed to create property shots zip for {client_name}: {e}")
             property_shots_info = f"<div style='background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;'><p style='margin: 0; color: #92400e; font-size: 14px;'>{icon('warning', '#f59e0b', 18)} Property photos available in dashboard ({len(property_shots_keys)} images)</p></div>"
@@ -854,9 +854,9 @@ async def send_contract_signed_notification(
       </div>
     </div>
 
-    <div style="background: #e0f2fe; border-left: 4px solid #0ea5e9; padding: 16px; margin: 20px 0; border-radius: 8px;">
-      <p style="margin: 0; color: #0369a1; font-weight: 600; font-size: 14px;">{icon('calendar', '#0ea5e9', 18)} Next Steps:</p>
-      <ul style="margin: 12px 0 0 0; padding-left: 20px; color: #0369a1;">
+    <div style="background: #ccfbf1; border-left: 4px solid #14b8a6; padding: 16px; margin: 20px 0; border-radius: 8px;">
+      <p style="margin: 0; color: #0d9488; font-weight: 600; font-size: 14px;">{icon('calendar', '#14b8a6', 18)} Next Steps:</p>
+      <ul style="margin: 12px 0 0 0; padding-left: 20px; color: #0d9488;">
         <li style="margin-bottom: 8px;">Review the schedule submitted by the client</li>
         <li style="margin-bottom: 8px;">Accept the proposed time or suggest an alternative</li>
         <li style="margin-bottom: 8px;">Sign the contract to finalize the agreement</li>
@@ -895,17 +895,17 @@ async def send_client_signature_confirmation(
       </div>
       <div>
         <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 4px;">Status</div>
-        <div style="display: inline-flex; align-items: center; gap: 6px; background: #dbeafe; color: #1e40af; padding: 4px 12px; border-radius: 9999px; font-size: 13px; font-weight: 600;">
-          {icon('clock', '#1e40af', 16)} Awaiting Provider Signature
+        <div style="display: inline-flex; align-items: center; gap: 6px; background: #ccfbf1; color: #0d9488; padding: 4px 12px; border-radius: 9999px; font-size: 13px; font-weight: 600;">
+          {icon('clock', '#0d9488', 16)} Awaiting Provider Signature
         </div>
       </div>
     </div>
 
     <p>Your signature has been recorded successfully. The service provider will review and sign the contract shortly.</p>
 
-    <div style="background: #f0fdf4; border-left: 4px solid #22c55e; padding: 16px; margin: 20px 0; border-radius: 8px;">
-      <p style="margin: 0; color: #166534; font-weight: 600; font-size: 14px;">{icon('check', '#22c55e', 18)} What happens next?</p>
-      <ul style="margin: 12px 0 0 0; padding-left: 20px; color: #166534;">
+    <div style="background: #f0fdfa; border-left: 4px solid #14b8a6; padding: 16px; margin: 20px 0; border-radius: 8px;">
+      <p style="margin: 0; color: #0d9488; font-weight: 600; font-size: 14px;">{icon('check', '#14b8a6', 18)} What happens next?</p>
+      <ul style="margin: 12px 0 0 0; padding-left: 20px; color: #0d9488;">
         <li style="margin-bottom: 8px;">The provider will review your proposed schedule</li>
         <li style="margin-bottom: 8px;">They will either accept your time or suggest an alternative</li>
         <li style="margin-bottom: 8px;">Once they sign, you'll receive a confirmation email</li>
@@ -953,28 +953,28 @@ async def send_contract_fully_executed_email(
     schedule_section = ""
     if scheduled_time_confirmed and scheduled_start_time:
         schedule_section = f"""
-        <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
-          <p style="margin: 0 0 8px 0; color: #166534; font-size: 14px; font-weight: 600;">
-            {icon('check', '#22c55e', 18)} First Cleaning Confirmed
+        <div style="background: #ccfbf1; border: 1px solid #14b8a6; border-radius: 12px; padding: 16px; margin: 20px 0;">
+          <p style="margin: 0 0 8px 0; color: #0d9488; font-size: 14px; font-weight: 600;">
+            {icon('check', '#14b8a6', 18)} First Cleaning Confirmed
           </p>
-          <p style="margin: 0; color: #166534; font-size: 14px;">
-            {icon('calendar', '#166534', 18)} {scheduled_start_time}
+          <p style="margin: 0; color: #0d9488; font-size: 14px;">
+            {icon('calendar', '#0d9488', 18)} {scheduled_start_time}
           </p>
         </div>
         """
     elif start_date:
         schedule_section = f"""
-        <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0; text-align: center;">
-          <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
-            {icon('check', '#22c55e', 18)} Your signed contract PDF is attached. Your schedule has been confirmed!
+        <div style="background: #ccfbf1; border: 1px solid #14b8a6; border-radius: 12px; padding: 16px; margin: 20px 0; text-align: center;">
+          <p style="margin: 0; color: #0d9488; font-size: 14px; font-weight: 600;">
+            {icon('check', '#14b8a6', 18)} Your signed contract PDF is attached. Your schedule has been confirmed!
           </p>
         </div>
         """
     else:
         schedule_section = f"""
-        <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0; text-align: center;">
-          <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
-            {icon('sparkles', '#22c55e', 18)} Your signed contract PDF is attached. Your schedule has been confirmed!
+        <div style="background: #ccfbf1; border: 1px solid #14b8a6; border-radius: 12px; padding: 16px; margin: 20px 0; text-align: center;">
+          <p style="margin: 0; color: #0d9488; font-size: 14px; font-weight: 600;">
+            {icon('sparkles', '#14b8a6', 18)} Your signed contract PDF is attached. Your schedule has been confirmed!
           </p>
         </div>
         """
@@ -1041,9 +1041,9 @@ async def send_provider_contract_signed_confirmation(
       {f'<div><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 4px;">Property</div><div style="font-size: 15px; color: {THEME["text_primary"]};">{property_address}</div></div>' if property_address else ''}
     </div>
 
-    <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
-      <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
-        {icon('check', '#22c55e', 18)} Schedule confirmed - Ready to start service
+    <div style="background: #ccfbf1; border: 1px solid #14b8a6; border-radius: 12px; padding: 16px; margin: 20px 0;">
+      <p style="margin: 0; color: #0d9488; font-size: 14px; font-weight: 600;">
+        {icon('check', '#14b8a6', 18)} Schedule confirmed - Ready to start service
       </p>
     </div>
 
@@ -1098,9 +1098,9 @@ async def send_scheduling_proposal_email(
         {slots_html}
     </div>
 
-    <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
-        <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
-            {icon('info', '#22c55e', 18)} Tip: Click the button below to select a time slot or suggest your own preferred times!
+    <div style="background: #ccfbf1; border: 1px solid #14b8a6; border-radius: 12px; padding: 16px; margin: 20px 0;">
+        <p style="margin: 0; color: #0d9488; font-size: 14px; font-weight: 600;">
+            {icon('info', '#14b8a6', 18)} Tip: Click the button below to select a time slot or suggest your own preferred times!
         </p>
     </div>
 
@@ -1145,9 +1145,9 @@ async def send_scheduling_accepted_email(
         {f'<div><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 4px;">Location</div><div style="font-size: 15px; color: {THEME["text_primary"]};">{property_address}</div></div>' if property_address else ''}
     </div>
 
-    <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
-        <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
-            {icon('check', '#22c55e', 18)} Appointment confirmed
+    <div style="background: #ccfbf1; border: 1px solid #14b8a6; border-radius: 12px; padding: 16px; margin: 20px 0;">
+        <p style="margin: 0; color: #0d9488; font-size: 14px; font-weight: 600;">
+            {icon('check', '#14b8a6', 18)} Appointment confirmed
         </p>
     </div>
     """
@@ -1203,25 +1203,18 @@ async def send_email_verification_otp(to: str, user_name: str, otp: str) -> dict
     """Send OTP for email verification"""
     content = f"""
     <p>Hi {user_name},</p>
-    <p>To verify your email address, please use the verification code below:</p>
+    <p>Please use the following verification code to confirm your email address. This code will expire in 10 minutes.</p>
 
-    <div style="background: {THEME['background']}; border-radius: 16px; padding: 32px; margin: 32px 0; text-align: center;">
-        <div style="color: {THEME['text_muted']}; font-size: 14px; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Your Verification Code</div>
-        <div style="font-size: 42px; font-weight: 700; letter-spacing: 8px; color: {THEME['primary']}; font-family: 'Courier New', monospace; text-align: center;">
+    <div class="highlight">
+        <p style="color: #64748b; font-size: 14px; margin: 0 0 12px 0; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Verification Code</p>
+        <div class="highlight-value" style="font-family: 'Courier New', monospace; letter-spacing: 8px;">
             {otp}
         </div>
-        <div style="color: {THEME['text_muted']}; font-size: 13px; margin-top: 12px;">This code expires in 10 minutes</div>
     </div>
 
-    <p style="color: {THEME['text_muted']}; font-size: 14px;">
-        Enter this code in the verification page to confirm your email address.
+    <p style="color: #64748b; font-size: 14px;">
+        If you didn't request this code, you can safely ignore this email.
     </p>
-
-    <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;">
-        <p style="margin: 0; color: #92400e; font-size: 13px;">
-            {icon('warning', '#f59e0b', 18)} If you didn't request this code, you can safely ignore this email.
-        </p>
-    </div>
     """
     return await send_email(
         to=to,
@@ -1308,9 +1301,9 @@ async def send_appointment_confirmation(
         </div>
     </div>
 
-    <div style="background: #d1fae5; border: 1px solid #10b981; border-radius: 12px; padding: 16px; margin: 20px 0;">
-        <p style="margin: 0; color: #065f46; font-size: 14px; font-weight: 600;">
-            {icon('check', '#10b981', 18)} Your appointment is confirmed and has been added to your calendar
+    <div style="background: #ccfbf1; border: 1px solid #14b8a6; border-radius: 12px; padding: 16px; margin: 20px 0;">
+        <p style="margin: 0; color: #0f766e; font-size: 14px; font-weight: 600;">
+            {icon('check', '#14b8a6', 18)} Your appointment is confirmed and has been added to your calendar
         </p>
     </div>
 
@@ -1404,10 +1397,10 @@ async def send_client_accepted_proposal(
     <p>Hi {provider_name},</p>
     <p>Great news! <strong>{client_name}</strong> has accepted your proposed appointment time.</p>
 
-    <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 24px; margin: 24px 0;">
-        <div style="color: #166534; font-size: 13px; margin-bottom: 6px;">{icon('check', '#22c55e', 18)} Confirmed Appointment</div>
-        <div style="font-size: 18px; color: #166534; font-weight: 600;">{date_formatted}</div>
-        <div style="font-size: 15px; color: #166534; margin-top: 4px;">{accepted_start_time} - {accepted_end_time}</div>
+    <div style="background: #ccfbf1; border: 1px solid #14b8a6; border-radius: 12px; padding: 24px; margin: 24px 0;">
+        <div style="color: #0d9488; font-size: 13px; margin-bottom: 6px;">{icon('check', '#14b8a6', 18)} Confirmed Appointment</div>
+        <div style="font-size: 18px; color: #0d9488; font-weight: 600;">{date_formatted}</div>
+        <div style="font-size: 15px; color: #0d9488; margin-top: 4px;">{accepted_start_time} - {accepted_end_time}</div>
     </div>
 
     <p style="color: {THEME['text_muted']}; font-size: 14px;">
@@ -1442,10 +1435,10 @@ async def send_appointment_confirmed_to_client(
     <p>Hi {client_name},</p>
     <p>Your appointment with <strong>{provider_name}</strong> has been confirmed!</p>
 
-    <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 24px; margin: 24px 0;">
-        <div style="color: #166534; font-size: 13px; margin-bottom: 6px;">{icon('check', '#22c55e', 18)} Confirmed Appointment</div>
-        <div style="font-size: 18px; color: #166534; font-weight: 600;">{date_formatted}</div>
-        <div style="font-size: 15px; color: #166534; margin-top: 4px;">{confirmed_start_time} - {confirmed_end_time}</div>
+    <div style="background: #ccfbf1; border: 1px solid #14b8a6; border-radius: 12px; padding: 24px; margin: 24px 0;">
+        <div style="color: #0d9488; font-size: 13px; margin-bottom: 6px;">{icon('check', '#14b8a6', 18)} Confirmed Appointment</div>
+        <div style="font-size: 18px; color: #0d9488; font-weight: 600;">{date_formatted}</div>
+        <div style="font-size: 15px; color: #0d9488; margin-top: 4px;">{confirmed_start_time} - {confirmed_end_time}</div>
     </div>
 
     <p style="color: {THEME['text_muted']}; font-size: 14px;">
@@ -1494,9 +1487,9 @@ async def send_schedule_accepted_confirmation_to_provider(
         {f'<div><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 6px;">{icon("location", THEME["primary"], 18)} Location</div><div style="font-size: 15px; color: {THEME["text_primary"]};">{client_address}</div></div>' if client_address else ''}
     </div>
 
-    <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
-        <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
-            {icon('check', '#22c55e', 18)} Appointment confirmed and client notified
+    <div style="background: #ccfbf1; border: 1px solid #14b8a6; border-radius: 12px; padding: 16px; margin: 20px 0;">
+        <p style="margin: 0; color: #0d9488; font-size: 14px; font-weight: 600;">
+            {icon('check', '#14b8a6', 18)} Appointment confirmed and client notified
         </p>
     </div>
 
@@ -1589,8 +1582,8 @@ async def send_invoice_payment_link_email(
     recurring_info = ""
     if is_recurring and recurrence_pattern:
         recurring_info = f"""
-        <div style="background: #e0f2fe; border: 1px solid #0ea5e9; border-radius: 12px; padding: 16px; margin: 20px 0;">
-            <p style="margin: 0; color: #0369a1; font-size: 14px; font-weight: 600;">
+        <div style="background: #ccfbf1; border: 1px solid #14b8a6; border-radius: 12px; padding: 16px; margin: 20px 0;">
+            <p style="margin: 0; color: #0d9488; font-size: 14px; font-weight: 600;">
                 🔄 This is a recurring payment ({recurrence_pattern}). Your card will be charged automatically.
             </p>
         </div>
@@ -1618,9 +1611,9 @@ async def send_invoice_payment_link_email(
 
     {recurring_info}
 
-    <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
-        <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
-            {icon('money', '#22c55e', 18)} Click the button below to pay securely online
+    <div style="background: #ccfbf1; border: 1px solid #14b8a6; border-radius: 12px; padding: 16px; margin: 20px 0;">
+        <p style="margin: 0; color: #0d9488; font-size: 14px; font-weight: 600;">
+            {icon('money', '#14b8a6', 18)} Click the button below to pay securely online
         </p>
     </div>
 
@@ -1655,29 +1648,29 @@ async def send_payment_received_notification(
     <p>Hi {provider_name},</p>
     <p>{icon('sparkles', THEME['primary'], 20)} <strong>Excellent news!</strong> <strong>{client_name}</strong> has just paid their invoice.</p>
 
-    <div style="background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); border: 2px solid #22c55e; border-radius: 16px; padding: 28px; margin: 24px 0; box-shadow: 0 4px 12px rgba(34, 197, 94, 0.15);">
+    <div style="background: linear-gradient(135deg, #ccfbf1 0%, #99f6e4 100%); border: 2px solid #14b8a6; border-radius: 16px; padding: 28px; margin: 24px 0; box-shadow: 0 4px 12px rgba(20, 184, 166, 0.15);">
         <div style="text-align: center; margin-bottom: 20px;">
-            <div style="display: inline-block; background: #22c55e; color: white; padding: 12px; border-radius: 50%; margin-bottom: 12px;">
+            <div style="display: inline-block; background: #14b8a6; color: white; padding: 12px; border-radius: 50%; margin-bottom: 12px;">
                 <svg style="width: 24px; height: 24px; fill: currentColor;" viewBox="0 0 20 20">
                     <path fill-rule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" />
                 </svg>
             </div>
-            <div style="font-size: 32px; color: #22c55e; font-weight: 800; margin-bottom: 8px;">${amount:,.2f} {currency}</div>
-            <div style="color: #166534; font-size: 16px; font-weight: 600;">Payment Received!</div>
+            <div style="font-size: 32px; color: #14b8a6; font-weight: 800; margin-bottom: 8px;">${amount:,.2f} {currency}</div>
+            <div style="color: #0d9488; font-size: 16px; font-weight: 600;">Payment Received!</div>
         </div>
 
         <div style="background: rgba(255, 255, 255, 0.8); border-radius: 12px; padding: 20px;">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                 <div>
-                    <div style="color: #166534; font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 4px;">Invoice</div>
-                    <div style="font-size: 15px; color: #166534; font-weight: 600;">{invoice_number}</div>
+                    <div style="color: #0d9488; font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 4px;">Invoice</div>
+                    <div style="font-size: 15px; color: #0d9488; font-weight: 600;">{invoice_number}</div>
                 </div>
                 <div>
-                    <div style="color: #166534; font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 4px;">Client</div>
-                    <div style="font-size: 15px; color: #166534; font-weight: 600;">{client_name}</div>
+                    <div style="color: #0d9488; font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 4px;">Client</div>
+                    <div style="font-size: 15px; color: #0d9488; font-weight: 600;">{client_name}</div>
                 </div>
             </div>
-            {f'<div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(34, 197, 94, 0.2);"><div style="color: #166534; font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 4px;">Payment Date</div><div style="font-size: 15px; color: #166534; font-weight: 600;">{payment_date}</div></div>' if payment_date else ''}
+            {f'<div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(20, 184, 166, 0.2);"><div style="color: #0d9488; font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 4px;">Payment Date</div><div style="font-size: 15px; color: #0d9488; font-weight: 600;">{payment_date}</div></div>' if payment_date else ''}
         </div>
     </div>
 
@@ -1739,9 +1732,9 @@ async def send_payment_thank_you_email(
         {f'<div><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 6px;">Service Date</div><div style="font-size: 15px; color: {THEME["text_primary"]};">{service_date}</div></div>' if service_date else ''}
     </div>
 
-    <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 12px; padding: 16px; margin: 20px 0;">
-        <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">
-            {icon('check', '#22c55e', 18)} Your payment has been processed successfully
+    <div style="background: #ccfbf1; border: 1px solid #14b8a6; border-radius: 12px; padding: 16px; margin: 20px 0;">
+        <p style="margin: 0; color: #0d9488; font-size: 14px; font-weight: 600;">
+            {icon('check', '#14b8a6', 18)} Your payment has been processed successfully
         </p>
     </div>
 
@@ -1881,7 +1874,7 @@ async def send_quote_submitted_confirmation(
     """Send confirmation email to client after they approve the automated quote"""
     content = f"""
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+        <div style="background: linear-gradient(135deg, #14b8a6 0%, #059669 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
             <h1 style="color: white; margin: 0; font-size: 28px;">Quote Submitted!</h1>
         </div>
         
@@ -1894,7 +1887,7 @@ async def send_quote_submitted_confirmation(
                 Thank you for submitting your quote request! We've received your approval and {business_name} will review it shortly.
             </p>
             
-            <div style="background: white; border: 2px solid #10b981; border-radius: 8px; padding: 20px; margin: 25px 0;">
+            <div style="background: white; border: 2px solid #14b8a6; border-radius: 8px; padding: 20px; margin: 25px 0;">
                 <h3 style="color: #059669; margin-top: 0; font-size: 18px;">Estimated Quote</h3>
                 <p style="font-size: 32px; font-weight: bold; color: #1f2937; margin: 10px 0;">
                     ${quote_amount:,.2f}
@@ -1904,9 +1897,9 @@ async def send_quote_submitted_confirmation(
                 </p>
             </div>
             
-            <div style="background: #dbeafe; border-left: 4px solid #3b82f6; padding: 15px; margin: 25px 0; border-radius: 4px;">
-                <h4 style="color: #1e40af; margin-top: 0; font-size: 16px;">What happens next?</h4>
-                <ol style="color: #1e3a8a; margin: 10px 0; padding-left: 20px; line-height: 1.8;">
+            <div style="background: #ccfbf1; border-left: 4px solid #14b8a6; padding: 15px; margin: 25px 0; border-radius: 4px;">
+                <h4 style="color: #0d9488; margin-top: 0; font-size: 16px;">What happens next?</h4>
+                <ol style="color: #0f766e; margin: 10px 0; padding-left: 20px; line-height: 1.8;">
                     <li>{business_name} will review your quote and service requirements</li>
                     <li>They may approve it as-is or make adjustments based on your specific needs</li>
                     <li>You'll receive an email with the final approved quote</li>
@@ -1950,12 +1943,12 @@ async def send_quote_review_notification(
     client_public_id: str,
 ) -> dict:
     """Send notification email to provider when client approves a quote"""
-    # Generate review link
-    review_link = f"{FRONTEND_URL}/dashboard/clients?review={client_public_id}"
+    # Generate review link - goes to quote requests detail page
+    review_link = f"{FRONTEND_URL}/dashboard/quote-requests/{client_public_id}"
     
     content = f"""
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+        <div style="background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
             <h1 style="color: white; margin: 0; font-size: 28px;">New Quote Approval Request</h1>
         </div>
         
@@ -1968,38 +1961,38 @@ async def send_quote_review_notification(
                 <strong>{client_name}</strong> has approved an automated quote and is waiting for your review.
             </p>
             
-            <div style="background: white; border: 2px solid #f59e0b; border-radius: 8px; padding: 20px; margin: 25px 0;">
-                <h3 style="color: #d97706; margin-top: 0; font-size: 18px;">Client Details</h3>
+            <div style="background: white; border: 2px solid #14b8a6; border-radius: 8px; padding: 20px; margin: 25px 0;">
+                <h3 style="color: #0d9488; margin-top: 0; font-size: 18px;">Client Details</h3>
                 <table style="width: 100%; border-collapse: collapse;">
                     <tr>
-                        <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Name:</td>
+                        <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Name:</td>
                         <td style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600;">{client_name}</td>
                     </tr>
                     <tr>
-                        <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Email:</td>
+                        <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Email:</td>
                         <td style="padding: 8px 0; color: #1f2937; font-size: 14px;">{client_email}</td>
                     </tr>
                     <tr>
-                        <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Automated Quote:</td>
+                        <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Automated Quote:</td>
                         <td style="padding: 8px 0; color: #1f2937; font-size: 18px; font-weight: bold;">${quote_amount:,.2f}</td>
                     </tr>
                 </table>
             </div>
             
-            <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 25px 0; border-radius: 4px;">
-                <p style="color: #92400e; margin: 0; font-size: 14px; line-height: 1.6;">
+            <div style="background: #f1f5f9; border-left: 4px solid #14b8a6; padding: 15px; margin: 25px 0; border-radius: 4px;">
+                <p style="color: #475569; margin: 0; font-size: 14px; line-height: 1.6;">
                     <strong>Action Required:</strong> Please review this quote and either approve it as-is or make adjustments based on the client's specific requirements.
                 </p>
             </div>
             
             <div style="text-align: center; margin: 30px 0;">
                 <a href="{review_link}" 
-                   style="display: inline-block; background: #f59e0b; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
+                   style="display: inline-block; background: #14b8a6; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                     Review & Approve Quote
                 </a>
             </div>
             
-            <p style="font-size: 14px; color: #6b7280; margin-top: 25px;">
+            <p style="font-size: 14px; color: #64748b; margin-top: 25px;">
                 <strong>Recommended response time:</strong> Within 24-48 hours
             </p>
             
@@ -2036,8 +2029,8 @@ async def send_quote_approved_email(
     adjustment_section = ""
     if was_adjusted and adjustment_notes:
         adjustment_section = f"""
-        <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 25px 0; border-radius: 4px;">
-            <h4 style="color: #92400e; margin-top: 0; font-size: 16px;">Quote Adjusted</h4>
+        <div style="background: #fef3c7; border-left: 3px solid #f59e0b; padding: 16px; margin: 24px 0; border-radius: 4px;">
+            <p style="color: #92400e; margin: 0 0 8px 0; font-weight: 600; font-size: 14px;">Quote Adjusted</p>
             <p style="color: #92400e; margin: 0; font-size: 14px; line-height: 1.6;">
                 {adjustment_notes}
             </p>
@@ -2045,66 +2038,34 @@ async def send_quote_approved_email(
         """
     
     content = f"""
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
-            <h1 style="color: white; margin: 0; font-size: 28px;">Your Quote Has Been Approved!</h1>
-        </div>
-        
-        <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px;">
-            <p style="font-size: 16px; color: #374151; margin-bottom: 20px;">
-                Hi {client_name},
-            </p>
-            
-            <p style="font-size: 16px; color: #374151; line-height: 1.6; margin-bottom: 20px;">
-                Great news! {business_name} has reviewed and approved your quote. You're ready to schedule your first cleaning!
-            </p>
-            
-            <div style="background: white; border: 2px solid #10b981; border-radius: 8px; padding: 20px; margin: 25px 0; text-align: center;">
-                <h3 style="color: #059669; margin-top: 0; font-size: 18px;">Final Approved Quote</h3>
-                <p style="font-size: 36px; font-weight: bold; color: #1f2937; margin: 10px 0;">
-                    ${final_quote_amount:,.2f}
-                </p>
-            </div>
-            
-            {adjustment_section}
-            
-            <div style="text-align: center; margin: 30px 0;">
-                <a href="{schedule_link}" 
-                   style="display: inline-block; background: #10b981; color: white; padding: 16px 40px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 18px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                    Schedule Your First Cleaning
-                </a>
-            </div>
-            
-            <div style="background: #dbeafe; border-left: 4px solid #3b82f6; padding: 15px; margin: 25px 0; border-radius: 4px;">
-                <h4 style="color: #1e40af; margin-top: 0; font-size: 16px;">Next Steps:</h4>
-                <ol style="color: #1e3a8a; margin: 10px 0; padding-left: 20px; line-height: 1.8;">
-                    <li>Click the button above to choose your preferred date and time</li>
-                    <li>Review and sign the service agreement</li>
-                    <li>Receive your invoice and complete payment</li>
-                    <li>Get ready for your first cleaning!</li>
-                </ol>
-            </div>
-            
-            <p style="font-size: 14px; color: #6b7280; margin-top: 25px;">
-                Questions? Contact {business_name} directly for assistance.
-            </p>
-            
-            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
-            
-            <p style="font-size: 12px; color: #9ca3af; text-align: center; margin: 0;">
-                This is an automated message from {business_name}
-            </p>
+    <p>Hi {client_name},</p>
+    <p>Great news! {business_name} has reviewed and approved your quote. You're ready to schedule your first cleaning.</p>
+    
+    <div class="highlight">
+        <p style="color: #64748b; font-size: 14px; margin: 0 0 8px 0; font-weight: 600;">Final Approved Quote</p>
+        <div class="highlight-value">
+            ${final_quote_amount:,.2f}
         </div>
     </div>
+    
+    {adjustment_section}
+    
+    <p style="margin-top: 24px;">Click the button below to choose your preferred date and time, review the service agreement, and complete your booking.</p>
+    
+    <p style="color: #64748b; font-size: 14px; margin-top: 32px;">
+        Questions? Contact {business_name} directly for assistance.
+    </p>
     """
 
-    subject = "Your Quote Has Been Approved - Schedule Your First Cleaning"
+    subject = "Your Quote Has Been Approved"
     if was_adjusted:
-        subject = "Your Quote Has Been Updated - Schedule Your First Cleaning"
+        subject = "Your Quote Has Been Updated"
 
     return await send_email(
         to=to,
         subject=f"{subject} - {business_name}",
         title=subject,
         content_html=content,
+        cta_url=schedule_link,
+        cta_label="Schedule Your First Cleaning",
     )
