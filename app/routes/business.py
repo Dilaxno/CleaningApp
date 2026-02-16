@@ -877,23 +877,10 @@ def get_public_calendly_status(firebase_uid: str, request: Request, db: Session 
         logger.warning(f"❌ User not found for firebase_uid: {firebase_uid}")
         raise HTTPException(status_code=404, detail="Business not found")
 
-    # Check if user has Calendly integration
-    from ..models import CalendlyIntegration
-
-    calendly_integration = (
-        db.query(CalendlyIntegration).filter(CalendlyIntegration.user_id == user.id).first()
-    )
-
-    if not calendly_integration or not calendly_integration.default_event_type_url:
-        return {
-            "hasCalendly": False,
-            "bookingUrl": None,
-        }
-
-    # Generate Calendly booking URL (without prefill for now, will be added when client info is available)
+    # Calendly integration removed
     return {
-        "hasCalendly": True,
-        "bookingUrl": calendly_integration.default_event_type_url,
+        "hasCalendly": False,
+        "bookingUrl": None,
     }
 
 

@@ -963,3 +963,110 @@ async def download_contract_by_public_id(public_id: str, db: Session = Depends(g
     except Exception as e:
         logger.error(f"Failed to generate PDF download URL: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to generate download link") from e
+
+
+class PublicContractSignRequest(BaseModel):
+    signature_data: str
+    client_name: str
+
+
+@router.post("/public/{contract_public_id}/sign")
+async def sign_contract_public(
+    contract_public_id: str,
+    data: PublicContractSignRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    Public endpoint for clients to sign their contract using contract public ID.
+    This is used in the quote approval flow where clients schedule first, then sign.
+    """
+    if not validate_uuid(contract_public_id):
+        raise HTTPException(status_code=400, detail="Invalid contract identifier")
+
+    # Validate signature size
+    if len(data.signature_data) > 500000:
+        raise HTTPException(status_code=400, detail="Signature data too large")
+
+    # Find contract by public_id
+    contract = db.query(Contract).filter(Contract.public_id == contract_public_id).first()
+
+    if not contract:
+        raise HTTPException(status_code=404, detail="Contract not found")
+
+    # Get client
+    client = db.query(Client).filter(Client.id == contract.client_id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    # Get user (business owner)
+    user = db.query(User).filter(User.id == contract.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Business not found")
+
+    # Capture signature audit data
+    client_ip = request.headers.get(
+        "X-Forwarded-For", request.client.host if request.client else "unknown"
+    )
+    if client_ip and "," in client_ip:
+        client_ip = client_ip.split(",")[0].strip()
+    user_agent = request.headers.get("User-Agent", "unknown")
+
+    # Update contract with client signature
+    contract.client_signature = data.signature_data
+    contract.client_signature_ip = client_ip
+    contract.client_signature_user_agent = user_agent
+    contract.client_signed_at = datetime.utcnow()
+
+    # Update status if not already signed
+    if contract.status in ["new", "pending_signature"]:
+        contract.status = "client_signed"
+
+    db.commit()
+    db.refresh(contract)
+
+    logger.info(f"✅ Contract {contract.id} signed by client via public endpoint (IP: {client_ip})")
+
+    # Send confirmation emails
+    from ..email_service import (
+        send_client_signature_confirmation,
+        send_contract_signed_notification,
+    )
+
+    business_name = "Service Provider"
+    business_config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
+    if business_config:
+        business_name = business_config.business_name or user.full_name or "Service Provider"
+
+    # Send confirmation to client
+    if client.email:
+        try:
+            await send_client_signature_confirmation(
+                to=client.email,
+                client_name=data.client_name,
+                business_name=business_name,
+                contract_title=contract.title,
+                contract_public_id=contract.public_id,
+            )
+        except Exception as e:
+            logger.error(f"Failed to send client confirmation email: {e}")
+
+    # Send notification to provider
+    if user.email:
+        try:
+            await send_contract_signed_notification(
+                to=user.email,
+                client_name=data.client_name,
+                business_name=business_name,
+                contract_title=contract.title,
+                contract_id=contract.id,
+            )
+        except Exception as e:
+            logger.error(f"Failed to send provider notification email: {e}")
+
+    return {
+        "message": "Contract signed successfully",
+        "contract_id": contract.id,
+        "contract_public_id": contract.public_id,
+        "status": contract.status,
+    }

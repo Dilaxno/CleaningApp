@@ -6,16 +6,62 @@ Run with: python -m backend.migrations.populate_form_templates
 """
 
 import json
+import os
 import sys
 from pathlib import Path
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from sqlalchemy.orm import Session
+# Load environment variables from .env file in root directory
+from dotenv import load_dotenv
+root_dir = Path(__file__).parent.parent.parent  # Go up to root (CleaningApp/)
+env_path = root_dir / ".env"
+load_dotenv(env_path)
 
-from backend.app.database import SessionLocal
-from backend.app.models import FormTemplate
+if not env_path.exists():
+    print(f"⚠️  Warning: .env file not found at {env_path}")
+    print("Looking for .env in current directory...")
+    load_dotenv()  # Try current directory
+else:
+    print(f"✅ Loaded .env from {env_path}")
+
+from sqlalchemy import create_engine, Column, Integer, String, Text, Boolean, DateTime, JSON
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.sql import func
+
+# Get database URL from environment
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    print("❌ ERROR: DATABASE_URL not found in environment variables")
+    print("Please set DATABASE_URL in backend/.env file")
+    sys.exit(1)
+
+print(f"📊 Using database: {DATABASE_URL.split('@')[-1] if '@' in DATABASE_URL else DATABASE_URL}")
+
+# Create engine and session
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+
+# Define minimal FormTemplate model to avoid relationship issues
+class FormTemplate(Base):
+    __tablename__ = "form_templates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    template_id = Column(String(100), unique=True, index=True, nullable=False)
+    user_id = Column(Integer, nullable=True)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    image = Column(String(500), nullable=True)
+    color = Column(String(7), nullable=True)
+    is_system_template = Column(Boolean, default=False, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    template_data = Column(JSON, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
 def get_universal_contact_section():
@@ -412,6 +458,7 @@ def main():
     print("=" * 60)
     print("Form Templates Database Population Script")
     print("=" * 60)
+    print()
 
     db = SessionLocal()
     try:
@@ -424,6 +471,8 @@ def main():
         print("3. Update frontend to remove hardcoded templates")
     except Exception as e:
         print(f"\n❌ ERROR: {e}")
+        import traceback
+        traceback.print_exc()
         db.rollback()
         raise
     finally:

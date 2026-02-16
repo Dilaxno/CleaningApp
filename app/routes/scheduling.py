@@ -124,38 +124,15 @@ async def get_scheduling_info_by_client(client_id: int, db: Session = Depends(ge
     elif user:
         business_name = user.full_name or "Service Provider"
 
-    # Check if provider has Calendly integration
-    from ..models import CalendlyIntegration
-
-    calendly_integration = (
-        db.query(CalendlyIntegration).filter(CalendlyIntegration.user_id == client.user_id).first()
-    )
-    has_calendly = calendly_integration is not None
+    # Calendly integration removed
+    has_calendly = False
 
     # Check if meetings are required
     meetings_required = business_config.meetings_required if business_config else False
 
-    # When provider has Calendly + meetings_required, client must book consultation before scheduling
+    # Consultation requirement removed - Calendly integration no longer supported
     consultation_required = False
     consultation_booking_url = None
-    if (
-        calendly_integration
-        and business_config
-        and business_config.meetings_required
-        and calendly_integration.default_event_type_url
-    ):
-        consultation_required = True
-        from ..services.calendly_service import CalendlyService
-
-        calendly_service = CalendlyService()
-        prefill_data = {
-            "name": client.contact_name or client.business_name or "",
-            "email": client.email or "",
-            "phone": client.phone or "",
-        }
-        consultation_booking_url = calendly_service.generate_scheduling_link(
-            calendly_integration.default_event_type_url, prefill_data
-        )
 
     return {
         "business_name": sanitize_string(business_name),
@@ -860,32 +837,9 @@ async def get_public_scheduling_info(contract_public_id: str, db: Session = Depe
         business_name = user.full_name or "Service Provider"
 
     # Check if provider has Calendly and requires consultations
-    from ..models import CalendlyIntegration
-
-    calendly_integration = (
-        db.query(CalendlyIntegration)
-        .filter(CalendlyIntegration.user_id == contract.user_id)
-        .first()
-    )
-
+    # Calendly integration removed
     consultation_required = False
     consultation_booking_url = None
-
-    if calendly_integration and business_config and business_config.meetings_required:
-        consultation_required = True
-        # Generate Calendly booking URL with client prefill
-        if calendly_integration.default_event_type_url:
-            from ..services.calendly_service import CalendlyService
-
-            calendly_service = CalendlyService()
-            prefill_data = {
-                "name": client.contact_name or client.business_name,
-                "email": client.email,
-                "phone": client.phone,
-            }
-            consultation_booking_url = calendly_service.generate_scheduling_link(
-                calendly_integration.default_event_type_url, prefill_data
-            )
 
     return {
         "contract_id": contract.id,
@@ -903,6 +857,7 @@ async def get_public_scheduling_info(contract_public_id: str, db: Session = Depe
         "status": contract.status,
         "consultation_required": consultation_required,
         "consultation_booking_url": consultation_booking_url,
+        "contract_pdf_url": contract.pdf_url,
     }
 
 

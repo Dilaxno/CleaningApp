@@ -21,16 +21,17 @@ from . import (
 from .csrf import CSRF_COOKIE_NAME, CSRFMiddleware, generate_csrf_token
 from .database import Base, engine, get_db
 from .routes import auth_router
+
 # NEW: Use domain-driven billing router
 from .domain.billing import router as billing_router
 from .domain.billing import webhooks_router as dodopayments_webhooks_router
 from .routes.business import router as business_router
-from .routes.calendly import router as calendly_router
-from .routes.calendly_webhooks import router as calendly_webhooks_router
 from .routes.clients import router as clients_router
 from .routes.contract_revisions import router as contract_revisions_router
+
 # NEW: Use domain-driven contracts router for CRUD operations
 from .domain.contracts import router as contracts_router
+
 # Keep original contracts_pdf router for PDF generation (will be integrated later)
 from .routes.contracts_pdf import router as contracts_pdf_router
 from .routes.email import router as email_router
@@ -47,7 +48,6 @@ from .routes.property_shots import router as property_shots_router
 from .routes.quickbooks import router as quickbooks_router
 from .routes.schedules import router as schedules_router
 from .routes.scheduling import router as scheduling_router
-from .routes.scheduling_calendly import router as scheduling_calendly_router
 from .routes.security import router as security_router
 from .routes.service_areas import router as service_areas_router
 from .routes.smarty_geocoding import router as smarty_geocoding_router
@@ -253,9 +253,6 @@ app.include_router(schedules_router)
 app.include_router(billing_router)
 app.include_router(dodopayments_webhooks_router)
 app.include_router(email_router)
-app.include_router(calendly_router)
-app.include_router(calendly_webhooks_router)
-app.include_router(scheduling_calendly_router)
 app.include_router(status_router)
 app.include_router(notifications_router)
 app.include_router(jobs_router)

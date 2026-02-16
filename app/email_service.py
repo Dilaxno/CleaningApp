@@ -1,6 +1,6 @@
 """
 Unified Email Service using Resend (fallback) or Custom SMTP
-Provides a consistent email template for all automated emails
+Provides a consistent email template for all automated emails using MJML
 """
 
 import io
@@ -18,9 +18,23 @@ from typing import Optional, Union
 
 import aiohttp
 import resend
-from jinja2 import Template
+from mjml import mjml_to_html
 
 from .config import EMAIL_FROM_ADDRESS, FRONTEND_URL, RESEND_API_KEY, SMTP_ENCRYPTION_KEY
+from .email_templates import (
+    client_signature_confirmation_template,
+    contract_fully_executed_template,
+    contract_signed_notification_template,
+    email_verification_template,
+    form_submission_confirmation_template,
+    new_client_notification_template,
+    password_reset_template,
+    payment_received_notification_template,
+    quote_approved_template,
+    quote_review_notification_template,
+    quote_submitted_confirmation_template,
+    welcome_email_template,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -142,6 +156,7 @@ def send_via_custom_smtp(
         raise Exception(f"Custom SMTP failed: {str(e)}") from e
 
 
+# Legacy helper function - will be removed once all templates are migrated
 async def create_property_shots_zip(
     property_shots_keys: list[str], client_name: str
 ) -> Optional[bytes]:
@@ -479,14 +494,28 @@ def render_email(
     )
 
 
+def compile_mjml_to_html(mjml_content: str) -> str:
+    """
+    Compile MJML template to production-ready HTML
+
+    Args:
+        mjml_content: MJML template string
+
+    Returns:
+        Compiled HTML string
+    """
+    try:
+        result = mjml_to_html(mjml_content)
+        return result
+    except Exception as e:
+        logger.error(f"MJML compilation error: {e}")
+        raise Exception(f"Failed to compile MJML template: {str(e)}") from e
+
+
 async def send_email(
     to: Union[str, list[str]],
     subject: str,
-    title: str,
-    content_html: str,
-    intro: Optional[str] = None,
-    cta_url: Optional[str] = None,
-    cta_label: Optional[str] = None,
+    mjml_content: str,
     from_address: Optional[str] = None,
     business_config=None,
     is_user_email: bool = False,
@@ -498,11 +527,7 @@ async def send_email(
     Args:
         to: Recipient email(s)
         subject: Email subject line
-        title: Main heading in the email
-        content_html: HTML content for the email body
-        intro: Optional intro paragraph (muted text)
-        cta_url: Optional call-to-action button URL
-        cta_label: Optional call-to-action button text
+        mjml_content: MJML template content (will be compiled to HTML)
         from_address: Optional custom from address
         business_config: Optional BusinessConfig for custom SMTP
         is_user_email: Whether this email is to a CleanEnroll user (not a client)
@@ -511,15 +536,8 @@ async def send_email(
     Returns:
         Send response dict
     """
-    html_content = render_email(
-        subject=subject,
-        title=title,
-        content_html=content_html,
-        intro=intro,
-        cta_url=cta_url,
-        cta_label=cta_label,
-        is_user_email=is_user_email,
-    )
+    # Compile MJML to HTML
+    html_content = compile_mjml_to_html(mjml_content)
 
     # Ensure 'to' is a list
     recipients = [to] if isinstance(to, str) else to
@@ -573,30 +591,39 @@ async def send_email(
 
 # ============================================
 # Pre-built Email Templates for Common Events
+# All templates now use MJML for responsive design
 # ============================================
 
 
 async def send_welcome_email(to: str, user_name: str) -> dict:
     """Send welcome email to new users"""
-    content = f"""
-    <p>Hi {user_name},</p>
-    <p>Welcome to CleanEnroll! We're excited to have you on board.</p>
-    <p>With CleanEnroll, you can:</p>
-    <ul style="margin: 16px 0; padding-left: 20px; color: {THEME['text_primary']};">
-      <li style="margin-bottom: 8px;">Create professional client intake forms</li>
-      <li style="margin-bottom: 8px;">Generate contracts automatically</li>
-      <li style="margin-bottom: 8px;">Manage your cleaning business efficiently</li>
-    </ul>
-    <p>Get started by setting up your business profile and creating your first form.</p>
-    """
+    mjml_content = welcome_email_template(user_name)
     return await send_email(
         to=to,
         subject="Welcome to CleanEnroll",
-        title="Welcome to CleanEnroll!",
-        intro="Your account has been created successfully.",
-        content_html=content,
-        cta_url="https://cleanenroll.com/dashboard",
-        cta_label="Go to Dashboard",
+        mjml_content=mjml_content,
+        is_user_email=True,
+    )
+
+
+async def send_email_verification_otp(to: str, user_name: str, otp: str) -> dict:
+    """Send OTP for email verification"""
+    mjml_content = email_verification_template(user_name, otp)
+    return await send_email(
+        to=to,
+        subject="Verify Your Email - CleanEnroll",
+        mjml_content=mjml_content,
+        is_user_email=True,
+    )
+
+
+async def send_password_reset_email(to: str, reset_link: str) -> dict:
+    """Send password reset email"""
+    mjml_content = password_reset_template(reset_link)
+    return await send_email(
+        to=to,
+        subject="Reset Your Password - CleanEnroll",
+        mjml_content=mjml_content,
         is_user_email=True,
     )
 
@@ -613,9 +640,10 @@ async def send_new_client_notification(
 
     # Create property shots zip if available
     attachments = None
-    property_shots_info = ""
+    property_shots_count = 0
 
     if property_shots_keys and len(property_shots_keys) > 0:
+        property_shots_count = len(property_shots_keys)
         try:
             zip_data = await create_property_shots_zip(property_shots_keys, client_name)
             if zip_data:
@@ -628,158 +656,23 @@ async def send_new_client_notification(
                 attachments = [
                     {"filename": filename, "content": zip_data, "content_type": "application/zip"}
                 ]
-
-                property_shots_info = f"<div style='background: #ccfbf1; border: 1px solid #14b8a6; border-radius: 12px; padding: 16px; margin: 20px 0;'><p style='margin: 0; color: #0d9488; font-size: 14px; font-weight: 600;'>{icon('image', '#14b8a6', 18)} Property photos attached as ZIP file ({len(property_shots_keys)} images)</p></div>"
         except Exception as e:
             logger.warning(f"Failed to create property shots zip for {client_name}: {e}")
-            property_shots_info = f"<div style='background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;'><p style='margin: 0; color: #92400e; font-size: 14px;'>{icon('warning', '#f59e0b', 18)} Property photos available in dashboard ({len(property_shots_keys)} images)</p></div>"
 
-    content = f"""
-    <p>Hi {business_name},</p>
-    <p>{client_name} ({client_email}) completed a {property_type} cleaning intake form for {business_name}.</p>
+    mjml_content = new_client_notification_template(
+        business_name=business_name,
+        client_name=client_name,
+        client_email=client_email,
+        property_type=property_type,
+        property_shots_count=property_shots_count,
+    )
 
-    {property_shots_info}
-
-    <div style="background: {THEME['background']}; border-radius: 12px; padding: 20px; margin: 20px 0;">
-      <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: {THEME['text_primary']};">{icon('building', THEME['primary'], 20)} Key Details Captured:</h3>
-      <div style="margin-bottom: 12px;">
-        <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 4px;">Property type: {property_type}</div>
-        <div style="font-size: 14px; color: {THEME['text_muted']};">Full intake details available in dashboard (sq ft, peak hours, security codes, fragile displays)</div>
-      </div>
-    </div>
-
-    <div style="background: {THEME['background']}; border-radius: 12px; padding: 20px; margin: 20px 0;">
-      <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: {THEME['text_primary']};">{icon('sparkles', THEME['primary'], 20)} Next Steps:</h3>
-      <p style="margin: 0; font-size: 14px; color: {THEME['text_primary']};">Review property specifics in dashboard → Wait for auto-generated contract to be reviewed and signed by client</p>
-    </div>
-
-    <p style="font-size: 15px; color: {THEME['text_primary']}; font-weight: 600;">First booking awaits! {icon('check', THEME['success'], 20)}</p>
-
-    <p style="margin-top: 20px;">Best,<br/><strong>Cleanenroll Team</strong></p>
-    """
     return await send_email(
         to=to,
         subject=f"New {property_type} Property Intake: {client_name} Ready to Review",
-        title="New Client Property Intake Submission",
-        content_html=content,
+        mjml_content=mjml_content,
         is_user_email=True,
         attachments=attachments,
-    )
-
-
-async def send_contract_ready_email(
-    to: str,
-    client_name: str,
-    business_name: str,
-    contract_pdf_url: str,
-) -> dict:
-    """Send contract ready notification to client"""
-    content = f"""
-    <p>Hi {client_name},</p>
-    <p>Your service contract with <strong>{business_name}</strong> is ready for review.</p>
-    <p>Please download and review the contract. If you have any questions, feel free to reach out to {business_name} directly.</p>
-    <div style="background: {THEME['background']}; border-radius: 12px; padding: 16px; margin: 20px 0; text-align: center;">
-      <p style="margin: 0; color: {THEME['text_muted']}; font-size: 14px;">
-        📄 Your contract is attached to this email
-      </p>
-    </div>
-    """
-    return await send_email(
-        to=to,
-        subject=f"Your Contract from {business_name}",
-        title="Your Contract is Ready",
-        intro="Please review and sign your service agreement.",
-        content_html=content,
-        cta_url=contract_pdf_url,
-        cta_label="Download Contract",
-    )
-
-
-async def send_payment_confirmation(
-    to: str,
-    user_name: str,
-    plan_name: str,
-    amount: str,
-    next_billing_date: str,
-) -> dict:
-    """Send payment confirmation email"""
-    content = f"""
-    <p>Hi {user_name},</p>
-    <p>Thank you for your payment! Your subscription has been updated.</p>
-    <div style="background: {THEME['background']}; border-radius: 12px; padding: 20px; margin: 20px 0;">
-      <div style="margin-bottom: 12px;">
-        <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 4px;">Plan</div>
-        <div style="font-weight: 600; font-size: 16px; color: {THEME['text_primary']};">{plan_name}</div>
-      </div>
-      <div style="margin-bottom: 12px;">
-        <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 4px;">Amount Paid</div>
-        <div style="font-weight: 600; font-size: 16px; color: {THEME['success']};">{amount}</div>
-      </div>
-      <div>
-        <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 4px;">Next Billing</div>
-        <div style="font-size: 15px; color: {THEME['text_primary']};">{next_billing_date}</div>
-      </div>
-    </div>
-    <p>You can manage your subscription anytime from your billing settings.</p>
-    """
-    return await send_email(
-        to=to,
-        subject="Payment Confirmed - CleanEnroll",
-        title="Payment Successful! ✓",
-        intro="Your payment has been processed successfully.",
-        content_html=content,
-        cta_url="https://cleanenroll.com/billing",
-        cta_label="View Billing",
-        is_user_email=True,
-    )
-
-
-async def send_password_reset_email(to: str, reset_link: str) -> dict:
-    """Send password reset email"""
-    content = f"""
-    <p>We received a request to reset your password.</p>
-    <p>Click the button below to create a new password. This link will expire in 1 hour.</p>
-    <p style="margin-top: 24px; padding: 16px; background: {THEME['background']}; border-radius: 8px; font-size: 13px; color: {THEME['text_muted']};">
-      If you didn't request this, you can safely ignore this email. Your password won't be changed.
-    </p>
-    """
-    return await send_email(
-        to=to,
-        subject="Reset Your Password - CleanEnroll",
-        title="Reset Your Password",
-        content_html=content,
-        cta_url=reset_link,
-        cta_label="Reset Password",
-        is_user_email=True,
-    )
-
-
-async def send_subscription_expiring_email(
-    to: str,
-    user_name: str,
-    plan_name: str,
-    expiry_date: str,
-) -> dict:
-    """Send subscription expiring reminder"""
-    content = f"""
-    <p>Hi {user_name},</p>
-    <p>Your <strong>{plan_name}</strong> subscription is expiring on <strong>{expiry_date}</strong>.</p>
-    <p>To continue enjoying all features without interruption, please update your payment method or renew your subscription.</p>
-    <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 20px 0;">
-      <p style="margin: 0; color: #92400e; font-size: 14px;">
-        ⚠️ After expiration, you'll lose access to premium features.
-      </p>
-    </div>
-    """
-    return await send_email(
-        to=to,
-        subject="Your Subscription is Expiring Soon",
-        title="Subscription Expiring Soon",
-        intro="Don't lose access to your premium features.",
-        content_html=content,
-        cta_url="https://cleanenroll.com/billing",
-        cta_label="Renew Subscription",
-        is_user_email=True,
     )
 
 
@@ -790,40 +683,16 @@ async def send_form_submission_confirmation(
     property_type: str = "Property",
 ) -> dict:
     """Send confirmation to client after form submission"""
-    content = f"""
-    <p>Hi {client_name},</p>
-    <p>Thank you for completing your {property_type} cleaning intake form for {business_name}!</p>
-    <p>Your property details (square footage, peak hours, security codes, fragile displays) and proposed schedule have been received and processed successfully.</p>
+    mjml_content = form_submission_confirmation_template(
+        client_name=client_name,
+        business_name=business_name,
+        property_type=property_type,
+    )
 
-    <div style="background: {THEME['background']}; border-radius: 12px; padding: 20px; margin: 20px 0;">
-      <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: {THEME['text_primary']};">What's Next:</h3>
-      <div style="font-size: 14px; color: {THEME['text_primary']};">
-        <div style="margin-bottom: 8px;">{icon('check', THEME['success'], 18)} Auto-generated contract with dynamic pricing sent to your email</div>
-        <div style="margin-bottom: 8px;">{icon('check', THEME['success'], 18)} Review & sign at your convenience</div>
-        <div>{icon('check', THEME['success'], 18)} {business_name} will review your proposed schedule and confirm</div>
-      </div>
-    </div>
-
-    <div style="background: {THEME['background']}; border-radius: 12px; padding: 20px; margin: 20px 0;">
-      <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: {THEME['text_primary']};">Quick Confirmation:</h3>
-      <div style="font-size: 14px; color: {THEME['text_primary']};">
-        <div style="margin-bottom: 8px;">{icon('check', THEME['success'], 18)} {property_type} property intake completed</div>
-        <div style="margin-bottom: 8px;">{icon('check', THEME['success'], 18)} Proposed schedule submitted</div>
-        <div>{icon('check', THEME['success'], 18)} Ready for your review</div>
-      </div>
-    </div>
-
-    <p style="color: {THEME['text_muted']}; font-size: 14px;">
-      Questions? Contact {business_name} directly. Excited to get your store sparkling! {icon('sparkles', THEME['primary'], 18)}
-    </p>
-
-    <p style="margin-top: 20px;">Best,<br/><strong>Cleanenroll</strong></p>
-    """
     return await send_email(
         to=to,
         subject=f"Thank You for Your {property_type} Cleaning Intake, {client_name}",
-        title=f"Thank You for Your {property_type} Cleaning Intake",
-        content_html=content,
+        mjml_content=mjml_content,
     )
 
 
@@ -834,44 +703,16 @@ async def send_contract_signed_notification(
     contract_title: str,
 ) -> dict:
     """Notify business owner when a client signs their contract"""
-    content = f"""
-    <p>Great news! <strong>{client_name}</strong> has signed their contract.</p>
-    <div style="background: {THEME['background']}; border-radius: 12px; padding: 20px; margin: 20px 0;">
-      <div style="margin-bottom: 12px;">
-        <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 4px;">Contract</div>
-        <div style="font-weight: 600; font-size: 16px; color: {THEME['text_primary']};">{contract_title}</div>
-      </div>
-      <div style="margin-bottom: 12px;">
-        <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 4px;">Client</div>
-        <div style="font-size: 15px; color: {THEME['text_primary']};">{client_name}</div>
-      </div>
-      <div>
-        <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 4px;">Status</div>
-        <div style="display: inline-flex; align-items: center; gap: 6px; background: #fef3c7; color: #92400e; padding: 4px 12px; border-radius: 9999px; font-size: 13px; font-weight: 600;">
-          {icon('clock', '#f59e0b', 16)} Awaiting Your Signature
-        </div>
-      </div>
-    </div>
+    mjml_content = contract_signed_notification_template(
+        business_name=business_name,
+        client_name=client_name,
+        contract_title=contract_title,
+    )
 
-    <div style="background: #ccfbf1; border-left: 4px solid #14b8a6; padding: 16px; margin: 20px 0; border-radius: 8px;">
-      <p style="margin: 0; color: #0d9488; font-weight: 600; font-size: 14px;">{icon('calendar', '#14b8a6', 18)} Next Steps:</p>
-      <ul style="margin: 12px 0 0 0; padding-left: 20px; color: #0d9488;">
-        <li style="margin-bottom: 8px;">Review the schedule submitted by the client</li>
-        <li style="margin-bottom: 8px;">Accept the proposed time or suggest an alternative</li>
-        <li style="margin-bottom: 8px;">Sign the contract to finalize the agreement</li>
-      </ul>
-    </div>
-
-    <p>The contract is now awaiting your signature to be fully executed. Review the client's proposed schedule and sign to complete the agreement.</p>
-    """
     return await send_email(
         to=to,
         subject=f"Contract Signed by {client_name} - Review Schedule & Sign",
-        title="Client Has Signed!",
-        intro=f"A contract for {business_name} requires your signature.",
-        content_html=content,
-        cta_url="https://cleanenroll.com/contracts",
-        cta_label="Review & Sign Contract",
+        mjml_content=mjml_content,
         is_user_email=True,
     )
 
@@ -884,49 +725,17 @@ async def send_client_signature_confirmation(
     contract_pdf_url: Optional[str] = None,
 ) -> dict:
     """Notify client after they sign the contract (awaiting provider signature)"""
-    content = f"""
-    <p>Thank you for signing your contract with <strong>{business_name}</strong>!</p>
-
-    <div style="background: {THEME['background']}; border-radius: 12px; padding: 20px; margin: 20px 0;">
-      <div style="margin-bottom: 12px;">
-        <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 4px;">Contract</div>
-        <div style="font-weight: 600; font-size: 16px; color: {THEME['text_primary']};">{contract_title}</div>
-      </div>
-      <div>
-        <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 4px;">Status</div>
-        <div style="display: inline-flex; align-items: center; gap: 6px; background: #ccfbf1; color: #0d9488; padding: 4px 12px; border-radius: 9999px; font-size: 13px; font-weight: 600;">
-          {icon('clock', '#0d9488', 16)} Awaiting Provider Signature
-        </div>
-      </div>
-    </div>
-
-    <p>Your signature has been recorded successfully. The service provider will review and sign the contract shortly.</p>
-
-    <div style="background: #f0fdfa; border-left: 4px solid #14b8a6; padding: 16px; margin: 20px 0; border-radius: 8px;">
-      <p style="margin: 0; color: #0d9488; font-weight: 600; font-size: 14px;">{icon('check', '#14b8a6', 18)} What happens next?</p>
-      <ul style="margin: 12px 0 0 0; padding-left: 20px; color: #0d9488;">
-        <li style="margin-bottom: 8px;">The provider will review your proposed schedule</li>
-        <li style="margin-bottom: 8px;">They will either accept your time or suggest an alternative</li>
-        <li style="margin-bottom: 8px;">Once they sign, you'll receive a confirmation email</li>
-      </ul>
-    </div>
-
-    <p style="color: {THEME['text_muted']}; font-size: 14px;">
-      We'll notify you as soon as the contract is fully executed and your schedule is confirmed. If you have any questions, please contact {business_name} directly.
-    </p>
-    """
-
-    cta_url = contract_pdf_url if contract_pdf_url else None
-    cta_label = "View Signed Contract" if contract_pdf_url else None
+    mjml_content = client_signature_confirmation_template(
+        client_name=client_name,
+        business_name=business_name,
+        contract_title=contract_title,
+        contract_pdf_url=contract_pdf_url,
+    )
 
     return await send_email(
         to=to,
         subject=f"Contract Signed - Awaiting {business_name}",
-        title="Thank You for Signing!",
-        intro=f"Your contract with {business_name} has been signed successfully.",
-        content_html=content,
-        cta_url=cta_url,
-        cta_label=cta_label,
+        mjml_content=mjml_content,
         is_user_email=False,
     )
 
@@ -936,7 +745,7 @@ async def send_contract_fully_executed_email(
     client_name: str,
     business_name: str,
     contract_title: str,
-    contract_id: str,  # Now accepts public_id (string UUID)
+    contract_id: str,
     service_type: str,
     start_date: Optional[str] = None,
     total_value: Optional[float] = None,
@@ -947,72 +756,130 @@ async def send_contract_fully_executed_email(
     scheduled_start_time: Optional[str] = None,
 ) -> dict:
     """Notify client when contract is fully signed by both parties"""
+    mjml_content = contract_fully_executed_template(
+        client_name=client_name,
+        business_name=business_name,
+        contract_title=contract_title,
+        contract_id=contract_id,
+        service_type=service_type,
+        start_date=start_date,
+        total_value=total_value,
+        property_address=property_address,
+        business_phone=business_phone,
+        contract_pdf_url=contract_pdf_url,
+        scheduled_time_confirmed=scheduled_time_confirmed,
+        scheduled_start_time=scheduled_start_time,
+    )
 
-    # Build scheduled time section if applicable
-    schedule_section = ""
-    if scheduled_time_confirmed and scheduled_start_time:
-        schedule_section = f"""
-        <div style="background: #ccfbf1; border: 1px solid #14b8a6; border-radius: 12px; padding: 16px; margin: 20px 0;">
-          <p style="margin: 0 0 8px 0; color: #0d9488; font-size: 14px; font-weight: 600;">
-            {icon('check', '#14b8a6', 18)} First Cleaning Confirmed
-          </p>
-          <p style="margin: 0; color: #0d9488; font-size: 14px;">
-            {icon('calendar', '#0d9488', 18)} {scheduled_start_time}
-          </p>
-        </div>
-        """
-    elif start_date:
-        schedule_section = f"""
-        <div style="background: #ccfbf1; border: 1px solid #14b8a6; border-radius: 12px; padding: 16px; margin: 20px 0; text-align: center;">
-          <p style="margin: 0; color: #0d9488; font-size: 14px; font-weight: 600;">
-            {icon('check', '#14b8a6', 18)} Your signed contract PDF is attached. Your schedule has been confirmed!
-          </p>
-        </div>
-        """
-    else:
-        schedule_section = f"""
-        <div style="background: #ccfbf1; border: 1px solid #14b8a6; border-radius: 12px; padding: 16px; margin: 20px 0; text-align: center;">
-          <p style="margin: 0; color: #0d9488; font-size: 14px; font-weight: 600;">
-            {icon('sparkles', '#14b8a6', 18)} Your signed contract PDF is attached. Your schedule has been confirmed!
-          </p>
-        </div>
-        """
-
-    content = f"""
-    <p>Hi {client_name},</p>
-    <p>Perfect! <strong>{business_name}</strong> has reviewed and signed your service agreement{f' for {property_address}' if property_address else ''}.</p>
-
-    <div style="background: {THEME['background']}; border-radius: 12px; padding: 20px; margin: 24px 0;">
-      <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: {THEME['text_primary']};">Quick Details:</h3>
-      <div style="space-y: 12px;">
-        <div style="margin-bottom: 12px;">
-          <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 4px;">Contract ID</div>
-          <div style="font-weight: 600; font-size: 15px; color: {THEME['text_primary']}; font-family: monospace;">{contract_id}</div>
-        </div>
-        <div style="margin-bottom: 12px;">
-          <div style="color: {THEME['text_muted']}; font-size: 13px; margin-bottom: 4px;">Service Type</div>
-          <div style="font-size: 15px; color: {THEME['text_primary']};">{service_type}</div>
-        </div>
-        {f'<div style="margin-bottom: 12px;"><div style="color: {THEME["text_muted"]}; font-size: 13px; margin-bottom: 4px;">Total</div><div style="font-weight: 600; font-size: 16px; color: {THEME["primary"]};">${total_value:,.2f}</div></div>' if total_value else ''}
-      </div>
-    </div>
-
-    {schedule_section}
-
-    <p style="color: {THEME['text_muted']}; font-size: 14px;">
-      Questions? Reply here{f' or call {business_phone}' if business_phone else ''}.
-    </p>
-    <p style="margin-top: 20px;">Clean regards,<br/><strong>{business_name} Team</strong></p>
-    """
     return await send_email(
         to=to,
         subject=f"Great News! Your Cleaning Contract is Fully Signed & Ready [Contract {contract_id}]",
-        title="Contract Fully Signed!",
-        intro=f"{business_name} has reviewed and signed your service agreement.",
-        content_html=content,
-        cta_url=contract_pdf_url,
-        cta_label="Download Signed Contract" if contract_pdf_url else None,
+        mjml_content=mjml_content,
     )
+
+
+async def send_quote_submitted_confirmation(
+    to: str,
+    client_name: str,
+    business_name: str,
+    quote_amount: float,
+) -> dict:
+    """Send confirmation email to client after they approve the automated quote"""
+    mjml_content = quote_submitted_confirmation_template(
+        client_name=client_name,
+        business_name=business_name,
+        quote_amount=quote_amount,
+    )
+
+    return await send_email(
+        to=to,
+        subject=f"Your Quote Request Has Been Submitted - {business_name}",
+        mjml_content=mjml_content,
+    )
+
+
+async def send_quote_review_notification(
+    to: str,
+    provider_name: str,
+    client_name: str,
+    client_email: str,
+    quote_amount: float,
+    client_id: int,
+    client_public_id: str,
+) -> dict:
+    """Send notification email to provider when client approves a quote"""
+    mjml_content = quote_review_notification_template(
+        provider_name=provider_name,
+        client_name=client_name,
+        client_email=client_email,
+        quote_amount=quote_amount,
+        client_public_id=client_public_id,
+    )
+
+    return await send_email(
+        to=to,
+        subject=f"New Quote Approval Request from {client_name}",
+        mjml_content=mjml_content,
+    )
+
+
+async def send_quote_approved_email(
+    to: str,
+    client_name: str,
+    business_name: str,
+    final_quote_amount: float,
+    was_adjusted: bool,
+    adjustment_notes: str = None,
+    client_public_id: str = None,
+) -> dict:
+    """Send email to client when provider approves their quote"""
+    mjml_content = quote_approved_template(
+        client_name=client_name,
+        business_name=business_name,
+        final_quote_amount=final_quote_amount,
+        was_adjusted=was_adjusted,
+        adjustment_notes=adjustment_notes,
+        client_public_id=client_public_id,
+    )
+
+    subject = "Your Quote Has Been Updated" if was_adjusted else "Your Quote Has Been Approved"
+
+    return await send_email(
+        to=to,
+        subject=f"{subject} - {business_name}",
+        mjml_content=mjml_content,
+    )
+
+
+async def send_payment_received_notification(
+    provider_email: str,
+    provider_name: str,
+    client_name: str,
+    invoice_number: str,
+    amount: float,
+    currency: str = "USD",
+    payment_date: Optional[str] = None,
+) -> dict:
+    """Notify provider when client payment is received"""
+    mjml_content = payment_received_notification_template(
+        provider_name=provider_name,
+        client_name=client_name,
+        invoice_number=invoice_number,
+        amount=amount,
+        currency=currency,
+        payment_date=payment_date,
+    )
+
+    return await send_email(
+        to=provider_email,
+        subject=f"Payment Received: ${amount:,.2f} from {client_name}",
+        mjml_content=mjml_content,
+        is_user_email=True,
+    )
+
+
+# Keep legacy functions that are still needed but not yet converted
+# These will be gradually migrated to MJML templates
 
 
 async def send_provider_contract_signed_confirmation(

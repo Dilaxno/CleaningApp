@@ -131,7 +131,6 @@ class User(Base):
     clients = relationship("Client", back_populates="user")
     contracts = relationship("Contract", back_populates="user")
     schedules = relationship("Schedule", back_populates="user")
-    calendly_integration = relationship("CalendlyIntegration", back_populates="user", uselist=False)
     form_templates = relationship("FormTemplate", back_populates="user")
 
 
@@ -493,37 +492,6 @@ class Schedule(Base):
 
     user = relationship("User", back_populates="schedules")
     client = relationship("Client", back_populates="schedules")
-
-
-class CalendlyIntegration(Base):
-    __tablename__ = "calendly_integrations"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
-
-    # OAuth tokens
-    access_token = Column(Text, nullable=False)
-    refresh_token = Column(Text, nullable=False)
-    token_expires_at = Column(DateTime, nullable=False)
-
-    # Calendly user info
-    calendly_user_uri = Column(String(500), nullable=False)
-    calendly_user_email = Column(String(255), nullable=True)
-    calendly_organization_uri = Column(String(500), nullable=True)
-
-    # Selected event type for appointments
-    default_event_type_uri = Column(String(500), nullable=True)
-    default_event_type_name = Column(String(255), nullable=True)
-    default_event_type_url = Column(String(500), nullable=True)
-
-    # Settings
-    auto_sync_enabled = Column(Boolean, default=True)
-    webhook_uuid = Column(String(255), nullable=True)
-
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-
-    user = relationship("User", back_populates="calendly_integration")
 
 
 class SchedulingProposal(Base):
