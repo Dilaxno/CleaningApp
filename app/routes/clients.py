@@ -1236,7 +1236,7 @@ async def submit_public_form(
 
     # Create quote history entry if quote was accepted
     if data.quoteAccepted and quote_amount:
-        from .models import QuoteHistory
+        from ..models import QuoteHistory
         quote_history_entry = QuoteHistory(
             client_id=client.id,
             action="submitted",
