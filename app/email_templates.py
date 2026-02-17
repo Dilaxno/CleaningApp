@@ -45,7 +45,7 @@ def get_base_template(
               color="#ffffff"
               font-weight="600"
               border-radius="8px"
-              padding="14px 32px"
+              padding="18px 40px"
               font-size="16px">
               {cta_label}
             </mj-button>
@@ -322,7 +322,7 @@ def password_reset_template(reset_link: str) -> str:
               color="#ffffff"
               font-weight="600"
               border-radius="8px"
-              padding="14px 32px"
+              padding="18px 40px"
               font-size="16px">
               Reset Password
             </mj-button>
