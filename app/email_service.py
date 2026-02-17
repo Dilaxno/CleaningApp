@@ -197,7 +197,13 @@ def compile_mjml_to_html(mjml_content: str) -> str:
     """Compile MJML template to production-ready HTML"""
     try:
         result = mjml_to_html(mjml_content)
-        return result
+        # mjml_to_html returns a dict with 'html' and 'errors' keys
+        if isinstance(result, dict):
+            if result.get("errors"):
+                logger.warning(f"MJML compilation warnings: {result['errors']}")
+            return result.get("html", "")
+        # If it returns a string directly (older versions)
+        return str(result)
     except Exception as e:
         logger.error(f"MJML compilation error: {e}")
         raise Exception(f"Failed to compile MJML template: {str(e)}") from e
