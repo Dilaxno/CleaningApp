@@ -856,7 +856,7 @@ async def get_public_scheduling_info(contract_public_id: str, db: Session = Depe
         "status": contract.status,
         "consultation_required": consultation_required,
         "consultation_booking_url": consultation_booking_url,
-        "contract_pdf_url": contract.pdf_url,
+        "contract_pdf_url": None,  # PDF URL will be generated separately if needed
     }
 
 
