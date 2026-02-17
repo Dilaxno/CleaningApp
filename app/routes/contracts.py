@@ -569,12 +569,17 @@ async def sign_contract_as_provider(
     # Send notification email to client
     if client.email:
         try:
+            # Format public_id as CLN-XXXXXXXX
+            formatted_contract_id = (
+                f"CLN-{contract.public_id[:8].upper()}" if contract.public_id else f"#{contract.id}"
+            )
+
             await send_contract_fully_executed_email(
                 to=client.email,
                 client_name=client.contact_name or client.business_name,
                 business_name=business_name,
                 contract_title=contract.title,
-                contract_id=contract.public_id,  # Use public_id instead of id
+                contract_id=formatted_contract_id,
                 service_type=service_type,
                 start_date=start_date,
                 total_value=contract.total_value,
@@ -589,10 +594,15 @@ async def sign_contract_as_provider(
     # Send confirmation email to provider
     if current_user.email:
         try:
+            # Format public_id as CLN-XXXXXXXX
+            formatted_contract_id = (
+                f"CLN-{contract.public_id[:8].upper()}" if contract.public_id else f"#{contract.id}"
+            )
+
             await send_provider_contract_signed_confirmation(
                 to=current_user.email,
                 provider_name=current_user.full_name or "Provider",
-                contract_id=contract.public_id,  # Use public_id instead of id
+                contract_id=formatted_contract_id,
                 client_name=client.business_name,
                 property_address=property_address,
                 contract_pdf_url=pdf_url,
@@ -894,13 +904,18 @@ async def provider_sign_contract(
             # Get client info
             client = db.query(Client).filter(Client.id == contract.client_id).first()
 
+            # Format public_id as CLN-XXXXXXXX
+            formatted_contract_id = (
+                f"CLN-{contract.public_id[:8].upper()}" if contract.public_id else f"#{contract.id}"
+            )
+
             # Send fully executed email to client
             await send_contract_fully_executed_email(
                 to=client.email if client else "",
                 client_name=client.contact_name or client.business_name if client else "Client",
                 business_name=current_user.full_name or "Provider",
                 contract_title=contract.title,
-                contract_id=contract.public_id,
+                contract_id=formatted_contract_id,
                 service_type=contract.service_type or "Cleaning Service",
                 total_value=contract.total_value,
             )
@@ -909,7 +924,7 @@ async def provider_sign_contract(
             await send_provider_contract_signed_confirmation(
                 to=current_user.email,
                 provider_name=current_user.full_name or "Provider",
-                contract_id=contract.public_id,
+                contract_id=formatted_contract_id,
                 client_name=client.contact_name or client.business_name if client else "Client",
             )
         except Exception as e:

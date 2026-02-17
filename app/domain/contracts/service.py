@@ -171,6 +171,11 @@ class ContractService:
             )
             business_name = business_config.business_name if business_config else user.email
 
+            # Format public_id as CLN-XXXXXXXX
+            formatted_contract_id = (
+                f"CLN-{contract.public_id[:8].upper()}" if contract.public_id else f"#{contract.id}"
+            )
+
             # Send fully executed email
             try:
                 await send_contract_fully_executed_email(
@@ -178,7 +183,7 @@ class ContractService:
                     client_name=client.business_name or client.contact_name,
                     business_name=business_name,
                     contract_title=contract.title or "Service Agreement",
-                    contract_id=contract.public_id,
+                    contract_id=formatted_contract_id,
                     service_type=contract.service_type or "Cleaning Service",
                     total_value=contract.total_value,
                 )
