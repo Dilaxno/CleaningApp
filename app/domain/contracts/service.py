@@ -11,7 +11,7 @@ from ...email_service import (
     send_contract_fully_executed_email,
     send_provider_contract_signed_confirmation,
 )
-from ...models import Contract, User
+from ...models import BusinessConfig, Contract, User
 from ...utils.sanitization import sanitize_string
 from ...routes.upload import generate_presigned_url
 from .pdf_service import ContractPDFService
@@ -165,12 +165,18 @@ class ContractService:
             if client:
                 self.repo.update_client_status(self.db, client, "active")
 
+            # Get business config for business name
+            business_config = (
+                self.db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
+            )
+            business_name = business_config.business_name if business_config else user.email
+
             # Send fully executed email
             try:
                 await send_contract_fully_executed_email(
                     to=client.email,
                     client_name=client.business_name or client.contact_name,
-                    business_name=user.business_name or user.email,
+                    business_name=business_name,
                     contract_title=contract.title or "Service Agreement",
                     contract_id=contract.public_id,
                     service_type=contract.service_type or "Cleaning Service",
@@ -180,11 +186,17 @@ class ContractService:
             except Exception as e:
                 logger.error(f"Failed to send fully executed email: {e}")
 
+        # Get business config for provider name
+        business_config = (
+            self.db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
+        )
+        provider_name = business_config.business_name if business_config else user.email
+
         # Send provider confirmation email
         try:
             await send_provider_contract_signed_confirmation(
                 to=user.email,
-                provider_name=user.business_name or user.email,
+                provider_name=provider_name,
                 client_name=contract.client.business_name or contract.client.contact_name,
                 contract_id=str(contract.id),
             )
