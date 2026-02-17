@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from ..config import FRONTEND_URL, SQUARE_WEBHOOK_SIGNATURE_KEY
 from ..database import get_db
-from ..email_service import send_email, payment_received_notification_template
+from ..email_service import send_email, send_payment_received_notification
 from ..email_templates import THEME
 from ..models import Client, Contract, User
 from ..services.square_subscription import create_square_subscription

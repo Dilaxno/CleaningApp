@@ -28,12 +28,17 @@ from .email_templates import (
     contract_signed_notification_template,
     email_verification_template,
     form_submission_confirmation_template,
+    invoice_ready_template,
     new_client_notification_template,
+    new_schedule_request_template,
     password_reset_template,
+    payment_confirmation_client_template,
     payment_received_notification_template,
     quote_approved_template,
     quote_review_notification_template,
     quote_submitted_confirmation_template,
+    schedule_confirmed_client_template,
+    schedule_confirmed_provider_template,
     welcome_email_template,
 )
 
@@ -604,4 +609,282 @@ async def send_provider_contract_signed_confirmation(
         subject="You've Signed Contract - Client Notification Sent",
         mjml_content=mjml_content,
         is_user_email=True,
+    )
+
+
+async def send_scheduling_proposal_email(
+    client_email: str,
+    client_name: str,
+    provider_name: str,
+    contract_id: str,
+    time_slots: list[dict],
+    expires_at: str,
+) -> dict:
+    """Send scheduling proposal with time slots to client"""
+    from .email_templates import get_base_template
+
+    # Format time slots for display
+    slots_html = ""
+    for i, slot in enumerate(time_slots[:3], 1):
+        slots_html += f"""
+        <mj-text font-size="15px" color="{THEME['text_primary']}" padding="8px 0">
+          <strong>Option {i}:</strong> {slot.get('date', 'N/A')} at {slot.get('start_time', 'N/A')}
+        </mj-text>
+        """
+
+    schedule_url = f"https://app.cleanenroll.com/schedule-selection/{contract_id}"
+
+    content_sections = f"""
+    <mj-text>
+      Hi {client_name},
+    </mj-text>
+    
+    <mj-text>
+      <strong>{provider_name}</strong> has proposed the following time slots for your cleaning service:
+    </mj-text>
+    
+    {slots_html}
+    
+    <mj-text color="{THEME['text_muted']}" font-size="14px" padding="20px 0">
+      Please select your preferred time slot or propose an alternative. This proposal expires on {expires_at}.
+    </mj-text>
+    """
+
+    mjml_content = get_base_template(
+        title="Choose Your Cleaning Time",
+        preview_text=f"Scheduling Proposal from {provider_name}",
+        content_sections=content_sections,
+        cta_url=schedule_url,
+        cta_label="Select Time Slot",
+    )
+
+    return await send_email(
+        to=client_email,
+        subject=f"Choose Your Cleaning Time - {provider_name}",
+        mjml_content=mjml_content,
+    )
+
+
+async def send_scheduling_accepted_email(
+    provider_email: str,
+    provider_name: str,
+    client_name: str,
+    contract_id: str,
+    selected_date: str,
+    start_time: str,
+    end_time: str,
+    property_address: Optional[str] = None,
+) -> dict:
+    """Notify provider when client accepts a proposed time slot"""
+    mjml_content = schedule_confirmed_provider_template(
+        provider_name=provider_name,
+        client_name=client_name,
+        scheduled_date=selected_date,
+        scheduled_time=f"{start_time} - {end_time}",
+    )
+
+    return await send_email(
+        to=provider_email,
+        subject=f"Schedule Confirmed: {client_name} - {selected_date}",
+        mjml_content=mjml_content,
+        is_user_email=True,
+    )
+
+
+async def send_scheduling_counter_proposal_email(
+    provider_email: str,
+    provider_name: str,
+    client_name: str,
+    contract_id: str,
+    preferred_days: str,
+    time_window: str,
+    client_notes: Optional[str] = None,
+) -> dict:
+    """Notify provider when client proposes alternative times"""
+    from .email_templates import get_base_template
+
+    notes_section = ""
+    if client_notes:
+        notes_section = f"""
+        <mj-text font-size="14px" color="{THEME['text_muted']}" padding="16px 0 0 0">
+          <strong>Client Notes:</strong><br/>
+          {client_notes}
+        </mj-text>
+        """
+
+    content_sections = f"""
+    <mj-text>
+      Hi {provider_name},
+    </mj-text>
+    
+    <mj-text>
+      <strong>{client_name}</strong> has proposed alternative times for their cleaning service.
+    </mj-text>
+    
+    <mj-text font-size="15px" color="{THEME['text_primary']}" padding="20px 0 8px 0">
+      <strong>Preferred Days:</strong> {preferred_days}
+    </mj-text>
+    
+    <mj-text font-size="15px" color="{THEME['text_primary']}" padding="0">
+      <strong>Preferred Time:</strong> {time_window}
+    </mj-text>
+    
+    {notes_section}
+    
+    <mj-text color="#92400e" font-size="14px" padding="20px 0">
+      ⏰ <strong>Action Required:</strong> Please review and propose new time slots in your dashboard.
+    </mj-text>
+    """
+
+    mjml_content = get_base_template(
+        title="Client Proposed Alternative Times",
+        preview_text=f"Counter-Proposal from {client_name}",
+        content_sections=content_sections,
+        cta_url="https://cleanenroll.com/schedule",
+        cta_label="Review & Respond",
+        is_user_email=True,
+    )
+
+    return await send_email(
+        to=provider_email,
+        subject=f"Counter-Proposal: {client_name} Suggested Alternative Times",
+        mjml_content=mjml_content,
+        is_user_email=True,
+    )
+
+
+async def send_pending_booking_notification(
+    provider_email: str,
+    provider_name: str,
+    client_name: str,
+    scheduled_date: str,
+    start_time: str,
+    end_time: str,
+    property_address: Optional[str] = None,
+    schedule_id: Optional[int] = None,
+    client_email: Optional[str] = None,
+    client_phone: Optional[str] = None,
+    duration_minutes: Optional[int] = None,
+) -> dict:
+    """Notify provider about pending booking that requires approval"""
+    mjml_content = new_schedule_request_template(
+        provider_name=provider_name,
+        client_name=client_name,
+        scheduled_date=scheduled_date,
+        scheduled_time=f"{start_time} - {end_time}",
+        duration_minutes=duration_minutes or 120,
+        client_email=client_email or "",
+        client_phone=client_phone or "",
+        dashboard_url="https://cleanenroll.com/schedule",
+    )
+
+    return await send_email(
+        to=provider_email,
+        subject=f"New Booking Request: {client_name} - {scheduled_date}",
+        mjml_content=mjml_content,
+        is_user_email=True,
+    )
+
+
+async def send_invoice_payment_link_email(
+    to: str,
+    client_name: str,
+    business_name: str,
+    invoice_number: str,
+    invoice_title: str,
+    total_amount: float,
+    currency: str = "USD",
+    due_date: Optional[str] = None,
+    payment_link: Optional[str] = None,
+    is_recurring: bool = False,
+) -> dict:
+    """Send invoice with payment link to client"""
+    mjml_content = invoice_ready_template(
+        client_name=client_name,
+        business_name=business_name,
+        invoice_number=invoice_number,
+        amount=total_amount,
+        due_date=due_date or "",
+        payment_url=payment_link or "",
+    )
+
+    subject = f"Invoice Ready: {invoice_number} - {business_name}"
+    if is_recurring:
+        subject = f"Recurring Invoice: {invoice_number} - {business_name}"
+
+    return await send_email(
+        to=to,
+        subject=subject,
+        mjml_content=mjml_content,
+    )
+
+
+async def send_contract_cancelled_email(
+    client_email: str,
+    client_name: str,
+    contract_title: str,
+    business_name: str,
+    business_config=None,
+) -> dict:
+    """Send contract cancellation notification to client"""
+    from .email_templates import get_base_template
+
+    content_sections = f"""
+    <mj-text>
+      Hi {client_name},
+    </mj-text>
+    
+    <mj-text>
+      Your contract with <strong>{business_name}</strong> has been cancelled.
+    </mj-text>
+    
+    <mj-text font-size="14px" color="{THEME['text_muted']}" padding="20px 0">
+      Contract: {contract_title}<br/>
+      Status: Cancelled
+    </mj-text>
+    
+    <mj-text>
+      If you have any questions about this cancellation, please contact {business_name} directly.
+    </mj-text>
+    """
+
+    mjml_content = get_base_template(
+        title="Contract Cancelled",
+        preview_text=f"Contract Cancelled - {contract_title}",
+        content_sections=content_sections,
+    )
+
+    return await send_email(
+        to=client_email,
+        subject=f"Contract Cancelled - {contract_title}",
+        mjml_content=mjml_content,
+        business_config=business_config,
+    )
+
+
+async def send_payment_thank_you_email(
+    client_email: str,
+    client_name: str,
+    business_name: str,
+    invoice_number: str,
+    amount: float,
+    currency: str = "USD",
+) -> dict:
+    """Send payment thank you email to client"""
+    from datetime import datetime
+
+    payment_date = datetime.utcnow().strftime("%B %d, %Y")
+
+    mjml_content = payment_confirmation_client_template(
+        client_name=client_name,
+        business_name=business_name,
+        amount=amount,
+        contract_title=f"Invoice {invoice_number}",
+        payment_date=payment_date,
+    )
+
+    return await send_email(
+        to=client_email,
+        subject=f"Payment Received - Thank You! ({invoice_number})",
+        mjml_content=mjml_content,
     )

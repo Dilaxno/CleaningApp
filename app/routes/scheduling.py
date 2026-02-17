@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from ..auth import get_current_user
 from ..database import get_db
 from ..email_service import (
+    send_pending_booking_notification,
     send_scheduling_accepted_email,
     send_scheduling_counter_proposal_email,
     send_scheduling_proposal_email,
@@ -240,8 +241,6 @@ async def create_client_booking(data: ClientBookingRequest, db: Session = Depend
     Creates a PENDING schedule entry that requires provider approval.
     Works even if contract is not yet created (handles race condition).
     """
-    from ..email_service import send_pending_booking_notification
-
     logger.info(f"📅 Client booking request for client {data.client_id}")
 
     # Get client
@@ -1104,8 +1103,6 @@ async def create_direct_booking(data: DirectBookingRequest, db: Session = Depend
     db.refresh(schedule)
     # Send notification email to provider about pending booking (requires approval)
     try:
-        from ..email_service import send_pending_booking_notification
-
         if user.email:
             await send_pending_booking_notification(
                 provider_email=user.email,
