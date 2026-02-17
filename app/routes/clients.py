@@ -1926,47 +1926,43 @@ async def handle_schedule_decision(
 
             # Send confirmation email to client
             if client.email:
-                content = f"""
-                <p>Hi {client.contact_name or client.business_name},</p>
-                <p>Great news! <strong>{business_name}</strong> has confirmed your preferred cleaning schedule.</p>
-                <div style="background: #f0fdf4; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #22c55e;">
-                  <p style="color: #15803d; font-weight: 600; margin-bottom: 12px;">✓ Confirmed Cleaning Date & Time</p>
-                  <p style="color: #15803d; font-size: 16px; margin: 8px 0;">
-                    📅 {(start_dt.strftime("%A, %B %d, %Y") if start_dt else "Confirmed")}
-                  </p>
-                  <p style="color: #15803d; font-size: 16px; margin: 8px 0;">
-                    ⏰ {(start_dt.strftime("%I:%M %p") if start_dt else "")}{(" - " + end_dt.strftime("%I:%M %p")) if start_dt and end_dt else ""}
-                  </p>
-                </div>
-                <p>Your first cleaning is all set! We look forward to serving you.</p>
-                """
+                from ..email_templates import schedule_confirmed_client_template
+
+                scheduled_date = start_dt.strftime("%A, %B %d, %Y") if start_dt else "Confirmed"
+                scheduled_time = f"{start_dt.strftime('%I:%M %p') if start_dt else ''}{' - ' + end_dt.strftime('%I:%M %p') if start_dt and end_dt else ''}"
+
+                mjml_content = schedule_confirmed_client_template(
+                    client_name=client.contact_name or client.business_name,
+                    business_name=business_name,
+                    scheduled_date=scheduled_date,
+                    scheduled_time=scheduled_time,
+                )
 
                 await send_email(
                     to=client.email,
                     subject=f"Cleaning Schedule Confirmed - {business_name}",
-                    title="Your Cleaning is Scheduled! 🎉",
-                    content_html=content,
+                    mjml_content=mjml_content,
                 )
 
             # Send confirmation email to provider (same action, other side)
             provider = db.query(User).filter(User.id == client.user_id).first()
             if provider and provider.email:
-                provider_content = f"""
-                <p>Hi {provider.full_name or business_name},</p>
-                <p>You confirmed a cleaning schedule for <strong>{client.contact_name or client.business_name}</strong>.</p>
-                <div style="background: #f8fafc; border-radius: 12px; padding: 20px; margin: 20px 0;">
-                  <p style="margin:0; color:#334155; font-size: 14px;">
-                    📅 {(start_dt.strftime("%A, %B %d, %Y") if start_dt else "Confirmed")}
-                    {(start_dt.strftime("%I:%M %p") if start_dt else "")}{(" - " + end_dt.strftime("%I:%M %p")) if start_dt and end_dt else ""}
-                  </p>
-                </div>
-                """
+                from ..email_templates import schedule_confirmed_provider_template
+
+                scheduled_date = start_dt.strftime("%A, %B %d, %Y") if start_dt else "Confirmed"
+                scheduled_time = f"{start_dt.strftime('%I:%M %p') if start_dt else ''}{' - ' + end_dt.strftime('%I:%M %p') if start_dt and end_dt else ''}"
+
+                mjml_content = schedule_confirmed_provider_template(
+                    provider_name=provider.full_name or business_name,
+                    client_name=client.contact_name or client.business_name,
+                    scheduled_date=scheduled_date,
+                    scheduled_time=scheduled_time,
+                )
+
                 await send_email(
                     to=provider.email,
                     subject=f"Schedule Confirmed for {client.contact_name or client.business_name}",
-                    title="Schedule Confirmed",
-                    content_html=provider_content,
-                    is_user_email=True,
+                    mjml_content=mjml_content,
                 )
         elif data.action == "request_change":
             # Provider requested a different time
@@ -2039,22 +2035,24 @@ async def handle_schedule_decision(
             # Send confirmation email to provider (same action, other side)
             provider = db.query(User).filter(User.id == client.user_id).first()
             if provider and provider.email:
-                provider_content = f"""
-                <p>Hi {provider.full_name or business_name},</p>
-                <p>You proposed an alternative time for <strong>{client.contact_name or client.business_name}</strong>.</p>
+                from ..email_templates import alternative_time_proposed_provider_template
 
-                <div style="background: #f8fafc; border-radius: 12px; padding: 20px; margin: 20px 0;">
-                  <p style="margin:0; color:#334155; font-size: 14px;">
-                    Proposed: {proposed_start.strftime("%A, %B %d, %Y")} {proposed_start.strftime("%I:%M %p")} - {proposed_end.strftime("%I:%M %p")}
-                  </p>
-                </div>
-                """
+                proposed_date = proposed_start.strftime("%A, %B %d, %Y")
+                proposed_time = (
+                    f"{proposed_start.strftime('%I:%M %p')} - {proposed_end.strftime('%I:%M %p')}"
+                )
+
+                mjml_content = alternative_time_proposed_provider_template(
+                    provider_name=provider.full_name or business_name,
+                    client_name=client.contact_name or client.business_name,
+                    proposed_date=proposed_date,
+                    proposed_time=proposed_time,
+                )
+
                 await send_email(
                     to=provider.email,
                     subject=f"Alternative Time Sent to {client.contact_name or client.business_name}",
-                    title="Alternative Time Proposed",
-                    content_html=provider_content,
-                    is_user_email=True,
+                    mjml_content=mjml_content,
                 )
         else:
             raise HTTPException(status_code=400, detail="Invalid action")
@@ -2199,51 +2197,29 @@ async def submit_client_schedule(
                 start_dt = datetime.fromisoformat(scheduled_start)
                 end_dt = datetime.fromisoformat(scheduled_end)
 
-                provider_content = f"""
-                <p>Hi {provider.full_name or business_name},</p>
-                <p><strong>{client.contact_name or client.business_name}</strong> has selected their preferred cleaning time!</p>
+                from ..email_templates import new_schedule_request_template
 
-                <div style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-radius: 16px; padding: 24px; margin: 24px 0; border-left: 4px solid #0ea5e9;">
-                  <p style="color: #0c4a6e; font-weight: 600; margin-bottom: 16px; font-size: 16px;">📅 Requested Cleaning Schedule</p>
-                  <div style="background: white; border-radius: 12px; padding: 16px; margin-bottom: 12px;">
-                    <p style="color: #0c4a6e; font-size: 15px; margin: 8px 0;">
-                      <strong>Date:</strong> {start_dt.strftime("%A, %B %d, %Y")}
-                    </p>
-                    <p style="color: #0c4a6e; font-size: 15px; margin: 8px 0;">
-                      <strong>Time:</strong> {start_dt.strftime("%I:%M %p")} - {end_dt.strftime("%I:%M %p")}
-                    </p>
-                    <p style="color: #64748b; font-size: 13px; margin: 8px 0;">
-                      Duration: {data.durationMinutes} minutes
-                    </p>
-                  </div>
-                </div>
+                scheduled_date = start_dt.strftime("%A, %B %d, %Y")
+                scheduled_time = f"{start_dt.strftime('%I:%M %p')} - {end_dt.strftime('%I:%M %p')}"
+                dashboard_url = (
+                    f"{config.custom_forms_domain or 'https://cleanenroll.com'}/schedule"
+                )
 
-                <div style="background: #fef3c7; border-radius: 12px; padding: 16px; margin: 20px 0; border-left: 4px solid #f59e0b;">
-                  <p style="color: #92400e; font-size: 14px; margin: 0;">
-                    ⏰ <strong>Action Required:</strong> Please review and confirm this schedule in your dashboard, or propose an alternative time if needed.
-                  </p>
-                </div>
-
-                <p style="margin-top: 24px;">
-                  <a href="{config.custom_forms_domain or 'https://cleanenroll.com'}/schedule"
-                     style="display: inline-block; background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); color: white; padding: 14px 28px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 15px;">
-                    Review Schedule →
-                  </a>
-                </p>
-
-                <p style="color: #64748b; font-size: 13px; margin-top: 20px;">
-                  Client: {client.contact_name or client.business_name}<br>
-                  {f"Email: {client.email}" if client.email else ""}<br>
-                  {f"Phone: {client.phone}" if client.phone else ""}
-                </p>
-                """
+                mjml_content = new_schedule_request_template(
+                    provider_name=provider.full_name or business_name,
+                    client_name=client.contact_name or client.business_name,
+                    scheduled_date=scheduled_date,
+                    scheduled_time=scheduled_time,
+                    duration_minutes=data.durationMinutes,
+                    client_email=client.email or "",
+                    client_phone=client.phone or "",
+                    dashboard_url=dashboard_url,
+                )
 
                 await send_email(
                     to=provider.email,
                     subject=f"New Schedule Request from {client.contact_name or client.business_name}",
-                    title="Client Selected Cleaning Time! 📅",
-                    content_html=provider_content,
-                    is_user_email=True,
+                    mjml_content=mjml_content,
                 )
 
                 logger.info(f"✅ Schedule notification sent to provider {provider.email}")

@@ -941,3 +941,381 @@ __all__ = [
     "THEME",
     "LOGO_URL",
 ]
+
+
+def schedule_confirmed_client_template(
+    client_name: str,
+    business_name: str,
+    scheduled_date: str,
+    scheduled_time: str,
+) -> str:
+    """Schedule confirmed notification for client"""
+    content = f"""
+    <mj-text>
+      Hi {client_name},
+    </mj-text>
+    
+    <mj-text>
+      Great news! <strong>{business_name}</strong> has confirmed your preferred cleaning schedule.
+    </mj-text>
+    
+    <mj-text align="center" font-size="18px" font-weight="600" color="{THEME['success']}" padding="20px 0">
+      ✓ Confirmed Cleaning Date & Time
+    </mj-text>
+    
+    <mj-text align="center" font-size="16px" color="{THEME['text_primary']}" padding="0">
+      📅 {scheduled_date}
+    </mj-text>
+    
+    <mj-text align="center" font-size="16px" color="{THEME['text_primary']}" padding="0 0 20px 0">
+      ⏰ {scheduled_time}
+    </mj-text>
+    
+    <mj-text>
+      Your first cleaning is all set! We look forward to serving you.
+    </mj-text>
+    """
+
+    return get_base_template(
+        title="Your Cleaning is Scheduled! 🎉",
+        preview_text=f"Cleaning Schedule Confirmed - {business_name}",
+        content_sections=content,
+    )
+
+
+def schedule_confirmed_provider_template(
+    provider_name: str,
+    client_name: str,
+    scheduled_date: str,
+    scheduled_time: str,
+) -> str:
+    """Schedule confirmed notification for provider"""
+    content = f"""
+    <mj-text>
+      Hi {provider_name},
+    </mj-text>
+    
+    <mj-text>
+      You confirmed a cleaning schedule for <strong>{client_name}</strong>.
+    </mj-text>
+    
+    <mj-text font-size="14px" color="{THEME['text_muted']}" padding="20px 0">
+      📅 {scheduled_date} {scheduled_time}
+    </mj-text>
+    """
+
+    return get_base_template(
+        title="Schedule Confirmed",
+        preview_text=f"Schedule Confirmed for {client_name}",
+        content_sections=content,
+        is_user_email=True,
+    )
+
+
+def alternative_time_proposed_client_template(
+    client_name: str,
+    business_name: str,
+    proposed_date: str,
+    proposed_time: str,
+) -> str:
+    """Alternative time proposed notification for client"""
+    content = f"""
+    <mj-text>
+      Hi {client_name},
+    </mj-text>
+    
+    <mj-text>
+      <strong>{business_name}</strong> has proposed an alternative cleaning time for your convenience.
+    </mj-text>
+    
+    <mj-text align="center" font-size="16px" color="{THEME['primary']}" font-weight="600" padding="20px 0">
+      Proposed Alternative Time
+    </mj-text>
+    
+    <mj-text align="center" font-size="16px" color="{THEME['text_primary']}" padding="0">
+      📅 {proposed_date}
+    </mj-text>
+    
+    <mj-text align="center" font-size="16px" color="{THEME['text_primary']}" padding="0 0 20px 0">
+      ⏰ {proposed_time}
+    </mj-text>
+    
+    <mj-text>
+      The service provider will reach out to you shortly to confirm this new time or discuss other options that work for both of you.
+    </mj-text>
+    
+    <mj-text color="{THEME['text_muted']}" font-size="14px" padding="20px 0 0 0">
+      If you have any questions or concerns, please contact {business_name} directly.
+    </mj-text>
+    """
+
+    return get_base_template(
+        title="Schedule Change Request",
+        preview_text=f"Alternative Cleaning Time Proposed - {business_name}",
+        content_sections=content,
+    )
+
+
+def alternative_time_proposed_provider_template(
+    provider_name: str,
+    client_name: str,
+    proposed_date: str,
+    proposed_time: str,
+) -> str:
+    """Alternative time proposed confirmation for provider"""
+    content = f"""
+    <mj-text>
+      Hi {provider_name},
+    </mj-text>
+    
+    <mj-text>
+      You proposed an alternative time for <strong>{client_name}</strong>.
+    </mj-text>
+    
+    <mj-text font-size="14px" color="{THEME['text_muted']}" padding="20px 0">
+      Proposed: {proposed_date} {proposed_time}
+    </mj-text>
+    """
+
+    return get_base_template(
+        title="Alternative Time Proposed",
+        preview_text=f"Alternative Time Sent to {client_name}",
+        content_sections=content,
+        is_user_email=True,
+    )
+
+
+def new_schedule_request_template(
+    provider_name: str,
+    client_name: str,
+    scheduled_date: str,
+    scheduled_time: str,
+    duration_minutes: int,
+    client_email: str = "",
+    client_phone: str = "",
+    dashboard_url: str = "https://cleanenroll.com/schedule",
+) -> str:
+    """New schedule request notification for provider"""
+    contact_info = ""
+    if client_email or client_phone:
+        contact_info = f"""
+        <mj-text color="{THEME['text_muted']}" font-size="13px" padding="20px 0 0 0">
+          Client: {client_name}<br/>
+          {f"Email: {client_email}<br/>" if client_email else ""}
+          {f"Phone: {client_phone}" if client_phone else ""}
+        </mj-text>
+        """
+
+    content = f"""
+    <mj-text>
+      Hi {provider_name},
+    </mj-text>
+    
+    <mj-text>
+      <strong>{client_name}</strong> has selected their preferred cleaning time!
+    </mj-text>
+    
+    <mj-text font-size="16px" font-weight="600" color="{THEME['primary']}" padding="20px 0 12px 0">
+      📅 Requested Cleaning Schedule
+    </mj-text>
+    
+    <mj-text font-size="15px" color="{THEME['text_primary']}" padding="0">
+      <strong>Date:</strong> {scheduled_date}
+    </mj-text>
+    
+    <mj-text font-size="15px" color="{THEME['text_primary']}" padding="0">
+      <strong>Time:</strong> {scheduled_time}
+    </mj-text>
+    
+    <mj-text font-size="13px" color="{THEME['text_muted']}" padding="0 0 20px 0">
+      Duration: {duration_minutes} minutes
+    </mj-text>
+    
+    <mj-text color="#92400e" font-size="14px" padding="20px 0">
+      ⏰ <strong>Action Required:</strong> Please review and confirm this schedule in your dashboard, or propose an alternative time if needed.
+    </mj-text>
+    
+    {contact_info}
+    """
+
+    return get_base_template(
+        title="Client Selected Cleaning Time! 📅",
+        preview_text=f"New Schedule Request from {client_name}",
+        content_sections=content,
+        cta_url=dashboard_url,
+        cta_label="Review Schedule",
+        is_user_email=True,
+    )
+
+
+# Update exports
+__all__ = [
+    "get_base_template",
+    "welcome_email_template",
+    "email_verification_template",
+    "password_reset_template",
+    "new_client_notification_template",
+    "form_submission_confirmation_template",
+    "contract_signed_notification_template",
+    "client_signature_confirmation_template",
+    "contract_fully_executed_template",
+    "quote_submitted_confirmation_template",
+    "quote_review_notification_template",
+    "quote_approved_template",
+    "payment_received_notification_template",
+    "schedule_confirmed_client_template",
+    "schedule_confirmed_provider_template",
+    "alternative_time_proposed_client_template",
+    "alternative_time_proposed_provider_template",
+    "new_schedule_request_template",
+    "THEME",
+    "LOGO_URL",
+]
+
+
+def payment_confirmation_client_template(
+    client_name: str,
+    business_name: str,
+    amount: float,
+    contract_title: str,
+    payment_date: str,
+) -> str:
+    """Payment confirmation for client"""
+    content = f"""
+    <mj-text>
+      Hi {client_name},
+    </mj-text>
+    
+    <mj-text>
+      Thank you! Your payment for <strong>{contract_title}</strong> has been successfully processed.
+    </mj-text>
+    
+    <mj-text align="center" font-size="36px" font-weight="700" color="{THEME['success']}" padding="20px 0">
+      ${amount:,.2f}
+    </mj-text>
+    
+    <mj-text align="center" color="{THEME['success_light']}" font-size="16px" font-weight="600">
+      Payment Received
+    </mj-text>
+    
+    <mj-text font-size="14px" color="{THEME['text_muted']}" padding="20px 0">
+      Payment Date: {payment_date}<br/>
+      Service: {contract_title}<br/>
+      Provider: {business_name}
+    </mj-text>
+    
+    <mj-text font-size="13px" color="{THEME['text_muted']}">
+      This is an automated confirmation email. Please do not reply to this message.
+    </mj-text>
+    """
+
+    return get_base_template(
+        title="Payment Received",
+        preview_text=f"✅ Payment Received - {contract_title}",
+        content_sections=content,
+    )
+
+
+def subscription_activated_template(
+    client_name: str,
+    business_name: str,
+    frequency: str,
+    contract_title: str,
+    amount: float,
+) -> str:
+    """Subscription activated notification for client"""
+    content = f"""
+    <mj-text>
+      Hi {client_name},
+    </mj-text>
+    
+    <mj-text>
+      Great news! Your <strong>{frequency}</strong> subscription for <strong>{contract_title}</strong> is now active.
+    </mj-text>
+    
+    <mj-text align="center" font-size="32px" font-weight="700" color="{THEME['success']}" padding="20px 0">
+      ${amount:,.2f} / {frequency}
+    </mj-text>
+    
+    <mj-text>
+      Your card will be automatically charged on the scheduled date. You'll receive a confirmation email after each payment.
+    </mj-text>
+    
+    <mj-text font-size="14px" color="{THEME['text_muted']}" padding="20px 0 0 0">
+      Service Provider: {business_name}
+    </mj-text>
+    """
+
+    return get_base_template(
+        title="Subscription Activated! 🎉",
+        preview_text=f"Subscription Activated - {frequency.title()} {contract_title}",
+        content_sections=content,
+    )
+
+
+def invoice_ready_template(
+    client_name: str,
+    business_name: str,
+    invoice_number: str,
+    amount: float,
+    due_date: str = "",
+    payment_url: str = "",
+) -> str:
+    """Invoice ready notification for client"""
+    due_date_section = ""
+    if due_date:
+        due_date_section = f"<br/>Due Date: {due_date}"
+
+    content = f"""
+    <mj-text>
+      Hi {client_name},
+    </mj-text>
+    
+    <mj-text>
+      Your invoice from <strong>{business_name}</strong> is ready for payment.
+    </mj-text>
+    
+    <mj-text align="center" font-size="32px" font-weight="700" color="{THEME['text_primary']}" padding="20px 0">
+      ${amount:,.2f}
+    </mj-text>
+    
+    <mj-text font-size="14px" color="{THEME['text_muted']}">
+      Invoice: {invoice_number}{due_date_section}
+    </mj-text>
+    """
+
+    return get_base_template(
+        title="Invoice Ready",
+        preview_text=f"Invoice Ready - {invoice_number}",
+        content_sections=content,
+        cta_url=payment_url if payment_url else None,
+        cta_label="Pay Invoice" if payment_url else None,
+    )
+
+
+# Update exports
+__all__ = [
+    "get_base_template",
+    "welcome_email_template",
+    "email_verification_template",
+    "password_reset_template",
+    "new_client_notification_template",
+    "form_submission_confirmation_template",
+    "contract_signed_notification_template",
+    "client_signature_confirmation_template",
+    "contract_fully_executed_template",
+    "quote_submitted_confirmation_template",
+    "quote_review_notification_template",
+    "quote_approved_template",
+    "payment_received_notification_template",
+    "schedule_confirmed_client_template",
+    "schedule_confirmed_provider_template",
+    "alternative_time_proposed_client_template",
+    "alternative_time_proposed_provider_template",
+    "new_schedule_request_template",
+    "payment_confirmation_client_template",
+    "subscription_activated_template",
+    "invoice_ready_template",
+    "THEME",
+    "LOGO_URL",
+]

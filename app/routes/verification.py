@@ -275,27 +275,16 @@ async def request_email_change(
         # Send OTP to new email
         try:
             from ..email_service import send_email
+            from ..email_templates import email_verification_template
 
-            content = f"""
-            <p>Hi {current_user.full_name or 'there'},</p>
-            <p>You requested to change your email address to <strong>{new_email}</strong>.</p>
-            <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
-              <p style="color: #64748b; font-size: 14px; margin-bottom: 12px;">Your verification code is:</p>
-              <div style="font-size: 36px; font-weight: bold; color: #00C4B4; letter-spacing: 8px; font-family: monospace;">
-                {otp}
-              </div>
-              <p style="color: #64748b; font-size: 13px; margin-top: 12px;">This code expires in 10 minutes</p>
-            </div>
-            <p style="color: #64748b; font-size: 14px;">
-              If you didn't request this change, please ignore this email or contact support if you're concerned.
-            </p>
-            """
+            mjml_content = email_verification_template(
+                user_name=current_user.full_name or "there", otp=otp
+            )
 
             await send_email(
                 to=new_email,
                 subject="Verify Your New Email Address",
-                title="Email Change Verification",
-                content_html=content,
+                mjml_content=mjml_content,
             )
             return {
                 "success": True,

@@ -286,10 +286,26 @@ async def send_invoice_ready_email(client: Client, contract: Contract, user: Use
         """
 
         if client.email:
+            from ..email_templates import invoice_ready_template
+
+            invoice_number = (
+                f"INV-{contract.public_id[:8].upper() if contract.public_id else contract.id}"
+            )
+            due_date = (datetime.utcnow() + timedelta(days=7)).strftime("%B %d, %Y")
+
+            mjml_content = invoice_ready_template(
+                client_name=client_name,
+                business_name=business_name,
+                invoice_number=invoice_number,
+                amount=contract.total_value,
+                due_date=due_date,
+                payment_url=contract.square_invoice_url,
+            )
+
             await send_email(
                 to=client.email,
                 subject=f"Invoice Ready - {contract.title}",
-                html_content=html,
+                mjml_content=mjml_content,
                 business_config=business_config,
             )
 

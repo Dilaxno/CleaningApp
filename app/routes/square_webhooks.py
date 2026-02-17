@@ -14,6 +14,8 @@ from sqlalchemy.orm import Session
 
 from ..config import FRONTEND_URL, SQUARE_WEBHOOK_SIGNATURE_KEY
 from ..database import get_db
+from ..email_service import send_email, payment_received_notification_template
+from ..email_templates import THEME
 from ..models import Client, Contract, User
 from ..services.square_subscription import create_square_subscription
 
@@ -331,8 +333,6 @@ async def handle_payment_event(event_data: dict, db: Session):
 async def send_payment_confirmation_email(client: Client, contract: Contract, user: User):
     """Send payment confirmation email to client and owner"""
     try:
-        from ..database import get_db
-        from ..email_service import send_email
         from ..models import BusinessConfig
 
         # Get business config for branding
@@ -689,11 +689,21 @@ async def send_payment_confirmation_email(client: Client, contract: Contract, us
             </html>
             """
 
+            from ..email_templates import payment_confirmation_client_template
+
+            payment_date = datetime.utcnow().strftime("%B %d, %Y")
+            mjml_content = payment_confirmation_client_template(
+                client_name=client.contact_name or client.business_name,
+                business_name=business_name,
+                amount=contract.total_value,
+                contract_title=contract.title,
+                payment_date=payment_date,
+            )
+
             await send_email(
                 to=client.email,
                 subject=f"✅ Payment Received - {contract.title}",
-                title="Payment Received",
-                content_html=client_html,
+                mjml_content=mjml_content,
                 business_config=business_config,
             )
 
@@ -775,11 +785,24 @@ async def send_payment_confirmation_email(client: Client, contract: Contract, us
             </div>
             """
 
+            invoice_number = (
+                f"INV-{contract.public_id[:8].upper() if contract.public_id else contract.id}"
+            )
+            payment_date = datetime.utcnow().strftime("%B %d, %Y")
+
+            mjml_content = payment_received_notification_template(
+                provider_name=user.full_name or "there",
+                client_name=client.contact_name or client.business_name,
+                invoice_number=invoice_number,
+                amount=contract.total_value,
+                currency="USD",
+                payment_date=payment_date,
+            )
+
             await send_email(
                 to=user.email,
                 subject=f"💰 Payment Received - {client.business_name}",
-                title="Payment Received",
-                content_html=owner_html,
+                mjml_content=mjml_content,
                 business_config=business_config,
             )
 
@@ -796,8 +819,6 @@ async def send_subscription_confirmation_email(
 ):
     """Send subscription confirmation email to client with detailed information"""
     try:
-        from ..database import get_db
-        from ..email_service import send_email
         from ..models import BusinessConfig
 
         db = next(get_db())
@@ -918,11 +939,20 @@ async def send_subscription_confirmation_email(
             </div>
             """
 
+            from ..email_templates import subscription_activated_template
+
+            mjml_content = subscription_activated_template(
+                client_name=client.contact_name or client.business_name,
+                business_name=business_name,
+                frequency=contract.frequency,
+                contract_title=contract.title,
+                amount=contract.total_value,
+            )
+
             await send_email(
                 to=client.email,
                 subject=f"🎉 Subscription Activated - {contract.frequency.title()} {contract.title}",
-                title="Subscription Activated",
-                content_html=html,
+                mjml_content=mjml_content,
                 business_config=business_config,
             )
 
@@ -943,8 +973,6 @@ async def send_subscription_notification_to_owner(
 ):
     """Send subscription notification email to owner when subscription is created"""
     try:
-        from ..database import get_db
-        from ..email_service import send_email
         from ..models import BusinessConfig
 
         db = next(get_db())
@@ -1078,11 +1106,46 @@ async def send_subscription_notification_to_owner(
             </div>
             """
 
+            from ..email_templates import get_base_template
+
+            content_sections = f"""
+            <mj-text>
+              Hi {user.full_name or 'there'},
+            </mj-text>
+            
+            <mj-text>
+              Great news! A new subscription has been created for <strong>{client.business_name}</strong>.
+            </mj-text>
+            
+            <mj-text align="center" font-size="32px" font-weight="700" color="{THEME['success']}" padding="20px 0">
+              ${contract.total_value:,.2f} / {contract.frequency}
+            </mj-text>
+            
+            <mj-text font-size="14px" color="{THEME['text_muted']}">
+              Client: {client.contact_name or client.business_name}<br/>
+              Service: {contract.title}<br/>
+              Frequency: {contract.frequency.title()}
+            </mj-text>
+            
+            <mj-text font-size="14px" color="{THEME['text_muted']}" padding="20px 0 0 0">
+              The subscription is now active and will automatically charge the client according to the schedule.
+              All payments will be processed through Square and deposited to your account.
+            </mj-text>
+            """
+
+            mjml_content = get_base_template(
+                title="Subscription Created",
+                preview_text=f"🔄 Subscription Created - {client.business_name} - {contract.frequency.title()}",
+                content_sections=content_sections,
+                cta_url=f"{FRONTEND_URL}/dashboard/contracts/{contract.public_id}",
+                cta_label="View Contract",
+                is_user_email=True,
+            )
+
             await send_email(
                 to=user.email,
                 subject=f"🔄 Subscription Created - {client.business_name} - {contract.frequency.title()}",
-                title="Subscription Created",
-                content_html=html,
+                mjml_content=mjml_content,
                 business_config=business_config,
             )
 
@@ -1103,8 +1166,6 @@ async def send_provider_payment_notification(
 ):
     """Send paid invoice confirmation email to service provider"""
     try:
-        from ..database import get_db
-        from ..email_service import send_email
         from ..models import BusinessConfig
 
         db = next(get_db())
@@ -1219,11 +1280,24 @@ async def send_provider_payment_notification(
             </div>
             """
 
+            invoice_number = (
+                f"INV-{contract.public_id[:8].upper() if contract.public_id else contract.id}"
+            )
+            payment_date = datetime.utcnow().strftime("%B %d, %Y")
+
+            mjml_content = payment_received_notification_template(
+                provider_name=user.full_name or "there",
+                client_name=client_name,
+                invoice_number=invoice_number,
+                amount=contract.total_value,
+                currency="USD",
+                payment_date=payment_date,
+            )
+
             await send_email(
                 to=user.email,
                 subject=f"💰 Payment Received - ${contract.total_value:.2f} from {client_name}",
-                title="Payment Received",
-                content_html=html,
+                mjml_content=mjml_content,
                 business_config=business_config,
             )
 

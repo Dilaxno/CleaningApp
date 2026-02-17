@@ -38,14 +38,27 @@ async def send_custom_email(
     current_user: User = Depends(get_current_user),
 ):
     """Send a custom email (authenticated users only)"""
+    from ..email_templates import get_base_template
+
+    # Create MJML content from custom email data
+    content_sections = f"""
+    <mj-text>
+      {sanitize_string(data.content_html)}
+    </mj-text>
+    """
+
+    mjml_content = get_base_template(
+        title=sanitize_string(data.title),
+        preview_text=sanitize_string(data.intro) if data.intro else sanitize_string(data.title),
+        content_sections=content_sections,
+        cta_url=data.cta_url,
+        cta_label=sanitize_string(data.cta_label) if data.cta_label else None,
+    )
+
     result = await send_email(
         to=data.to,
         subject=sanitize_string(data.subject),
-        title=sanitize_string(data.title),
-        content_html=sanitize_string(data.content_html),
-        intro=sanitize_string(data.intro) if data.intro else None,
-        cta_url=data.cta_url,
-        cta_label=sanitize_string(data.cta_label) if data.cta_label else None,
+        mjml_content=mjml_content,
     )
     return {"success": True, "result": result}
 
@@ -65,14 +78,26 @@ async def send_test_email(
             user_name=current_user.full_name or "User",
         )
     else:
+        from ..email_templates import get_base_template
+
+        content_sections = """
+        <mj-text>
+          If you're seeing this, your email setup is working correctly!
+        </mj-text>
+        """
+
+        mjml_content = get_base_template(
+            title="Test Email",
+            preview_text="This is a test email to verify your email configuration.",
+            content_sections=content_sections,
+            cta_url="https://cleanenroll.com/dashboard",
+            cta_label="Go to Dashboard",
+        )
+
         result = await send_email(
             to=current_user.email,
             subject="Test Email from CleanEnroll",
-            title="Test Email",
-            intro="This is a test email to verify your email configuration.",
-            content_html="<p>If you're seeing this, your email setup is working correctly!</p>",
-            cta_url="https://cleanenroll.com/dashboard",
-            cta_label="Go to Dashboard",
+            mjml_content=mjml_content,
         )
 
     return {"success": True, "sent_to": current_user.email, "result": result}

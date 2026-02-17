@@ -227,22 +227,16 @@ async def request_password_reset_otp(
     store_otp_in_redis(data.email, otp, expires_in_seconds=600)  # 10 minutes
 
     # Send OTP email
-    content_html = f"""
-    <p>You requested to reset your password. Use the code below to verify your identity:</p>
-    <div style="background: #f8f9fb; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
-      <p style="margin: 0 0 8px 0; color: #64748B; font-size: 14px;">Your verification code</p>
-      <p style="margin: 0; font-size: 36px; font-weight: 700; letter-spacing: 8px; color: #1E293B;">{otp}</p>
-    </div>
-    <p style="color: #64748B; font-size: 14px;">This code expires in 10 minutes.</p>
-    <p style="color: #64748B; font-size: 14px;">If you didn't request this, please ignore this email.</p>
-    """
+    # Send OTP email using MJML template
+    from ..email_templates import password_reset_template
+
+    reset_link = f"https://cleanenroll.com/reset-password?otp={otp}&email={data.email}"
+    mjml_content = password_reset_template(reset_link)
 
     await send_email(
         to=data.email,
         subject="Password Reset Code - CleanEnroll",
-        title="Reset Your Password",
-        intro="We received a request to reset your password.",
-        content_html=content_html,
+        mjml_content=mjml_content,
     )
 
     return {"message": "If an account exists with this email, you will receive an OTP code."}
@@ -398,22 +392,14 @@ async def send_recovery_code(
 
     # Send to recovery email if available
     if user.recovery_email_verified and user.recovery_email:
-        content_html = f"""
-        <p>You requested to recover your CleanEnroll account. Use the code below to verify your identity:</p>
-        <div style="background: #f8f9fb; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
-          <p style="margin: 0 0 8px 0; color: #64748B; font-size: 14px;">Your recovery code</p>
-          <p style="margin: 0; font-size: 36px; font-weight: 700; letter-spacing: 8px; color: #1E293B;">{otp}</p>
-        </div>
-        <p style="color: #64748B; font-size: 14px;">This code expires in 10 minutes.</p>
-        <p style="color: #64748B; font-size: 14px;">If you didn't request this, please secure your account immediately.</p>
-        """
+        from ..email_templates import email_verification_template
+
+        mjml_content = email_verification_template(user_name=user.full_name or "there", otp=otp)
 
         await send_email(
             to=user.recovery_email,
             subject="Account Recovery Code - CleanEnroll",
-            title="Recover Your Account",
-            intro="We received a request to recover your account.",
-            content_html=content_html,
+            mjml_content=mjml_content,
         )
         logger.info(f"Recovery code sent to recovery email for: {user.email}")
 

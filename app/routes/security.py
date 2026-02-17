@@ -111,20 +111,14 @@ def generate_otp() -> str:
 async def send_otp_email(email: str, otp: str):
     """Send OTP via email"""
     try:
+        from ..email_templates import email_verification_template
+
+        mjml_content = email_verification_template(user_name="there", otp=otp)
+
         await send_email(
-            to_email=email,
+            to=email,
             subject="Security Verification Code",
-            html_content=f"""
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2 style="color: #00C4B4;">Security Verification</h2>
-                <p>Your verification code is:</p>
-                <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
-                    <h1 style="color: #1E293B; font-size: 36px; margin: 0; letter-spacing: 8px;">{otp}</h1>
-                </div>
-                <p style="color: #64748B;">This code will expire in 10 minutes.</p>
-                <p style="color: #64748B; font-size: 12px;">If you didn't request this code, please ignore this email.</p>
-            </div>
-            """,
+            mjml_content=mjml_content,
         )
     except Exception as e:
         logger.error(f"Failed to send OTP email: {e}")
