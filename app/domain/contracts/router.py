@@ -315,11 +315,12 @@ async def sign_contract_public(
 
     # Update contract with client signature
     contract.client_signature = signature_data
-    contract.client_signed_at = datetime.utcnow()
+    contract.client_signature_timestamp = datetime.utcnow()
 
-    # Update status if not already signed
+    # Update status to signed (both parties have signed)
     if contract.status in ["new", "pending_signature"]:
-        contract.status = "client_signed"
+        contract.status = "signed"
+        contract.both_parties_signed_at = datetime.utcnow()
 
     service.db.commit()
     service.db.refresh(contract)
