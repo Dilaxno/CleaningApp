@@ -147,7 +147,8 @@ class ContractRepository:
     @staticmethod
     def mark_contract_fully_executed(db: Session, contract: Contract) -> Contract:
         """Mark contract as fully executed (both parties signed)"""
-        contract.status = "fully_executed"
+        contract.status = "signed"
+        contract.both_parties_signed_at = datetime.utcnow()
         db.commit()
         db.refresh(contract)
         return contract

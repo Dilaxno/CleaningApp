@@ -317,15 +317,16 @@ async def sign_contract_public(
     contract.client_signature = signature_data
     contract.client_signature_timestamp = datetime.utcnow()
 
-    # Update status to signed (both parties have signed)
-    if contract.status in ["new", "pending_signature"]:
-        contract.status = "signed"
-        contract.both_parties_signed_at = datetime.utcnow()
+    # Keep status as "new" - waiting for provider to review and sign
+    # Status will only change to "signed" when provider signs back
+    # This allows provider to review the client signature and schedule before finalizing
 
     service.db.commit()
     service.db.refresh(contract)
 
-    logger.info(f"✅ Contract {contract.id} signed by client via public endpoint")
+    logger.info(
+        f"✅ Contract {contract.id} signed by client via public endpoint - awaiting provider signature"
+    )
 
     # Send confirmation emails
     business_name = "Service Provider"

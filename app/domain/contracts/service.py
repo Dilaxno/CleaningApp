@@ -195,7 +195,7 @@ class ContractService:
         return {
             "message": "Contract signed successfully",
             "status": contract.status,
-            "fullyExecuted": contract.status == "fully_executed",
+            "fullyExecuted": contract.status == "signed",
         }
 
     def get_contract_with_details(self, contract_id: int, user: User) -> dict:
