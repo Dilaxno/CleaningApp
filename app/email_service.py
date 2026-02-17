@@ -22,6 +22,7 @@ from mjml import mjml_to_html
 
 from .config import EMAIL_FROM_ADDRESS, FRONTEND_URL, RESEND_API_KEY, SMTP_ENCRYPTION_KEY
 from .email_templates import (
+    THEME,
     client_signature_confirmation_template,
     contract_fully_executed_template,
     contract_signed_notification_template,
@@ -549,6 +550,58 @@ async def send_payment_received_notification(
     return await send_email(
         to=provider_email,
         subject=f"Payment Received: ${amount:,.2f} from {client_name}",
+        mjml_content=mjml_content,
+        is_user_email=True,
+    )
+
+
+async def send_provider_contract_signed_confirmation(
+    to: str,
+    provider_name: str,
+    contract_id: str,
+    client_name: str,
+    property_address: Optional[str] = None,
+    contract_pdf_url: Optional[str] = None,
+) -> dict:
+    """Send provider-only confirmation after they sign a contract"""
+    from .email_templates import get_base_template
+
+    content_sections = f"""
+    <mj-text>
+      Hi {provider_name},
+    </mj-text>
+    
+    <mj-text>
+      Contract <strong>{contract_id}</strong> for {client_name}{f' ({property_address})' if property_address else ''} is fully executed. Client has been notified.
+    </mj-text>
+    
+    <mj-text font-size="14px" color="{THEME['text_muted']}" padding="20px 0">
+      Contract ID: {contract_id}<br/>
+      Client: {client_name}
+      {f'<br/>Property: {property_address}' if property_address else ''}
+    </mj-text>
+    
+    <mj-text color="{THEME['success']}" font-size="14px" font-weight="700" padding="20px 0 0 0">
+      ✓ Schedule confirmed - Ready to start service
+    </mj-text>
+    
+    <mj-text color="{THEME['text_muted']}" font-size="14px">
+      The client's proposed schedule has been reviewed and confirmed. Signed PDF attached.
+    </mj-text>
+    """
+
+    mjml_content = get_base_template(
+        title="Contract Signed Successfully",
+        preview_text="You've Signed Contract - Client Notification Sent",
+        content_sections=content_sections,
+        cta_url=contract_pdf_url,
+        cta_label="View Signed Contract" if contract_pdf_url else None,
+        is_user_email=True,
+    )
+
+    return await send_email(
+        to=to,
+        subject="You've Signed Contract - Client Notification Sent",
         mjml_content=mjml_content,
         is_user_email=True,
     )

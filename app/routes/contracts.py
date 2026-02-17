@@ -891,8 +891,27 @@ async def provider_sign_contract(
 
         # Send confirmation emails
         try:
-            await send_contract_fully_executed_email(contract, current_user, db)
-            await send_provider_contract_signed_confirmation(contract, current_user, db)
+            # Get client info
+            client = db.query(Client).filter(Client.id == contract.client_id).first()
+
+            # Send fully executed email to client
+            await send_contract_fully_executed_email(
+                to=client.email if client else "",
+                client_name=client.contact_name or client.business_name if client else "Client",
+                business_name=current_user.full_name or "Provider",
+                contract_title=contract.title,
+                contract_id=contract.public_id,
+                service_type=contract.service_type or "Cleaning Service",
+                total_value=contract.total_value,
+            )
+
+            # Send provider confirmation
+            await send_provider_contract_signed_confirmation(
+                to=current_user.email,
+                provider_name=current_user.full_name or "Provider",
+                contract_id=contract.public_id,
+                client_name=client.contact_name or client.business_name if client else "Client",
+            )
         except Exception as e:
             logger.error(f"Failed to send confirmation emails: {str(e)}")
 

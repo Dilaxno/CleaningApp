@@ -64,9 +64,7 @@ class ContractService:
         # Sanitize text inputs
         title = sanitize_string(data.title) if data.title else "Untitled Contract"
         description = sanitize_string(data.description) if data.description else None
-        terms_conditions = (
-            sanitize_string(data.termsConditions) if data.termsConditions else None
-        )
+        terms_conditions = sanitize_string(data.termsConditions) if data.termsConditions else None
 
         contract_data = {
             "client_id": data.clientId,
@@ -129,7 +127,7 @@ class ContractService:
             "deletedCount": deleted_count,
         }
 
-    def sign_contract_as_provider(
+    async def sign_contract_as_provider(
         self, contract_id: int, signature_request: ProviderSignatureRequest, user: User
     ) -> dict:
         """Sign contract as provider"""
@@ -149,17 +147,13 @@ class ContractService:
                 signature_data = generate_presigned_url(business_config.signature_url)
             except Exception as e:
                 logger.error(f"Failed to generate presigned URL for signature: {e}")
-                raise HTTPException(
-                    status_code=500, detail="Failed to load default signature"
-                )
+                raise HTTPException(status_code=500, detail="Failed to load default signature")
         else:
             signature_data = signature_request.signature_data
 
         # Sign the contract
         signed_at = datetime.utcnow()
-        contract = self.repo.sign_contract_provider(
-            self.db, contract, signature_data, signed_at
-        )
+        contract = self.repo.sign_contract_provider(self.db, contract, signature_data, signed_at)
 
         # Check if both parties have signed
         if contract.client_signature:
@@ -173,12 +167,14 @@ class ContractService:
 
             # Send fully executed email
             try:
-                send_contract_fully_executed_email(
-                    client_email=client.email,
+                await send_contract_fully_executed_email(
+                    to=client.email,
                     client_name=client.business_name or client.contact_name,
-                    provider_name=user.business_name or user.email,
-                    contract_id=contract.id,
-                    contract_public_id=contract.public_id,
+                    business_name=user.business_name or user.email,
+                    contract_title=contract.title or "Service Agreement",
+                    contract_id=contract.public_id,
+                    service_type=contract.service_type or "Cleaning Service",
+                    total_value=contract.total_value,
                 )
                 logger.info(f"✅ Sent fully executed email for contract {contract.id}")
             except Exception as e:
@@ -186,11 +182,11 @@ class ContractService:
 
         # Send provider confirmation email
         try:
-            send_provider_contract_signed_confirmation(
-                provider_email=user.email,
+            await send_provider_contract_signed_confirmation(
+                to=user.email,
                 provider_name=user.business_name or user.email,
                 client_name=contract.client.business_name or contract.client.contact_name,
-                contract_id=contract.id,
+                contract_id=str(contract.id),
             )
             logger.info(f"✅ Sent provider signature confirmation for contract {contract.id}")
         except Exception as e:

@@ -40,9 +40,7 @@ async def get_contracts(
     current_user: User = Depends(get_current_user),
     service: ContractService = Depends(get_contract_service),
     client_id: Optional[int] = Query(None, description="Filter contracts by client ID"),
-    include_all: bool = Query(
-        False, description="Include contracts in all onboarding statuses"
-    ),
+    include_all: bool = Query(False, description="Include contracts in all onboarding statuses"),
 ):
     """Get all contracts for the current user"""
     contracts = service.get_contracts(current_user, client_id, include_all)
@@ -214,7 +212,7 @@ async def sign_contract_as_provider(
     service: ContractService = Depends(get_contract_service),
 ):
     """Sign contract as provider"""
-    return service.sign_contract_as_provider(contract_id, signature_request, current_user)
+    return await service.sign_contract_as_provider(contract_id, signature_request, current_user)
 
 
 @router.post("/{contract_id}/provider-sign")
@@ -225,7 +223,7 @@ async def provider_sign_contract(
     service: ContractService = Depends(get_contract_service),
 ):
     """Alternative endpoint for provider signing (alias)"""
-    return service.sign_contract_as_provider(contract_id, signature_request, current_user)
+    return await service.sign_contract_as_provider(contract_id, signature_request, current_user)
 
 
 # ============================================================================
