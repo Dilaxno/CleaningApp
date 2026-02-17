@@ -51,16 +51,15 @@ class BillingRepository:
         if dodo_customer_id is not None:
             user.dodo_customer_id = dodo_customer_id
         if dodo_subscription_id is not None:
-            user.dodo_subscription_id = dodo_subscription_id
+            # Map dodo_subscription_id to subscription_id field in User model
+            user.subscription_id = dodo_subscription_id
 
         db.commit()
         db.refresh(user)
         return user
 
     @staticmethod
-    def get_usage_counts(
-        db: Session, user_id: int, start_date: Optional[datetime] = None
-    ) -> dict:
+    def get_usage_counts(db: Session, user_id: int, start_date: Optional[datetime] = None) -> dict:
         """Get usage counts for clients, contracts, and schedules"""
         query_clients = db.query(Client).filter(Client.user_id == user_id)
         query_contracts = db.query(Contract).filter(Contract.user_id == user_id)

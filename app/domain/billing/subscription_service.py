@@ -68,16 +68,14 @@ class SubscriptionService:
             "plan": user.plan,
             "billing_cycle": user.billing_cycle,
             "subscription_status": user.subscription_status,
-            "dodo_customer_id": user.dodo_customer_id,
-            "dodo_subscription_id": user.dodo_subscription_id,
+            "dodo_customer_id": getattr(user, "dodo_customer_id", None),
+            "dodo_subscription_id": getattr(user, "subscription_id", None),
         }
 
     async def create_checkout_session(self, request: CheckoutRequest, user: User) -> dict:
         """Create a checkout session"""
         if not dodo_service.is_available():
-            raise HTTPException(
-                status_code=503, detail="Billing service temporarily unavailable"
-            )
+            raise HTTPException(status_code=503, detail="Billing service temporarily unavailable")
 
         # Build return URLs
         success_url = f"{FRONTEND_URL}{request.return_path or '/billing?checkout=success'}"
@@ -103,9 +101,7 @@ class SubscriptionService:
                 metadata=metadata,
             )
 
-            logger.info(
-                f"✅ Created checkout session for user {user.id}: {response.get('id')}"
-            )
+            logger.info(f"✅ Created checkout session for user {user.id}: {response.get('id')}")
 
             return {
                 "checkout_url": response.get("url"),
@@ -117,18 +113,17 @@ class SubscriptionService:
 
     async def cancel_subscription(self, request: CancelRequest, user: User) -> dict:
         """Cancel user's subscription"""
-        if not user.dodo_subscription_id:
+        subscription_id = getattr(user, "subscription_id", None)
+        if not subscription_id:
             raise HTTPException(status_code=400, detail="No active subscription found")
 
         if not dodo_service.is_available():
-            raise HTTPException(
-                status_code=503, detail="Billing service temporarily unavailable"
-            )
+            raise HTTPException(status_code=503, detail="Billing service temporarily unavailable")
 
         try:
             # Cancel subscription in Dodo
             await dodo_service.cancel_subscription(
-                subscription_id=user.dodo_subscription_id,
+                subscription_id=subscription_id,
                 cancel_at_period_end=request.cancel_at_period_end,
             )
 
@@ -165,18 +160,17 @@ class SubscriptionService:
 
     async def change_plan(self, request: ChangePlanRequest, user: User) -> dict:
         """Change subscription plan"""
-        if not user.dodo_subscription_id:
+        subscription_id = getattr(user, "subscription_id", None)
+        if not subscription_id:
             raise HTTPException(status_code=400, detail="No active subscription found")
 
         if not dodo_service.is_available():
-            raise HTTPException(
-                status_code=503, detail="Billing service temporarily unavailable"
-            )
+            raise HTTPException(status_code=503, detail="Billing service temporarily unavailable")
 
         try:
             # Update subscription in Dodo
             response = await dodo_service.update_subscription(
-                subscription_id=user.dodo_subscription_id,
+                subscription_id=subscription_id,
                 product_id=request.product_id,
                 quantity=request.quantity,
                 proration_billing_mode=request.proration_billing_mode,
@@ -218,42 +212,40 @@ class SubscriptionService:
 
     async def get_payment_method(self, user: User) -> dict:
         """Get user's payment method"""
-        if not user.dodo_customer_id:
+        dodo_customer_id = getattr(user, "dodo_customer_id", None)
+        if not dodo_customer_id:
             return {
                 "dodo_customer_id": None,
                 "payment_method": None,
             }
 
         if not dodo_service.is_available():
-            raise HTTPException(
-                status_code=503, detail="Billing service temporarily unavailable"
-            )
+            raise HTTPException(status_code=503, detail="Billing service temporarily unavailable")
 
         try:
-            payment_method = await dodo_service.get_payment_method(user.dodo_customer_id)
+            payment_method = await dodo_service.get_payment_method(dodo_customer_id)
             return {
-                "dodo_customer_id": user.dodo_customer_id,
+                "dodo_customer_id": dodo_customer_id,
                 "payment_method": payment_method,
             }
         except Exception as e:
             logger.error(f"Failed to get payment method for user {user.id}: {e}")
             return {
-                "dodo_customer_id": user.dodo_customer_id,
+                "dodo_customer_id": dodo_customer_id,
                 "payment_method": None,
             }
 
     async def get_payments(self, user: User, limit: int = 10) -> list:
         """Get user's payment history"""
-        if not user.dodo_customer_id:
+        dodo_customer_id = getattr(user, "dodo_customer_id", None)
+        if not dodo_customer_id:
             return []
 
         if not dodo_service.is_available():
-            raise HTTPException(
-                status_code=503, detail="Billing service temporarily unavailable"
-            )
+            raise HTTPException(status_code=503, detail="Billing service temporarily unavailable")
 
         try:
-            payments = await dodo_service.list_payments(user.dodo_customer_id, limit)
+            payments = await dodo_service.list_payments(dodo_customer_id, limit)
             return payments
         except Exception as e:
             logger.error(f"Failed to get payments for user {user.id}: {e}")
