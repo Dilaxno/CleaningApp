@@ -840,6 +840,20 @@ async def get_public_scheduling_info(contract_public_id: str, db: Session = Depe
     consultation_required = False
     consultation_booking_url = None
 
+    # Generate PDF URL if contract has a PDF
+    contract_pdf_url = None
+    if contract.pdf_key and contract.public_id:
+        from ..config import FRONTEND_URL
+
+        if "localhost" in FRONTEND_URL:
+            backend_base = FRONTEND_URL.replace("localhost:5173", "localhost:8000").replace(
+                "localhost:5174", "localhost:8000"
+            )
+        else:
+            backend_base = "https://api.cleanenroll.com"
+
+        contract_pdf_url = f"{backend_base}/contracts/pdf/public/{contract.public_id}"
+
     return {
         "contract_id": contract.id,
         "contract_public_id": contract.public_id,
@@ -856,7 +870,7 @@ async def get_public_scheduling_info(contract_public_id: str, db: Session = Depe
         "status": contract.status,
         "consultation_required": consultation_required,
         "consultation_booking_url": consultation_booking_url,
-        "contract_pdf_url": None,  # PDF URL will be generated separately if needed
+        "contract_pdf_url": contract_pdf_url,
     }
 
 
