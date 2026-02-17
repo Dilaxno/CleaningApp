@@ -139,7 +139,7 @@ class ContractRepository:
         contract.provider_signature = signature_data
         contract.provider_signed_at = signed_at
         contract.signed_at = signed_at
-        contract.status = "provider_signed"
+        contract.status = "signed"
         db.commit()
         db.refresh(contract)
         return contract
