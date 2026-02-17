@@ -1260,11 +1260,44 @@ def invoice_ready_template(
     amount: float,
     due_date: str = "",
     payment_url: str = "",
+    is_deposit: bool = False,
+    deposit_percentage: int = 50,
+    remaining_balance: Optional[float] = None,
 ) -> str:
-    """Invoice ready notification for client"""
+    """
+    Invoice ready notification for client
+
+    Args:
+        is_deposit: If True, shows deposit information
+        deposit_percentage: Percentage of deposit
+        remaining_balance: Remaining balance after deposit
+    """
     due_date_section = ""
     if due_date:
         due_date_section = f"<br/>Due Date: {due_date}"
+
+    # Deposit-specific messaging
+    deposit_info = ""
+    if is_deposit and remaining_balance:
+        total_job_amount = amount + remaining_balance
+        deposit_info = f"""
+    <mj-text font-size="14px" color="{THEME['text_muted']}" padding="10px 0">
+      <strong>Payment Structure:</strong><br/>
+      • Total Job Amount: ${total_job_amount:,.2f}<br/>
+      • Deposit ({deposit_percentage}%): ${amount:,.2f}<br/>
+      • Balance Due After Completion: ${remaining_balance:,.2f}
+    </mj-text>
+    
+    <mj-text>
+      This {deposit_percentage}% deposit secures your service appointment. The remaining balance of ${remaining_balance:,.2f} will be invoiced after your service is completed.
+    </mj-text>
+        """
+    elif is_deposit:
+        deposit_info = f"""
+    <mj-text>
+      This is a {deposit_percentage}% deposit to secure your service appointment. The remaining balance will be invoiced after your service is completed.
+    </mj-text>
+        """
 
     content = f"""
     <mj-text>
@@ -1272,7 +1305,7 @@ def invoice_ready_template(
     </mj-text>
     
     <mj-text>
-      Your invoice from <strong>{business_name}</strong> is ready for payment.
+      Your {'deposit ' if is_deposit else ''}invoice from <strong>{business_name}</strong> is ready for payment.
     </mj-text>
     
     <mj-text align="center" font-size="32px" font-weight="700" color="{THEME['text_primary']}" padding="20px 0">
@@ -1282,14 +1315,18 @@ def invoice_ready_template(
     <mj-text font-size="14px" color="{THEME['text_muted']}">
       Invoice: {invoice_number}{due_date_section}
     </mj-text>
+    
+    {deposit_info}
     """
 
+    cta_label = "Pay Deposit" if is_deposit else "Pay Invoice"
+
     return get_base_template(
-        title="Invoice Ready",
-        preview_text=f"Invoice Ready - {invoice_number}",
+        title=f"{'Deposit ' if is_deposit else ''}Invoice Ready",
+        preview_text=f"{'Deposit ' if is_deposit else ''}Invoice Ready - {invoice_number}",
         content_sections=content,
         cta_url=payment_url if payment_url else None,
-        cta_label="Pay Invoice" if payment_url else None,
+        cta_label=cta_label if payment_url else None,
     )
 
 

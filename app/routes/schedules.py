@@ -443,7 +443,7 @@ async def approve_schedule(
                             "One-time",
                         ]
 
-                        logger.info(f"📧 Sending Square invoice email to {client.email}")
+                        logger.info(f"📧 Sending Square deposit invoice email to {client.email}")
 
                         await send_invoice_payment_link_email(
                             to=client.email,
@@ -451,16 +451,21 @@ async def approve_schedule(
                             business_name=current_user.full_name
                             or current_user.business_name
                             or "Your Service Provider",
-                            invoice_number=f"INV-{contract.public_id[:8].upper()}",
+                            invoice_number=f"INV-{contract.public_id[:8].upper()}-DEP",
                             invoice_title=contract.title or "Cleaning Service",
-                            total_amount=contract.total_value or 0,
+                            total_amount=contract.deposit_amount or (contract.total_value / 2),
                             currency=contract.currency or "USD",
                             due_date=(datetime.utcnow() + timedelta(days=15)).strftime("%B %d, %Y"),
                             payment_link=contract.square_invoice_url,
                             is_recurring=is_recurring,
-                            recurrence_pattern=contract.frequency if is_recurring else None,
+                            is_deposit=True,
+                            deposit_percentage=50,
+                            remaining_balance=contract.remaining_balance
+                            or (contract.total_value / 2),
                         )
-                        logger.info(f"✅ Square invoice email sent successfully to {client.email}")
+                        logger.info(
+                            f"✅ Square deposit invoice email sent successfully to {client.email}"
+                        )
                     except Exception as e:
                         logger.error(
                             f"❌ Failed to send Square invoice email to {client.email}: {str(e)}"

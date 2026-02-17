@@ -414,10 +414,20 @@ class Contract(Base):
     custom_scope = Column(JSON, nullable=True)  # Provider's custom scope (inclusions/exclusions)
 
     # Square payment integration
-    square_invoice_id = Column(String(255), nullable=True)  # Square invoice ID
-    square_invoice_url = Column(Text, nullable=True)  # Public Square payment URL
+    square_invoice_id = Column(String(255), nullable=True)  # Square invoice ID (deposit invoice)
+    square_invoice_url = Column(Text, nullable=True)  # Public Square payment URL (deposit)
     square_payment_status = Column(String(50), nullable=True)  # pending, paid, failed, cancelled
     square_invoice_created_at = Column(DateTime, nullable=True)  # When invoice was created
+
+    # Deposit tracking (50% upfront payment)
+    deposit_amount = Column(Float, nullable=True)  # 50% deposit amount
+    deposit_paid = Column(Boolean, default=False)  # Whether deposit has been paid
+    deposit_paid_at = Column(DateTime, nullable=True)  # When deposit was paid
+    remaining_balance = Column(Float, nullable=True)  # Remaining 50% balance
+    balance_invoice_id = Column(String(255), nullable=True)  # Square invoice ID for balance
+    balance_invoice_url = Column(Text, nullable=True)  # Payment URL for balance invoice
+    balance_paid = Column(Boolean, default=False)  # Whether balance has been paid
+    balance_paid_at = Column(DateTime, nullable=True)  # When balance was paid
 
     # Square subscription integration (for recurring services)
     square_subscription_id = Column(String(255), nullable=True)  # Square subscription ID

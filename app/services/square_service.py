@@ -176,11 +176,18 @@ async def create_square_invoice_for_contract(
                     "message": "Invalid response from Square",
                 }
 
-            # Update contract with Square invoice details
+            # Update contract with Square invoice details and deposit tracking
             contract.square_invoice_id = invoice_id
             contract.square_invoice_url = invoice_url
             contract.square_payment_status = "pending"
             contract.square_invoice_created_at = datetime.utcnow()
+
+            # Store deposit and balance amounts
+            total_amount = contract.total_value
+            contract.deposit_amount = total_amount / 2
+            contract.remaining_balance = total_amount / 2
+            contract.deposit_paid = False
+
             db.commit()
 
             logger.info(
@@ -231,15 +238,21 @@ async def _prepare_invoice_data(
     contract: Contract, client: Client, schedule: Schedule, location_id: str, access_token: str
 ) -> dict[str, Any]:
     """
-    Prepare Square invoice data structure
+    Prepare Square invoice data structure with 50% deposit
 
     Square requires creating an Order first, then attaching it to the invoice.
+    The invoice will charge 50% upfront as a deposit, with the remaining 50% due after job completion.
     https://developer.squareup.com/reference/square/invoices-api/create-invoice
     """
     # Calculate due date (default 15 days from now)
     due_date = datetime.utcnow() + timedelta(days=15)
 
-    # Step 1: Create an Order first
+    # Calculate 50% deposit amount
+    total_amount = contract.total_value
+    deposit_amount = total_amount / 2  # 50% deposit
+    remaining_balance = total_amount - deposit_amount
+
+    # Step 1: Create an Order with line items showing the split
     service_description = contract.description or contract.title
     if schedule.service_type:
         service_description = (
@@ -248,19 +261,26 @@ async def _prepare_invoice_data(
 
     order_data = {
         "order": {
-            "location_id": location_id,  # Use actual location_id, not merchant_id
+            "location_id": location_id,
             "line_items": [
                 {
-                    "name": contract.title,
+                    "name": f"{contract.title} - 50% Deposit",
                     "quantity": "1",
                     "base_price_money": {
-                        "amount": int(contract.total_value * 100),  # Convert to cents
+                        "amount": int(deposit_amount * 100),  # Convert to cents
                         "currency": contract.currency or "USD",
                     },
-                    "note": service_description,
+                    "note": f"{service_description} | Total Job Amount: ${total_amount:.2f} | Deposit (50%): ${deposit_amount:.2f} | Balance Due After Completion: ${remaining_balance:.2f}",
                 }
             ],
-            "metadata": {"contract_id": str(contract.id), "schedule_id": str(schedule.id)},
+            "metadata": {
+                "contract_id": str(contract.id),
+                "schedule_id": str(schedule.id),
+                "payment_type": "deposit",
+                "deposit_percentage": "50",
+                "total_amount": str(total_amount),
+                "remaining_balance": str(remaining_balance),
+            },
         },
         "idempotency_key": f"order-{contract.id}-{int(datetime.utcnow().timestamp())}",
     }
@@ -297,22 +317,20 @@ async def _prepare_invoice_data(
     # Use SHARE_MANUALLY so Cleanenroll handles all email communications
     invoice_data = {
         "invoice": {
-            "location_id": location_id,  # Use actual location_id, not merchant_id
-            "order_id": order_id,  # Reference the created order
-            "primary_recipient": {"customer_id": customer_id},  # Only customer_id, no other fields
+            "location_id": location_id,
+            "order_id": order_id,
+            "primary_recipient": {"customer_id": customer_id},
             "payment_requests": [
                 {
                     "request_type": "BALANCE",
                     "due_date": due_date.strftime("%Y-%m-%d"),
                     "automatic_payment_source": "NONE",
-                    # No reminders - Cleanenroll will handle all email communications
                 }
             ],
-            "delivery_method": "SHARE_MANUALLY",  # Cleanenroll sends emails, not Square
-            "invoice_number": f"INV-{contract.public_id[:8].upper()}",  # Use secure random ID
-            "title": contract.title,
-            "description": f"Service scheduled for {schedule.scheduled_date.strftime('%B %d, %Y')} at {schedule.start_time}",
-            # Don't set scheduled_at - not needed for manual sharing
+            "delivery_method": "SHARE_MANUALLY",
+            "invoice_number": f"INV-{contract.public_id[:8].upper()}-DEP",  # -DEP suffix for deposit
+            "title": f"{contract.title} - 50% Deposit",
+            "description": f"50% deposit for service scheduled on {schedule.scheduled_date.strftime('%B %d, %Y')} at {schedule.start_time}. Total job amount: ${total_amount:.2f}. Remaining balance of ${remaining_balance:.2f} will be invoiced after job completion.",
             "accepted_payment_methods": {
                 "card": True,
                 "square_gift_card": False,
@@ -447,7 +465,7 @@ async def _publish_square_invoice(invoice_id: str, access_token: str) -> dict[st
 
 async def check_square_payment_status(contract: Contract, db: Session) -> Optional[str]:
     """
-    Check the payment status of a Square invoice
+    Check the payment status of a Square invoice (deposit or balance)
 
     Returns:
         Payment status: "paid", "pending", "failed", "cancelled", or None if not found
@@ -503,6 +521,13 @@ async def check_square_payment_status(contract: Contract, db: Session) -> Option
             # Update contract if status changed
             if contract.square_payment_status != mapped_status:
                 contract.square_payment_status = mapped_status
+
+                # If deposit invoice is paid, mark deposit as paid
+                if mapped_status == "paid" and not contract.deposit_paid:
+                    contract.deposit_paid = True
+                    contract.deposit_paid_at = datetime.utcnow()
+                    logger.info(f"✅ Deposit paid for contract {contract.id}")
+
                 db.commit()
                 logger.info(
                     f"Updated Square payment status for contract {contract.id}: {mapped_status}"
@@ -513,3 +538,224 @@ async def check_square_payment_status(contract: Contract, db: Session) -> Option
     except Exception as e:
         logger.error(f"Error checking Square payment status for contract {contract.id}: {str(e)}")
         return None
+
+
+async def create_balance_invoice_for_contract(
+    contract: Contract, client: Client, user: User, db: Session
+) -> dict[str, Any]:
+    """
+    Create a Square invoice for the remaining 50% balance after job completion
+
+    Args:
+        contract: The contract with completed job
+        client: The client who will receive the invoice
+        user: The provider (business owner)
+        db: Database session
+
+    Returns:
+        Dict with success status, invoice_id, and invoice_url
+    """
+    try:
+        # Check if balance invoice already exists
+        if contract.balance_invoice_id:
+            logger.info(
+                f"Balance invoice already exists for contract {contract.id}: {contract.balance_invoice_id}"
+            )
+            return {
+                "success": False,
+                "reason": "invoice_exists",
+                "message": "Balance invoice already created",
+                "invoice_id": contract.balance_invoice_id,
+                "invoice_url": contract.balance_invoice_url,
+            }
+
+        # Check if deposit was paid
+        if not contract.deposit_paid:
+            logger.warning(
+                f"Cannot create balance invoice - deposit not paid for contract {contract.id}"
+            )
+            return {
+                "success": False,
+                "reason": "deposit_not_paid",
+                "message": "Deposit must be paid before creating balance invoice",
+            }
+
+        # Get Square integration
+        square_integration = (
+            db.query(SquareIntegration)
+            .filter(SquareIntegration.user_id == user.firebase_uid, SquareIntegration.is_active)
+            .first()
+        )
+
+        if not square_integration:
+            return {
+                "success": False,
+                "reason": "square_not_connected",
+                "message": "Square integration not connected",
+            }
+
+        # Decrypt access token
+        access_token = decrypt_token(square_integration.access_token)
+
+        # Get location_id
+        location_id = await _get_location_id(access_token, square_integration.merchant_id)
+
+        # Prepare balance invoice data
+        invoice_data = await _prepare_balance_invoice_data(
+            contract=contract,
+            client=client,
+            location_id=location_id,
+            access_token=access_token,
+        )
+
+        # Create Square invoice via API
+        async with httpx.AsyncClient(timeout=30.0) as http_client:
+            response = await http_client.post(
+                f"{SQUARE_API_URL}/invoices",
+                json=invoice_data,
+                headers={
+                    "Square-Version": "2024-12-18",
+                    "Authorization": f"Bearer {access_token}",
+                    "Content-Type": "application/json",
+                },
+            )
+
+            if response.status_code not in [200, 201]:
+                error_detail = response.text
+                logger.error(f"Square balance invoice creation failed: {error_detail}")
+                return {
+                    "success": False,
+                    "reason": "api_error",
+                    "message": f"Square API error: {error_detail}",
+                }
+
+            invoice_response = response.json()
+            invoice = invoice_response.get("invoice", {})
+            invoice_id = invoice.get("id")
+            invoice_url = invoice.get("public_url")
+
+            if not invoice_id:
+                return {
+                    "success": False,
+                    "reason": "invalid_response",
+                    "message": "Invalid response from Square",
+                }
+
+            # Update contract with balance invoice details
+            contract.balance_invoice_id = invoice_id
+            contract.balance_invoice_url = invoice_url
+            db.commit()
+
+            logger.info(f"✅ Balance invoice created: {invoice_id} for contract {contract.id}")
+
+            # Publish the invoice
+            publish_result = await _publish_square_invoice(invoice_id, access_token)
+            if publish_result.get("success"):
+                published_url = publish_result.get("public_url")
+                if published_url:
+                    contract.balance_invoice_url = published_url
+                    db.commit()
+                    invoice_url = published_url
+
+            return {
+                "success": True,
+                "invoice_id": invoice_id,
+                "invoice_url": invoice_url,
+                "message": "Balance invoice created successfully",
+            }
+
+    except Exception as e:
+        logger.error(f"Error creating balance invoice for contract {contract.id}: {str(e)}")
+        db.rollback()
+        return {"success": False, "reason": "exception", "message": f"Error: {str(e)}"}
+
+
+async def _prepare_balance_invoice_data(
+    contract: Contract, client: Client, location_id: str, access_token: str
+) -> dict[str, Any]:
+    """
+    Prepare Square invoice data for the remaining 50% balance
+    """
+    # Calculate due date (7 days from now for balance)
+    due_date = datetime.utcnow() + timedelta(days=7)
+
+    remaining_balance = contract.remaining_balance or (contract.total_value / 2)
+
+    # Create Order for balance
+    order_data = {
+        "order": {
+            "location_id": location_id,
+            "line_items": [
+                {
+                    "name": f"{contract.title} - Final Balance",
+                    "quantity": "1",
+                    "base_price_money": {
+                        "amount": int(remaining_balance * 100),
+                        "currency": contract.currency or "USD",
+                    },
+                    "note": f"Final 50% balance payment for completed service. Total job amount: ${contract.total_value:.2f}",
+                }
+            ],
+            "metadata": {
+                "contract_id": str(contract.id),
+                "payment_type": "balance",
+                "total_amount": str(contract.total_value),
+                "deposit_paid": "true",
+            },
+        },
+        "idempotency_key": f"balance-order-{contract.id}-{int(datetime.utcnow().timestamp())}",
+    }
+
+    # Create the order
+    async with httpx.AsyncClient(timeout=30.0) as http_client:
+        order_response = await http_client.post(
+            f"{SQUARE_API_URL}/orders",
+            json=order_data,
+            headers={
+                "Square-Version": "2024-12-18",
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json",
+            },
+        )
+
+        if order_response.status_code not in [200, 201]:
+            raise Exception(f"Failed to create balance order: {order_response.text}")
+
+        order_result = order_response.json()
+        order_id = order_result.get("order", {}).get("id")
+
+        if not order_id:
+            raise Exception("No order ID returned from Square")
+
+    # Get customer_id
+    customer_id = await _get_or_create_square_customer(client=client, access_token=access_token)
+
+    # Create balance invoice
+    invoice_data = {
+        "invoice": {
+            "location_id": location_id,
+            "order_id": order_id,
+            "primary_recipient": {"customer_id": customer_id},
+            "payment_requests": [
+                {
+                    "request_type": "BALANCE",
+                    "due_date": due_date.strftime("%Y-%m-%d"),
+                    "automatic_payment_source": "NONE",
+                }
+            ],
+            "delivery_method": "SHARE_MANUALLY",
+            "invoice_number": f"INV-{contract.public_id[:8].upper()}-BAL",
+            "title": f"{contract.title} - Final Balance",
+            "description": f"Final 50% balance payment for completed service. Deposit of ${contract.deposit_amount:.2f} was paid on {contract.deposit_paid_at.strftime('%B %d, %Y') if contract.deposit_paid_at else 'N/A'}.",
+            "accepted_payment_methods": {
+                "card": True,
+                "square_gift_card": False,
+                "bank_account": False,
+                "buy_now_pay_later": False,
+                "cash_app_pay": True,
+            },
+        },
+        "idempotency_key": f"balance-invoice-{contract.id}-{int(datetime.utcnow().timestamp())}",
+    }
+
+    return invoice_data

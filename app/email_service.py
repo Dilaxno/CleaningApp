@@ -803,8 +803,26 @@ async def send_invoice_payment_link_email(
     due_date: Optional[str] = None,
     payment_link: Optional[str] = None,
     is_recurring: bool = False,
+    is_deposit: bool = False,
+    deposit_percentage: int = 50,
+    remaining_balance: Optional[float] = None,
 ) -> dict:
-    """Send invoice with payment link to client"""
+    """
+    Send invoice with payment link to client
+
+    Args:
+        is_deposit: If True, this is a deposit invoice (50% upfront)
+        deposit_percentage: Percentage of deposit (default 50)
+        remaining_balance: Remaining balance due after job completion
+    """
+    # Adjust invoice title and amount display for deposits
+    if is_deposit:
+        display_title = f"{invoice_title} - {deposit_percentage}% Deposit"
+        amount_note = f"Deposit Amount ({deposit_percentage}%)"
+    else:
+        display_title = invoice_title
+        amount_note = "Total Amount"
+
     mjml_content = invoice_ready_template(
         client_name=client_name,
         business_name=business_name,
@@ -812,10 +830,15 @@ async def send_invoice_payment_link_email(
         amount=total_amount,
         due_date=due_date or "",
         payment_url=payment_link or "",
+        is_deposit=is_deposit,
+        deposit_percentage=deposit_percentage,
+        remaining_balance=remaining_balance,
     )
 
     subject = f"Invoice Ready: {invoice_number} - {business_name}"
-    if is_recurring:
+    if is_deposit:
+        subject = f"Deposit Invoice ({deposit_percentage}%): {invoice_number} - {business_name}"
+    elif is_recurring:
         subject = f"Recurring Invoice: {invoice_number} - {business_name}"
 
     return await send_email(
