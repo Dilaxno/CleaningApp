@@ -821,7 +821,7 @@ def quote_approved_template(
     client_public_id: str = None,
 ) -> str:
     """Quote approved notification MJML template"""
-    schedule_link = f"https://app.cleanenroll.com/client-schedule/{client_public_id}"
+    schedule_link = f"https://cleanenroll.com/client-schedule/{client_public_id}"
 
     adjustment_section = ""
     if was_adjusted and adjustment_notes:
