@@ -230,7 +230,7 @@ async def request_password_reset_otp(
     # Send OTP email using MJML template
     from ..email_templates import password_reset_template
 
-    reset_link = f"https://cleanenroll.com/forgot-password?otp={otp}&email={data.email}"
+    reset_link = f"https://cleanenroll.com/reset-password?otp={otp}&email={data.email}"
     mjml_content = password_reset_template(reset_link)
 
     await send_email(
