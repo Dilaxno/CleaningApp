@@ -265,3 +265,103 @@ __all__ = [
     "download_contract_by_public_id",
     "send_square_invoice_email",
 ]
+
+
+# ============================================================================
+# PUBLIC CONTRACT SIGNING (for clients)
+# ============================================================================
+
+
+@router.post("/public/{contract_public_id}/sign")
+async def sign_contract_public(
+    contract_public_id: str,
+    signature_request: dict,
+    service: ContractService = Depends(get_contract_service),
+):
+    """
+    Public endpoint for clients to sign their contract using contract public ID.
+    This is used in the quote approval flow where clients schedule first, then sign.
+    """
+    from datetime import datetime
+    from fastapi import HTTPException, Request
+    from ...models import BusinessConfig, Client, Contract
+    from ...email_service import (
+        send_client_signature_confirmation,
+        send_contract_signed_notification,
+    )
+
+    # Validate signature size
+    signature_data = signature_request.get("signature_data", "")
+    client_name = signature_request.get("client_name", "")
+
+    if len(signature_data) > 500000:
+        raise HTTPException(status_code=400, detail="Signature data too large")
+
+    # Find contract by public_id
+    contract = service.db.query(Contract).filter(Contract.public_id == contract_public_id).first()
+
+    if not contract:
+        raise HTTPException(status_code=404, detail="Contract not found")
+
+    # Get client
+    client = service.db.query(Client).filter(Client.id == contract.client_id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    # Get user (business owner)
+    user = service.db.query(User).filter(User.id == contract.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Business not found")
+
+    # Update contract with client signature
+    contract.client_signature = signature_data
+    contract.client_signed_at = datetime.utcnow()
+
+    # Update status if not already signed
+    if contract.status in ["new", "pending_signature"]:
+        contract.status = "client_signed"
+
+    service.db.commit()
+    service.db.refresh(contract)
+
+    logger.info(f"✅ Contract {contract.id} signed by client via public endpoint")
+
+    # Send confirmation emails
+    business_name = "Service Provider"
+    business_config = (
+        service.db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
+    )
+    if business_config:
+        business_name = business_config.business_name or user.full_name or "Service Provider"
+
+    # Send confirmation to client
+    if client.email:
+        try:
+            await send_client_signature_confirmation(
+                to=client.email,
+                client_name=client_name,
+                business_name=business_name,
+                contract_title=contract.title,
+                contract_pdf_url=None,
+            )
+        except Exception as e:
+            logger.error(f"Failed to send client confirmation email: {e}")
+
+    # Send notification to provider
+    if user.email:
+        try:
+            await send_contract_signed_notification(
+                to=user.email,
+                business_name=business_name,
+                client_name=client_name,
+                contract_title=contract.title,
+            )
+        except Exception as e:
+            logger.error(f"Failed to send provider notification email: {e}")
+
+    return {
+        "message": "Contract signed successfully",
+        "contract_id": contract.id,
+        "contract_public_id": contract.public_id,
+        "status": contract.status,
+    }
