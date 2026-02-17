@@ -5,7 +5,6 @@ This migrates hardcoded frontend templates to the database
 Run with: python -m backend.migrations.populate_form_templates
 """
 
-import json
 import os
 import sys
 from pathlib import Path
@@ -15,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 # Load environment variables from .env file in root directory
 from dotenv import load_dotenv
+
 root_dir = Path(__file__).parent.parent.parent  # Go up to root (CleaningApp/)
 env_path = root_dir / ".env"
 load_dotenv(env_path)
@@ -26,7 +26,7 @@ if not env_path.exists():
 else:
     print(f"✅ Loaded .env from {env_path}")
 
-from sqlalchemy import create_engine, Column, Integer, String, Text, Boolean, DateTime, JSON
+from sqlalchemy import JSON, Boolean, Column, DateTime, Integer, String, Text, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.sql import func
@@ -248,6 +248,25 @@ def get_universal_operations_section():
                 "required": True,
             },
             {
+                "id": "propertyShots",
+                "label": "Property shots (optional)",
+                "type": "file",
+                "accept": "image/*",
+                "required": False,
+                "multiple": True,
+                "uploadMode": "client-r2",
+                "hint": "Upload multiple photos of the property to help us understand the space better",
+            },
+            {
+                "id": "videoWalkthrough",
+                "label": "Video walkthrough (optional)",
+                "type": "file",
+                "accept": "video/*",
+                "required": False,
+                "uploadMode": "client-r2",
+                "hint": "Upload a video walkthrough of the property for a comprehensive view",
+            },
+            {
                 "id": "specialInstructions",
                 "label": "Special instructions",
                 "type": "textarea",
@@ -420,7 +439,7 @@ def populate_templates(db: Session):
             db.query(FormTemplate)
             .filter(
                 FormTemplate.template_id == template_data["template_id"],
-                FormTemplate.is_system_template == True,
+                FormTemplate.is_system_template,
             )
             .first()
         )
@@ -472,6 +491,7 @@ def main():
     except Exception as e:
         print(f"\n❌ ERROR: {e}")
         import traceback
+
         traceback.print_exc()
         db.rollback()
         raise

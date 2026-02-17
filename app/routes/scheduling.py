@@ -992,12 +992,12 @@ async def create_direct_booking(data: DirectBookingRequest, db: Session = Depend
     if not contract:
         raise HTTPException(status_code=404, detail="Contract not found")
 
-    # Scheduling is allowed only after the contract is fully signed by BOTH parties.
-    # Provider must sign in the dashboard to execute the agreement.
-    if contract.status != "signed":
+    # Allow scheduling if client has signed the contract
+    # Provider will review and sign later in the dashboard
+    if not contract.client_signature_timestamp:
         raise HTTPException(
             status_code=400,
-            detail="Contract must be signed by the provider before scheduling can be submitted.",
+            detail="Contract must be signed before scheduling can be submitted.",
         )
 
     # Get client and user
