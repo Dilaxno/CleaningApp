@@ -23,15 +23,25 @@ router = APIRouter(prefix="/scheduling", tags=["Scheduling"])
 
 
 @router.get("/info/{client_id}")
-async def get_scheduling_info_by_client(client_id: int, db: Session = Depends(get_db)):
+async def get_scheduling_info_by_client(client_id: str, db: Session = Depends(get_db)):
     """
     Public endpoint for client to get scheduling info.
     Returns business info, working hours, and estimated duration.
+    Supports both integer client ID and public_id (UUID string).
     """
     from .upload import generate_presigned_url
 
-    # Get client
-    client = db.query(Client).filter(Client.id == client_id).first()
+    # Get client - try by ID first, then by public_id
+    client = None
+
+    # Try as integer ID first
+    if client_id.isdigit():
+        client = db.query(Client).filter(Client.id == int(client_id)).first()
+
+    # If not found, try as public_id
+    if not client:
+        client = db.query(Client).filter(Client.public_id == client_id).first()
+
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
 

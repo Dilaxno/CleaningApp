@@ -272,6 +272,92 @@ __all__ = [
 # ============================================================================
 
 
+@router.post("/public/{contract_public_id}/generate-with-scope")
+async def generate_contract_with_scope(
+    contract_public_id: str,
+    scope_data: dict,
+    service: ContractService = Depends(get_contract_service),
+):
+    """
+    Generate contract with Exhibit A - Detailed Scope of Work
+
+    This endpoint:
+    1. Stores the scope of work data in the contract
+    2. Generates Exhibit A PDF
+    3. Uploads it to R2 storage
+    4. Updates the contract to reference Exhibit A
+    """
+    from datetime import datetime
+    from fastapi import HTTPException
+    from ...models import BusinessConfig, Client, Contract, User
+    from ...services.exhibit_a_generator import generate_exhibit_a_pdf
+    from ...routes.upload import upload_to_r2
+
+    # Find contract
+    contract = service.db.query(Contract).filter(Contract.public_id == contract_public_id).first()
+    if not contract:
+        raise HTTPException(status_code=404, detail="Contract not found")
+
+    # Get client info
+    client = service.db.query(Client).filter(Client.id == contract.client_id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    # Get business info
+    user = service.db.query(User).filter(User.id == contract.user_id).first()
+    business_config = (
+        service.db.query(BusinessConfig).filter(BusinessConfig.user_id == contract.user_id).first()
+    )
+    business_name = (
+        business_config.business_name if business_config else user.full_name or "Service Provider"
+    )
+
+    try:
+        # Generate Exhibit A PDF
+        exhibit_pdf = generate_exhibit_a_pdf(
+            scope_data=scope_data.get("scope_of_work", {}),
+            client_name=client.contact_name or client.business_name,
+            business_name=business_name,
+            contract_title=contract.title,
+        )
+
+        # Upload to R2
+        exhibit_filename = (
+            f"exhibit_a_{contract.public_id}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.pdf"
+        )
+        exhibit_key = f"contracts/{contract.user_id}/{exhibit_filename}"
+
+        upload_to_r2(
+            file_content=exhibit_pdf.getvalue(),
+            key=exhibit_key,
+            content_type="application/pdf",
+        )
+
+        # Store scope of work data and exhibit key
+        contract.scope_of_work = scope_data.get("scope_of_work", {})
+        contract.exhibit_a_pdf_key = exhibit_key
+
+        service.db.commit()
+        service.db.refresh(contract)
+
+        logger.info(
+            f"✅ Generated Exhibit A for contract {contract.public_id} - Key: {exhibit_key}"
+        )
+
+        return {
+            "message": "Exhibit A generated successfully",
+            "exhibit_key": exhibit_key,
+            "contract_id": contract.public_id,
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Failed to generate Exhibit A for contract {contract.public_id}: {e}")
+        service.db.rollback()
+        raise HTTPException(
+            status_code=500, detail=f"Failed to generate scope of work document: {str(e)}"
+        )
+
+
 @router.post("/public/{contract_public_id}/sign")
 async def sign_contract_public(
     contract_public_id: str,
