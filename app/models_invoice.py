@@ -78,6 +78,7 @@ class Invoice(Base):
     # Relationships
     client = relationship("Client", back_populates="invoices")
     contract = relationship("Contract", back_populates="invoices")
+    visit = relationship("Visit", back_populates="invoice", uselist=False)
 
 
 class Payout(Base):

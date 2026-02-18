@@ -331,6 +331,7 @@ class Client(Base):
     contracts = relationship("Contract", back_populates="client", cascade="all, delete-orphan")
     schedules = relationship("Schedule", back_populates="client", cascade="all, delete-orphan")
     invoices = relationship("Invoice", back_populates="client", cascade="all, delete-orphan")
+    visits = relationship("Visit", back_populates="client", cascade="all, delete-orphan")
     scheduling_proposals = relationship(
         "SchedulingProposal", back_populates="client", cascade="all, delete-orphan"
     )
@@ -460,6 +461,7 @@ class Contract(Base):
     user = relationship("User", back_populates="contracts")
     client = relationship("Client", back_populates="contracts")
     invoices = relationship("Invoice", back_populates="contract", cascade="all, delete-orphan")
+    visits = relationship("Visit", back_populates="contract", cascade="all, delete-orphan")
 
 
 class Schedule(Base):

@@ -18,6 +18,7 @@ from . import (
     models_quickbooks,  # noqa: F401
     models_square,  # noqa: F401
     models_twilio,  # noqa: F401
+    models_visit,  # noqa: F401
 )
 from .csrf import CSRF_COOKIE_NAME, CSRFMiddleware, generate_csrf_token
 from .database import Base, engine, get_db
@@ -63,6 +64,7 @@ from .routes.twilio import router as twilio_router
 from .routes.upload import router as upload_router
 from .routes.users import router as users_router
 from .routes.verification import router as verification_router
+from .routes.visits import router as visits_router
 from .security_headers import SecurityHeadersMiddleware
 
 # Configure logging
@@ -275,6 +277,7 @@ app.include_router(google_calendar_router)
 app.include_router(quickbooks_router)
 app.include_router(twilio_router)
 app.include_router(intercom_router)
+app.include_router(visits_router)
 
 
 # Square OAuth callback routes (must match redirect URI exactly)

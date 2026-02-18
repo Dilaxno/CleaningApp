@@ -49,6 +49,18 @@ def update_contract_statuses(db: Session) -> dict:
             summary["signed_to_active"] += 1
             logger.info(f"✅ Contract {contract.id} transitioned: signed → active")
 
+            # Auto-generate initial visits for recurring contracts
+            if contract.frequency:
+                try:
+                    from ..services.visit_service import VisitService
+
+                    visits = VisitService.generate_visits_for_contract(db, contract, limit=10)
+                    logger.info(
+                        f"✅ Generated {len(visits)} initial visits for contract {contract.id}"
+                    )
+                except Exception as e:
+                    logger.error(f"❌ Failed to generate visits for contract {contract.id}: {e}")
+
         # 2. Update ACTIVE → COMPLETED (end date has passed)
         active_contracts = (
             db.query(Contract)

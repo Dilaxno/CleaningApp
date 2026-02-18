@@ -3,29 +3,29 @@
 
 -- Twilio Integration table
 CREATE TABLE IF NOT EXISTS twilio_integrations (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL UNIQUE,
     account_sid TEXT NOT NULL,
     auth_token TEXT NOT NULL,
     messaging_service_sid TEXT,
     phone_number VARCHAR(20),
-    sms_enabled BOOLEAN DEFAULT 1,
-    send_estimate_approval BOOLEAN DEFAULT 1,
-    send_schedule_confirmation BOOLEAN DEFAULT 1,
-    send_contract_signed BOOLEAN DEFAULT 1,
-    send_job_reminder BOOLEAN DEFAULT 1,
-    send_job_completion BOOLEAN DEFAULT 1,
-    send_payment_confirmation BOOLEAN DEFAULT 1,
-    is_verified BOOLEAN DEFAULT 0,
-    last_test_at DATETIME,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    sms_enabled BOOLEAN DEFAULT TRUE,
+    send_estimate_approval BOOLEAN DEFAULT TRUE,
+    send_schedule_confirmation BOOLEAN DEFAULT TRUE,
+    send_contract_signed BOOLEAN DEFAULT TRUE,
+    send_job_reminder BOOLEAN DEFAULT TRUE,
+    send_job_completion BOOLEAN DEFAULT TRUE,
+    send_payment_confirmation BOOLEAN DEFAULT TRUE,
+    is_verified BOOLEAN DEFAULT FALSE,
+    last_test_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- Twilio SMS Logs table
 CREATE TABLE IF NOT EXISTS twilio_sms_logs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL,
     integration_id INTEGER NOT NULL,
     to_phone VARCHAR(20) NOT NULL,
@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS twilio_sms_logs (
     twilio_message_sid VARCHAR(255),
     status VARCHAR(50) NOT NULL,
     error_message TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (integration_id) REFERENCES twilio_integrations(id) ON DELETE CASCADE
 );
