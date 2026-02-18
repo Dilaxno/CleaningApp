@@ -314,7 +314,7 @@ async def generate_contract_with_scope(
 
     try:
         # Generate Exhibit A PDF
-        exhibit_pdf = generate_exhibit_a_pdf(
+        exhibit_pdf_bytes = await generate_exhibit_a_pdf(
             scope_data=scope_data.get("scope_of_work", {}),
             client_name=client.contact_name or client.business_name,
             business_name=business_name,
@@ -328,7 +328,7 @@ async def generate_contract_with_scope(
         exhibit_key = f"contracts/{contract.user_id}/{exhibit_filename}"
 
         upload_to_r2(
-            file_content=exhibit_pdf.getvalue(),
+            file_content=exhibit_pdf_bytes,
             key=exhibit_key,
             content_type="application/pdf",
         )

@@ -17,6 +17,7 @@ from . import (
     models_invoice,  # noqa: F401
     models_quickbooks,  # noqa: F401
     models_square,  # noqa: F401
+    models_twilio,  # noqa: F401
 )
 from .csrf import CSRF_COOKIE_NAME, CSRFMiddleware, generate_csrf_token
 from .database import Base, engine, get_db
@@ -58,6 +59,7 @@ from .routes.status_automation import router as status_router
 from .routes.subdomain import router as subdomain_router
 from .routes.template_selection import router as template_selection_router
 from .routes.templates import router as templates_router
+from .routes.twilio import router as twilio_router
 from .routes.upload import router as upload_router
 from .routes.users import router as users_router
 from .routes.verification import router as verification_router
@@ -271,6 +273,7 @@ app.include_router(square_router)
 app.include_router(square_webhooks_router)
 app.include_router(google_calendar_router)
 app.include_router(quickbooks_router)
+app.include_router(twilio_router)
 app.include_router(intercom_router)
 
 

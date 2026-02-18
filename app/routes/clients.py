@@ -2446,6 +2446,22 @@ async def approve_quote(
             client_public_id=client.public_id,
         )
 
+    # Send SMS notification to client if Twilio is enabled
+    if client.phone:
+        try:
+            from ..services.twilio_service import send_estimate_approval_sms
+
+            background_tasks.add_task(
+                send_estimate_approval_sms,
+                db=db,
+                user_id=current_user.id,
+                client_phone=client.phone,
+                client_name=client.contact_name or client.business_name,
+                estimate_amount=client.original_quote_amount or 0,
+            )
+        except Exception as e:
+            logger.error(f"Failed to send estimate approval SMS: {e}")
+
     return {
         "message": "Quote approved successfully",
         "client_id": client.id,
@@ -2533,6 +2549,22 @@ async def adjust_quote(
             adjustment_notes=data.adjustment_notes,
             client_public_id=client.public_id,
         )
+
+    # Send SMS notification to client if Twilio is enabled
+    if client.phone:
+        try:
+            from ..services.twilio_service import send_estimate_approval_sms
+
+            background_tasks.add_task(
+                send_estimate_approval_sms,
+                db=db,
+                user_id=current_user.id,
+                client_phone=client.phone,
+                client_name=client.contact_name or client.business_name,
+                estimate_amount=data.adjusted_amount,
+            )
+        except Exception as e:
+            logger.error(f"Failed to send adjusted estimate SMS: {e}")
 
     return {
         "message": "Quote adjusted successfully",

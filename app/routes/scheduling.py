@@ -663,6 +663,22 @@ async def client_accept_slot(
     except Exception as e:
         logger.error(f"Failed to send scheduling acceptance email: {e}")
 
+    # Send SMS notification to client if Twilio is enabled
+    if client.phone:
+        try:
+            from ..services.twilio_service import send_schedule_confirmation_sms
+
+            await send_schedule_confirmation_sms(
+                db=db,
+                user_id=user.id,
+                client_phone=client.phone,
+                client_name=client.contact_name or client.business_name,
+                schedule_date=data.slot_date,
+                schedule_time=data.slot_start_time,
+            )
+        except Exception as e:
+            logger.error(f"Failed to send SMS notification: {e}")
+
     return {
         "message": "Time slot accepted",
         "proposal_id": proposal_id,

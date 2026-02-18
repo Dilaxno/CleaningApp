@@ -3,24 +3,16 @@ Exhibit A - Detailed Scope of Work PDF Generator
 
 Generates a professionally formatted PDF attachment for the MSA
 containing the detailed scope of work selected by the client.
+Uses Playwright (Chromium) for PDF generation - same as contract PDFs.
 """
 
-from reportlab.lib.pagesizes import letter
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_JUSTIFY
-from reportlab.platypus import (
-    SimpleDocTemplate,
-    Paragraph,
-    Spacer,
-    Table,
-    TableStyle,
-    PageBreak,
-)
-from reportlab.lib import colors
-from io import BytesIO
+import asyncio
+import base64
+import os
+import subprocess
+import sys
 from datetime import datetime
-from typing import Dict, List, Any
+from typing import Dict, Any
 
 # Service area definitions (matching frontend)
 SERVICE_AREAS = {
@@ -107,12 +99,274 @@ TASK_DEFINITIONS = {
 COMPLIANCE_CLAUSE = """All cleaning services shall be performed in accordance with applicable OSHA (Occupational Safety and Health Administration) standards and CDC (Centers for Disease Control and Prevention) guidelines for commercial cleaning and disinfection. Service Provider shall use EPA-registered disinfectants and follow manufacturer instructions for proper application and contact time."""
 
 
-def generate_exhibit_a_pdf(
+async def html_to_pdf(html: str) -> bytes:
+    """
+    Convert HTML to PDF using Playwright via subprocess.
+    Runs in a separate process to avoid asyncio conflicts on Windows.
+    Same approach as contract PDF generation.
+    """
+    # Get the path to the pdf_worker script
+    worker_path = os.path.join(os.path.dirname(__file__), "..", "pdf_worker.py")
+    worker_path = os.path.abspath(worker_path)
+
+    # Get the correct Python executable from the venv
+    python_exe = sys.executable
+
+    # Encode HTML as base64 to safely pass via stdin
+    html_b64 = base64.b64encode(html.encode("utf-8")).decode("utf-8")
+
+    def run_worker():
+        # Run the worker script as a separate process
+        try:
+            result = subprocess.run(
+                [python_exe, worker_path],
+                input=html_b64,
+                capture_output=True,
+                text=True,
+                timeout=120,
+                creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+            )
+
+            if result.returncode != 0:
+                raise Exception(f"PDF worker failed (exit {result.returncode}): {result.stderr}")
+
+            # Decode the base64 PDF from stdout
+            pdf_b64 = result.stdout.strip()
+            if not pdf_b64:
+                raise Exception("PDF worker returned empty output")
+            return base64.b64decode(pdf_b64)
+        except subprocess.TimeoutExpired as e:
+            raise Exception("PDF generation timed out after 120 seconds") from e
+        except Exception as e:
+            raise Exception(f"PDF generation error: {str(e)}") from e
+
+    # Run in thread pool to not block the event loop
+    return await asyncio.to_thread(run_worker)
+
+
+def generate_exhibit_a_html(
     scope_data: Dict[str, Any],
     client_name: str,
     business_name: str,
     contract_title: str,
-) -> BytesIO:
+) -> str:
+    """
+    Generate HTML for Exhibit A - Detailed Scope of Work
+
+    Args:
+        scope_data: Dictionary containing selectedTasks, consumablesResponsibility, specialNotes
+        client_name: Name of the client
+        business_name: Name of the service provider
+        contract_title: Title of the main contract
+
+    Returns:
+        str: HTML content
+    """
+    selected_tasks = scope_data.get("selectedTasks", {})
+    consumables = scope_data.get("consumablesResponsibility", "provider")
+    special_notes = scope_data.get("specialNotes", "").strip()
+
+    # Build task sections HTML
+    task_sections_html = ""
+    task_number = 1
+
+    for area_id, task_ids in selected_tasks.items():
+        if not task_ids:
+            continue
+
+        area_info = SERVICE_AREAS.get(area_id, {})
+        area_name = area_info.get("name", area_id)
+
+        # Build task list for this area
+        tasks_html = ""
+        for task_id in task_ids:
+            task_label = TASK_DEFINITIONS.get(area_id, {}).get(task_id, task_id)
+            tasks_html += f"<li>{task_label}</li>"
+
+        task_sections_html += f"""
+        <div class="task-section">
+            <h4>2.{task_number} {area_name}</h4>
+            <ul class="task-list">{tasks_html}</ul>
+        </div>
+        """
+        task_number += 1
+
+    # Build consumables section
+    if consumables == "provider":
+        consumables_html = f"""
+        <p><strong>Service Provider Provides:</strong> {business_name} shall provide all cleaning supplies, 
+        chemicals, equipment, and consumables necessary to perform the services outlined in this Exhibit A. 
+        All products shall be commercial-grade and appropriate for the intended use.</p>
+        """
+    else:
+        consumables_html = f"""
+        <p><strong>Client Provides:</strong> {client_name} shall provide all cleaning supplies, chemicals, 
+        equipment, and consumables necessary to perform the services outlined in this Exhibit A. The Service 
+        Provider shall notify the Client in advance if any supplies are running low or need replenishment.</p>
+        """
+
+    # Build special notes section
+    special_notes_html = ""
+    if special_notes:
+        special_notes_html = f"""
+        <div class="section">
+            <h3>5. SPECIAL INSTRUCTIONS</h3>
+            <p style="white-space: pre-wrap;">{special_notes}</p>
+        </div>
+        """
+
+    html = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exhibit A - Scope of Work</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {{
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }}
+        body {{
+            font-family: 'Poppins', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 10pt;
+            line-height: 1.7;
+            color: #0A2540;
+            background: white;
+            padding: 50px 60px;
+        }}
+        .title {{
+            font-size: 22pt;
+            font-weight: 600;
+            color: #0A2540;
+            text-align: center;
+            margin-bottom: 10px;
+        }}
+        .subtitle {{
+            font-size: 18pt;
+            font-weight: 600;
+            color: #0A2540;
+            text-align: center;
+            margin-bottom: 30px;
+        }}
+        .contract-info {{
+            font-size: 10pt;
+            color: #425466;
+            margin-bottom: 30px;
+            line-height: 1.8;
+        }}
+        .contract-info strong {{
+            color: #0A2540;
+        }}
+        .section {{
+            margin-bottom: 28px;
+        }}
+        h3 {{
+            font-size: 11pt;
+            font-weight: 600;
+            color: #0A2540;
+            margin-bottom: 12px;
+        }}
+        .section p {{
+            color: #425466;
+            font-size: 10pt;
+            line-height: 1.8;
+            margin-bottom: 12px;
+        }}
+        .task-section {{
+            margin-bottom: 20px;
+        }}
+        .task-section h4 {{
+            font-size: 10pt;
+            font-weight: 600;
+            color: #0A2540;
+            margin-bottom: 8px;
+        }}
+        .task-list {{
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }}
+        .task-list li {{
+            padding: 4px 0;
+            padding-left: 20px;
+            position: relative;
+            font-size: 10pt;
+            color: #475569;
+        }}
+        .task-list li:before {{
+            content: "•";
+            color: #14b8a6;
+            font-weight: bold;
+            position: absolute;
+            left: 0;
+        }}
+        .footer {{
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #E2E8F0;
+            text-align: center;
+            font-size: 9pt;
+            color: #64748b;
+            font-style: italic;
+        }}
+    </style>
+</head>
+<body>
+    <div class="title">EXHIBIT A</div>
+    <div class="subtitle">DETAILED SCOPE OF WORK</div>
+    
+    <div class="contract-info">
+        <p><strong>Attached to:</strong> {contract_title}</p>
+        <p><strong>Between:</strong> {business_name} (Service Provider) and {client_name} (Client)</p>
+        <p><strong>Date:</strong> {datetime.now().strftime('%B %d, %Y')}</p>
+    </div>
+    
+    <div class="section">
+        <h3>1. SCOPE OF SERVICES</h3>
+        <p>The Service Provider agrees to perform the following cleaning services at the Client's premises as 
+        specified below. This Exhibit A forms an integral part of the Master Service Agreement and defines the 
+        specific tasks to be performed.</p>
+    </div>
+    
+    <div class="section">
+        <h3>2. DETAILED TASK LIST</h3>
+        {task_sections_html}
+    </div>
+    
+    <div class="section">
+        <h3>3. CLEANING SUPPLIES & CONSUMABLES</h3>
+        {consumables_html}
+    </div>
+    
+    <div class="section">
+        <h3>4. CLEANING STANDARDS & COMPLIANCE</h3>
+        <p>{COMPLIANCE_CLAUSE}</p>
+    </div>
+    
+    {special_notes_html}
+    
+    <div class="footer">
+        This Exhibit A is incorporated by reference into Section 2 (Scope of Services) of the Master Service 
+        Agreement between the parties.
+    </div>
+</body>
+</html>
+    """
+
+    return html
+
+
+async def generate_exhibit_a_pdf(
+    scope_data: Dict[str, Any],
+    client_name: str,
+    business_name: str,
+    contract_title: str,
+) -> bytes:
     """
     Generate Exhibit A - Detailed Scope of Work PDF
 
@@ -123,181 +377,12 @@ def generate_exhibit_a_pdf(
         contract_title: Title of the main contract
 
     Returns:
-        BytesIO: PDF file in memory
+        bytes: PDF file content
     """
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=letter,
-        rightMargin=0.75 * inch,
-        leftMargin=0.75 * inch,
-        topMargin=0.75 * inch,
-        bottomMargin=0.75 * inch,
-    )
+    # Generate HTML
+    html = generate_exhibit_a_html(scope_data, client_name, business_name, contract_title)
 
-    # Styles
-    styles = getSampleStyleSheet()
-    title_style = ParagraphStyle(
-        "CustomTitle",
-        parent=styles["Heading1"],
-        fontSize=18,
-        textColor=colors.HexColor("#0f172a"),
-        spaceAfter=12,
-        alignment=TA_CENTER,
-        fontName="Helvetica-Bold",
-    )
+    # Convert to PDF using Playwright
+    pdf_bytes = await html_to_pdf(html)
 
-    heading_style = ParagraphStyle(
-        "CustomHeading",
-        parent=styles["Heading2"],
-        fontSize=14,
-        textColor=colors.HexColor("#14b8a6"),
-        spaceAfter=10,
-        spaceBefore=15,
-        fontName="Helvetica-Bold",
-    )
-
-    body_style = ParagraphStyle(
-        "CustomBody",
-        parent=styles["BodyText"],
-        fontSize=10,
-        textColor=colors.HexColor("#334155"),
-        spaceAfter=8,
-        alignment=TA_JUSTIFY,
-        leading=14,
-    )
-
-    # Build document
-    story = []
-
-    # Title
-    story.append(Paragraph("EXHIBIT A", title_style))
-    story.append(Paragraph("DETAILED SCOPE OF WORK", title_style))
-    story.append(Spacer(1, 0.3 * inch))
-
-    # Contract reference
-    story.append(
-        Paragraph(
-            f"<b>Attached to:</b> {contract_title}",
-            body_style,
-        )
-    )
-    story.append(
-        Paragraph(
-            f"<b>Between:</b> {business_name} (Service Provider) and {client_name} (Client)",
-            body_style,
-        )
-    )
-    story.append(
-        Paragraph(
-            f"<b>Date:</b> {datetime.now().strftime('%B %d, %Y')}",
-            body_style,
-        )
-    )
-    story.append(Spacer(1, 0.3 * inch))
-
-    # Introduction
-    story.append(Paragraph("1. SCOPE OF SERVICES", heading_style))
-    story.append(
-        Paragraph(
-            "The Service Provider agrees to perform the following cleaning services at the Client's premises as specified below. This Exhibit A forms an integral part of the Master Service Agreement and defines the specific tasks to be performed.",
-            body_style,
-        )
-    )
-    story.append(Spacer(1, 0.2 * inch))
-
-    # Service areas and tasks
-    story.append(Paragraph("2. DETAILED TASK LIST", heading_style))
-
-    selected_tasks = scope_data.get("selectedTasks", {})
-    task_number = 1
-
-    for area_id, task_ids in selected_tasks.items():
-        if not task_ids:
-            continue
-
-        area_info = SERVICE_AREAS.get(area_id, {})
-        area_name = area_info.get("name", area_id)
-
-        # Area header
-        story.append(Spacer(1, 0.15 * inch))
-        story.append(
-            Paragraph(
-                f"<b>2.{task_number} {area_name}</b>",
-                ParagraphStyle(
-                    "AreaHeader",
-                    parent=body_style,
-                    fontSize=11,
-                    textColor=colors.HexColor("#0f172a"),
-                    fontName="Helvetica-Bold",
-                ),
-            )
-        )
-
-        # Tasks for this area
-        task_data = []
-        for task_id in task_ids:
-            task_label = TASK_DEFINITIONS.get(area_id, {}).get(task_id, task_id)
-            task_data.append(["•", task_label])
-
-        if task_data:
-            task_table = Table(task_data, colWidths=[0.3 * inch, 6 * inch])
-            task_table.setStyle(
-                TableStyle(
-                    [
-                        ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
-                        ("FONTSIZE", (0, 0), (-1, -1), 10),
-                        ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#475569")),
-                        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                        ("LEFTPADDING", (0, 0), (0, -1), 0),
-                        ("LEFTPADDING", (1, 0), (1, -1), 5),
-                    ]
-                )
-            )
-            story.append(task_table)
-
-        task_number += 1
-
-    # Consumables responsibility
-    story.append(Spacer(1, 0.2 * inch))
-    story.append(Paragraph("3. CLEANING SUPPLIES & CONSUMABLES", heading_style))
-
-    consumables = scope_data.get("consumablesResponsibility", "provider")
-    if consumables == "provider":
-        consumables_text = f"<b>Service Provider Provides:</b> {business_name} shall provide all cleaning supplies, chemicals, equipment, and consumables necessary to perform the services outlined in this Exhibit A. All products shall be commercial-grade and appropriate for the intended use."
-    else:
-        consumables_text = f"<b>Client Provides:</b> {client_name} shall provide all cleaning supplies, chemicals, equipment, and consumables necessary to perform the services outlined in this Exhibit A. The Service Provider shall notify the Client in advance if any supplies are running low or need replenishment."
-
-    story.append(Paragraph(consumables_text, body_style))
-
-    # Compliance clause
-    story.append(Spacer(1, 0.2 * inch))
-    story.append(Paragraph("4. CLEANING STANDARDS & COMPLIANCE", heading_style))
-    story.append(Paragraph(COMPLIANCE_CLAUSE, body_style))
-
-    # Special notes
-    special_notes = scope_data.get("specialNotes", "").strip()
-    if special_notes:
-        story.append(Spacer(1, 0.2 * inch))
-        story.append(Paragraph("5. SPECIAL INSTRUCTIONS", heading_style))
-        story.append(Paragraph(special_notes, body_style))
-
-    # Footer
-    story.append(Spacer(1, 0.3 * inch))
-    story.append(
-        Paragraph(
-            "<i>This Exhibit A is incorporated by reference into Section 2 (Scope of Services) of the Master Service Agreement between the parties.</i>",
-            ParagraphStyle(
-                "Footer",
-                parent=body_style,
-                fontSize=9,
-                textColor=colors.HexColor("#64748b"),
-                alignment=TA_CENTER,
-            ),
-        )
-    )
-
-    # Build PDF
-    doc.build(story)
-    buffer.seek(0)
-    return buffer
+    return pdf_bytes

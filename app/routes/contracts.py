@@ -610,6 +610,23 @@ async def sign_contract_as_provider(
         except Exception as e:
             logger.error(f"Failed to send provider email: {e}")
             # Don't fail the signing if email fails
+
+    # Send SMS notification to client if Twilio is enabled
+    if client.phone:
+        try:
+            from ..services.twilio_service import send_contract_signed_sms
+
+            await send_contract_signed_sms(
+                db=db,
+                user_id=current_user.id,
+                client_phone=client.phone,
+                client_name=client.contact_name or client.business_name,
+                contract_id=contract.id,
+            )
+        except Exception as e:
+            logger.error(f"Failed to send SMS notification: {e}")
+            # Don't fail the signing if SMS fails
+
     pdf_url = get_pdf_url(contract.pdf_key, contract.public_id)
     return ContractResponse(
         id=contract.id,

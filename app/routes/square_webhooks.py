@@ -325,6 +325,29 @@ async def handle_payment_event(event_data: dict, db: Session):
         # Send payment confirmation email to client
         await send_payment_confirmation_email(client=client, contract=contract, user=user)
 
+        # Send SMS notification to client if Twilio is enabled
+        if client.phone:
+            try:
+                from ..services.twilio_service import send_payment_confirmation_sms
+
+                # Generate invoice number from contract
+                invoice_number = (
+                    f"CLN-{contract.public_id[:8].upper()}"
+                    if contract.public_id
+                    else f"#{contract.id}"
+                )
+
+                await send_payment_confirmation_sms(
+                    db=db,
+                    user_id=user.id,
+                    client_phone=client.phone,
+                    client_name=client.contact_name or client.business_name,
+                    amount=contract.total_value or 0.0,
+                    invoice_number=invoice_number,
+                )
+            except Exception as e:
+                logger.error(f"Failed to send payment SMS notification: {e}")
+
     except Exception as e:
         logger.error(f"❌ Error handling payment event: {str(e)}")
         db.rollback()
