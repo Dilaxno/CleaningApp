@@ -900,6 +900,7 @@ async def get_public_scheduling_info(contract_public_id: str, db: Session = Depe
         ),
         "scheduled_date": scheduled_date,
         "scheduled_time": scheduled_time,
+        "property_type": client.property_type,
     }
 
 
