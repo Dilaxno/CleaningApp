@@ -854,6 +854,27 @@ async def get_public_scheduling_info(contract_public_id: str, db: Session = Depe
 
         contract_pdf_url = f"{backend_base}/contracts/pdf/public/{contract.public_id}"
 
+    # Check if there's already a schedule for this contract
+    existing_schedule = (
+        db.query(Schedule)
+        .filter(
+            Schedule.client_id == client.id,
+            Schedule.status.in_(["scheduled", "pending", "confirmed"]),
+        )
+        .order_by(Schedule.scheduled_date.desc())
+        .first()
+    )
+
+    scheduled_date = None
+    scheduled_time = None
+    if existing_schedule:
+        scheduled_date = (
+            existing_schedule.scheduled_date.isoformat()
+            if existing_schedule.scheduled_date
+            else None
+        )
+        scheduled_time = existing_schedule.start_time
+
     return {
         "contract_id": contract.id,
         "contract_public_id": contract.public_id,
@@ -871,6 +892,14 @@ async def get_public_scheduling_info(contract_public_id: str, db: Session = Depe
         "consultation_required": consultation_required,
         "consultation_booking_url": consultation_booking_url,
         "contract_pdf_url": contract_pdf_url,
+        "client_signature": contract.client_signature,
+        "client_signature_timestamp": (
+            contract.client_signature_timestamp.isoformat()
+            if contract.client_signature_timestamp
+            else None
+        ),
+        "scheduled_date": scheduled_date,
+        "scheduled_time": scheduled_time,
     }
 
 

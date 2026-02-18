@@ -448,6 +448,10 @@ class Contract(Base):
     invoice_auto_generated = Column(Boolean, default=False)  # Whether invoice was auto-generated
 
     invoice_auto_sent = Column(Boolean, default=False)  # Whether Square invoice was auto-sent
+
+    # Scope of Work (Exhibit A)
+    scope_of_work = Column(JSON, nullable=True)  # Structured scope of work data
+    exhibit_a_pdf_key = Column(String(500), nullable=True)  # R2 key for Exhibit A PDF
     invoice_auto_sent_at = Column(DateTime, nullable=True)  # When invoice was auto-sent
 
     created_at = Column(DateTime, server_default=func.now())
