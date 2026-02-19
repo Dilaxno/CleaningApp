@@ -1511,10 +1511,17 @@ async def generate_contract_for_client(
         db.commit()
         db.refresh(client)
 
+    # Try to use worker first, but fall back to synchronous generation if worker is unavailable
     try:
-        # Enqueue contract generation job
+        # Attempt to enqueue contract generation job
+        logger.info(f"🔄 Attempting to connect to Redis for ARQ worker...")
         redis_settings = get_redis_settings()
+        logger.info(
+            f"📡 Redis settings: host={redis_settings.host}, port={redis_settings.port}, ssl={redis_settings.ssl}"
+        )
+
         pool = await create_pool(redis_settings)
+        logger.info(f"✅ Redis pool created successfully")
 
         job = await pool.enqueue_job(
             "generate_contract_pdf_task",
@@ -1525,7 +1532,9 @@ async def generate_contract_for_client(
         )
 
         job_id = job.job_id
-        logger.info(f"📋 Contract generation job queued: {job_id} for client {client_id}")
+        logger.info(
+            f"📋 Contract generation job queued successfully: {job_id} for client {client_id}"
+        )
 
         return {
             "message": "Contract generation started",
@@ -1533,9 +1542,96 @@ async def generate_contract_for_client(
             "clientId": client.id,
         }
 
-    except Exception as e:
-        logger.error(f"❌ Failed to queue contract generation for client {client_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to start contract generation")
+    except Exception as worker_error:
+        # Worker unavailable - generate synchronously
+        logger.error(
+            f"❌ ARQ Worker error for client {client_id}: {type(worker_error).__name__}: {str(worker_error)}"
+        )
+        logger.warning(f"⚠️ Falling back to synchronous contract generation for client {client_id}")
+
+        try:
+            # Generate contract synchronously
+            from datetime import datetime
+
+            from ..config import R2_BUCKET_NAME
+            from ..routes.contracts_pdf import calculate_quote, generate_contract_html, html_to_pdf
+            from ..routes.upload import get_r2_client
+
+            logger.info(f"📊 Starting synchronous contract generation for client {client_id}")
+
+            # Calculate quote
+            logger.info(f"💰 Calculating quote...")
+            quote = calculate_quote(config, data.formData)
+            logger.info(f"✅ Quote calculated: ${quote.get('final_price', quote.get('total', 0))}")
+
+            # Create contract record
+            logger.info(f"📝 Creating contract record...")
+            contract = Contract(
+                user_id=user.id,
+                client_id=client_id,
+                title=f"Cleaning Contract - {client.business_name or client.contact_name}",
+                total_value=quote.get("final_price", quote.get("total", 0)),
+                status="new",
+            )
+
+            db.add(contract)
+            db.commit()
+            db.refresh(contract)
+            logger.info(
+                f"✅ Contract record created: ID={contract.id}, Public ID={contract.public_id}"
+            )
+
+            # Generate HTML
+            logger.info(f"📄 Generating contract HTML...")
+            html = await generate_contract_html(
+                config,
+                client,
+                data.formData,
+                quote,
+                db,
+                client_signature=None,
+                contract_public_id=contract.public_id,
+            )
+            logger.info(f"✅ HTML generated ({len(html)} chars)")
+
+            # Generate PDF
+            logger.info(f"📄 Converting HTML to PDF...")
+            pdf_bytes = await html_to_pdf(html)
+            logger.info(f"✅ PDF generated ({len(pdf_bytes)} bytes)")
+
+            # Upload to R2
+            pdf_key = f"contracts/{user.firebase_uid}/{contract.public_id}.pdf"
+            logger.info(f"📤 Uploading PDF to R2: {pdf_key}")
+            r2_client = get_r2_client()
+            r2_client.put_object(
+                Bucket=R2_BUCKET_NAME, Key=pdf_key, Body=pdf_bytes, ContentType="application/pdf"
+            )
+            logger.info(f"✅ PDF uploaded successfully")
+
+            # Update contract with PDF key
+            contract.pdf_key = pdf_key
+            db.commit()
+
+            logger.info(
+                f"✅ Contract generated synchronously: ID={contract.id}, Public ID={contract.public_id}"
+            )
+
+            return {
+                "message": "Contract generated successfully",
+                "contractId": contract.id,
+                "clientId": client.id,
+            }
+
+        except Exception as sync_error:
+            logger.error(
+                f"❌ Synchronous contract generation failed: {type(sync_error).__name__}: {str(sync_error)}"
+            )
+            import traceback
+
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            raise HTTPException(
+                status_code=500, detail=f"Failed to generate contract: {str(sync_error)}"
+            )
 
 
 @router.get("/public/{client_public_id}/info")

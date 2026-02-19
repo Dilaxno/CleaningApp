@@ -71,33 +71,45 @@ async def generate_contract_pdf_task(
     from .routes.contracts_pdf import calculate_quote, generate_contract_html, html_to_pdf
     from .routes.upload import get_r2_client
 
-    logger.info(f"Starting contract PDF generation for client {client_id}")
+    logger.info(f"🚀 ARQ Worker: Starting contract PDF generation for client {client_id}")
+    logger.info(f"📋 Job ID: {ctx.get('job_id', 'unknown')}")
 
     db = SessionLocal()
     try:
         # Get user and client
+        logger.info(f"🔍 Fetching user with Firebase UID: {owner_uid}")
         user = db.query(User).filter(User.firebase_uid == owner_uid).first()
         if not user:
+            logger.error(f"❌ User not found: {owner_uid}")
             raise Exception(f"User not found: {owner_uid}")
+        logger.info(f"✅ User found: ID={user.id}, Email={user.email}")
 
+        logger.info(f"🔍 Fetching client: {client_id}")
         client = db.query(Client).filter(Client.id == client_id).first()
         if not client:
+            logger.error(f"❌ Client not found: {client_id}")
             raise Exception(f"Client not found: {client_id}")
+        logger.info(f"✅ Client found: {client.business_name or client.contact_name}")
 
         # Get business config
+        logger.info(f"🔍 Fetching business config for user {user.id}")
         config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
         if not config:
+            logger.error(f"❌ Business config not found for user {user.id}")
             raise Exception("Business config not found")
+        logger.info(f"✅ Business config found: {config.business_name}")
 
         # Calculate quote
         try:
+            logger.info(f"💰 Calculating quote...")
             quote = calculate_quote(config, form_data)
-            logger.info(f"📊 Quote calculated: ${quote.get('total', 0)}")
+            logger.info(f"✅ Quote calculated: ${quote.get('total', 0)}")
         except Exception as e:
             logger.error(f"❌ Quote calculation failed: {str(e)}")
             raise Exception(f"Failed to calculate quote: {str(e)}") from e
 
         # Create contract record first to get public_id for secure contract numbering
+        logger.info(f"📝 Creating contract record...")
         contract = Contract(
             user_id=user.id,
             client_id=client_id,
@@ -114,10 +126,11 @@ async def generate_contract_pdf_task(
         db.commit()
         db.refresh(contract)
 
-        logger.info(f"Contract created: ID={contract.id}, Public ID={contract.public_id}")
+        logger.info(f"✅ Contract created: ID={contract.id}, Public ID={contract.public_id}")
 
         # Generate HTML with contract public_id for secure contract numbering
         try:
+            logger.info(f"📄 Generating contract HTML...")
             html = await generate_contract_html(
                 config,
                 client,
@@ -127,7 +140,7 @@ async def generate_contract_pdf_task(
                 client_signature=signature,
                 contract_public_id=contract.public_id,
             )
-            logger.info(f"📄 Contract HTML generated ({len(html)} chars)")
+            logger.info(f"✅ Contract HTML generated ({len(html)} chars)")
         except Exception as e:
             logger.error(f"❌ HTML generation failed: {str(e)}")
             db.rollback()
@@ -135,8 +148,9 @@ async def generate_contract_pdf_task(
 
         # Generate PDF
         try:
+            logger.info(f"📄 Converting HTML to PDF...")
             pdf_bytes = await html_to_pdf(html)
-            logger.info(f"📄 PDF generated ({len(pdf_bytes)} bytes)")
+            logger.info(f"✅ PDF generated ({len(pdf_bytes)} bytes)")
         except Exception as e:
             logger.error(f"❌ PDF generation failed: {str(e)}")
             db.rollback()
@@ -146,11 +160,12 @@ async def generate_contract_pdf_task(
         pdf_key = f"contracts/{user.firebase_uid}/{contract.public_id}.pdf"
 
         try:
+            logger.info(f"📤 Uploading PDF to R2: {pdf_key}")
             r2_client = get_r2_client()
             r2_client.put_object(
                 Bucket=R2_BUCKET_NAME, Key=pdf_key, Body=pdf_bytes, ContentType="application/pdf"
             )
-            logger.info(f"📤 PDF uploaded to R2: {pdf_key}")
+            logger.info(f"✅ PDF uploaded to R2: {pdf_key}")
         except Exception as e:
             logger.error(f"❌ R2 upload failed: {str(e)}")
             db.rollback()
@@ -176,17 +191,21 @@ async def generate_contract_pdf_task(
         backend_pdf_url = f"{backend_base}/contracts/pdf/public/{contract.public_id}"
 
         logger.info(
-            f"✅ Contract generation completed: ID={contract.id}, Public ID={contract.public_id}"
+            f"✅ ARQ Worker: Contract generation completed successfully: ID={contract.id}, Public ID={contract.public_id}"
         )
 
         return {"contract_id": contract.id, "pdf_url": backend_pdf_url, "status": "completed"}
 
     except Exception as e:
-        logger.error(f"❌ Contract generation failed: {str(e)}")
+        logger.error(f"❌ ARQ Worker: Contract generation failed: {type(e).__name__}: {str(e)}")
+        import traceback
+
+        logger.error(f"Traceback: {traceback.format_exc()}")
         db.rollback()
         raise
     finally:
         db.close()
+        logger.info(f"🔒 Database connection closed for client {client_id}")
 
 
 async def send_form_notification_emails_task(_ctx, client_id: int, user_id: int, owner_uid: str):

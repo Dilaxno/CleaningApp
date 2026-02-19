@@ -459,6 +459,7 @@ async def get_public_invoice(public_id: str, db: Session = Depends(get_db)):
 
     client = db.query(Client).filter(Client.id == invoice.client_id).first()
     # User data available for future invoice customization
+    user = db.query(User).filter(User.id == invoice.user_id).first()
     business_config = (
         db.query(BusinessConfig).filter(BusinessConfig.user_id == invoice.user_id).first()
     )
@@ -471,6 +472,7 @@ async def get_public_invoice(public_id: str, db: Session = Depends(get_db)):
         "description": invoice.description,
         "business_name": business_config.business_name if business_config else "Cleaning Service",
         "business_logo": business_config.logo_url if business_config else None,
+        "business_email": user.email if user else None,
         "client_name": client.contact_name or client.business_name if client else "Client",
         "client_email": client.email if client else None,
         "service_type": invoice.service_type,
