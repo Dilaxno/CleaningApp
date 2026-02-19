@@ -366,6 +366,10 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 existing.business_name = data.businessName
             if is_provided(data.logoUrl):
                 existing.logo_url = data.logoUrl
+                # If user doesn't have a profile picture, set it to the business logo
+                if not user.profile_picture_url:
+                    user.profile_picture_url = data.logoUrl
+                    logger.info(f"🖼️ Set user profile picture to business logo for user {user.id}")
             if is_provided(data.signatureUrl):
                 existing.signature_url = data.signatureUrl
             if data.onboardingComplete is not None:
@@ -506,6 +510,14 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
             config = existing
         else:
             logger.info(f"🆕 Creating new config for user_id: {user.id}")
+
+            # If user doesn't have a profile picture and logo is provided, set it to the business logo
+            if is_provided(data.logoUrl) and not user.profile_picture_url:
+                user.profile_picture_url = data.logoUrl
+                logger.info(
+                    f"🖼️ Set user profile picture to business logo for new config user {user.id}"
+                )
+
             config = BusinessConfig(
                 user_id=user.id,
                 business_name=data.businessName,

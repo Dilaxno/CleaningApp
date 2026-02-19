@@ -101,9 +101,6 @@ def create_or_update_user(data: UserCreate, db: Session = Depends(get_db)):
             # Set profile picture from Google if provided and user doesn't have one
             if data.profilePictureUrl and not user.profile_picture_url:
                 user.profile_picture_url = data.profilePictureUrl
-            # Remove the default profile picture assignment
-            # elif not user.profile_picture_url:
-            #     user.profile_picture_url = DEFAULT_PROFILE_PICTURE
         else:
             logger.info(f"🆕 Creating new user for firebase_uid: {data.firebaseUid}")
             # Only set profile picture if explicitly provided
