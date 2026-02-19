@@ -823,7 +823,7 @@ def quote_approved_template(
     client_public_id: str = None,
 ) -> str:
     """Quote approved notification MJML template"""
-    schedule_link = f"https://cleanenroll.com/client-schedule/{client_public_id}"
+    scope_of_work_link = f"https://cleanenroll.com/client-schedule/{client_public_id}"
 
     adjustment_section = ""
     if was_adjusted and adjustment_notes:
@@ -844,7 +844,7 @@ def quote_approved_template(
     </mj-text>
     
     <mj-text>
-      Great news! {business_name} has reviewed and approved your quote. You're ready to schedule your first cleaning.
+      Great news! {business_name} has reviewed and approved your quote. The next step is to define your specific cleaning needs.
     </mj-text>
     
     <mj-text align="center" font-size="36px" font-weight="700" color="{THEME['text_primary']}" padding="20px 0">
@@ -854,7 +854,7 @@ def quote_approved_template(
     {adjustment_section}
     
     <mj-text padding="24px 0 0 0">
-      Click the button below to choose your preferred date and time, review the service agreement, and complete your booking.
+      Click the button below to build your Scope of Work, review the service agreement, and complete your booking.
     </mj-text>
     """
 
@@ -862,8 +862,8 @@ def quote_approved_template(
         title=subject,
         preview_text=f"{subject} - {business_name}",
         content_sections=content,
-        cta_url=schedule_link,
-        cta_label="Schedule Your First Cleaning",
+        cta_url=scope_of_work_link,
+        cta_label="Build Your Scope of Work",
     )
 
 
@@ -925,6 +925,49 @@ def payment_received_notification_template(
     )
 
 
+def contract_fully_executed_schedule_invitation_template(
+    client_name: str,
+    business_name: str,
+    contract_title: str,
+    contract_id: str,
+    client_public_id: str,
+) -> str:
+    """Email template inviting client to schedule after both parties sign the MSA"""
+
+    schedule_link = f"https://cleanenroll.com/client-schedule/{client_public_id}"
+
+    content = f"""
+    <mj-text>
+      Hi {client_name},
+    </mj-text>
+    
+    <mj-text>
+      Congratulations! Your service agreement with <strong>{business_name}</strong> is now fully executed and ready to go.
+    </mj-text>
+    
+    <mj-text font-size="15px" color="{THEME['text_primary']}" padding="20px 0">
+      <strong>Contract:</strong> {contract_title}<br/>
+      <strong>Contract ID:</strong> {contract_id}
+    </mj-text>
+    
+    <mj-text>
+      The next step is to schedule your first cleaning session. Click the button below to choose your preferred date and time.
+    </mj-text>
+    
+    <mj-text color="{THEME['text_muted']}" font-size="14px" padding="20px 0 0 0">
+      You'll be able to select from available time slots or propose alternative times that work better for your schedule.
+    </mj-text>
+    """
+
+    return get_base_template(
+        title="Schedule Your First Cleaning",
+        preview_text=f"Your agreement with {business_name} is ready - Schedule your first cleaning",
+        content_sections=content,
+        cta_url=schedule_link,
+        cta_label="Schedule Your First Cleaning",
+    )
+
+
 # Export all template functions
 __all__ = [
     "get_base_template",
@@ -936,6 +979,7 @@ __all__ = [
     "contract_signed_notification_template",
     "client_signature_confirmation_template",
     "contract_fully_executed_template",
+    "contract_fully_executed_schedule_invitation_template",
     "quote_submitted_confirmation_template",
     "quote_review_notification_template",
     "quote_approved_template",
@@ -1343,6 +1387,7 @@ __all__ = [
     "contract_signed_notification_template",
     "client_signature_confirmation_template",
     "contract_fully_executed_template",
+    "contract_fully_executed_schedule_invitation_template",
     "quote_submitted_confirmation_template",
     "quote_review_notification_template",
     "quote_approved_template",

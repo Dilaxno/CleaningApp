@@ -1702,8 +1702,8 @@ async def sign_contract(
     contract.client_signature_timestamp = datetime.now()
     # Status remains 'new' until both parties sign (provider signs last)
 
-    # Update client onboarding status
-    contract.client_onboarding_status = "pending_scheduling"
+    # DO NOT update client_onboarding_status here - it will be set to "pending_scheduling"
+    # after the provider signs the contract (when both parties have signed)
 
     # DO NOT update client status here - client should only appear in provider's list
     # after BOTH parties sign the contract (when provider signs)

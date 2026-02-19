@@ -906,6 +906,9 @@ async def provider_sign_contract(
         contract.both_parties_signed_at = datetime.utcnow()
         contract.status = "signed"
 
+        # Update client onboarding status to pending_scheduling
+        contract.client_onboarding_status = "pending_scheduling"
+
         # Update client status to "new_lead" now that contract is fully signed
         client = db.query(Client).filter(Client.id == contract.client_id).first()
         if client and client.status == "pending_signature":
@@ -926,16 +929,39 @@ async def provider_sign_contract(
                 f"CLN-{contract.public_id[:8].upper()}" if contract.public_id else f"#{contract.id}"
             )
 
+            # Get business name
+            business_config = (
+                db.query(BusinessConfig).filter(BusinessConfig.user_id == current_user.id).first()
+            )
+            business_name = (
+                business_config.business_name
+                if business_config
+                else current_user.full_name or "Provider"
+            )
+
             # Send fully executed email to client
             await send_contract_fully_executed_email(
                 to=client.email if client else "",
                 client_name=client.contact_name or client.business_name if client else "Client",
-                business_name=current_user.full_name or "Provider",
+                business_name=business_name,
                 contract_title=contract.title,
                 contract_id=formatted_contract_id,
-                service_type=contract.service_type or "Cleaning Service",
+                service_type=contract.contract_type or "Cleaning Service",
                 total_value=contract.total_value,
             )
+
+            # Send scheduling invitation to client
+            from ..email_service import send_schedule_invitation_after_signing
+
+            await send_schedule_invitation_after_signing(
+                to=client.email if client else "",
+                client_name=client.contact_name or client.business_name if client else "Client",
+                business_name=business_name,
+                contract_title=contract.title,
+                contract_id=formatted_contract_id,
+                client_public_id=client.public_id if client else "",
+            )
+            logger.info(f"✅ Sent scheduling invitation for contract {contract_id}")
 
             # Send provider confirmation
             await send_provider_contract_signed_confirmation(

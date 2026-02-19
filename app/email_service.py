@@ -25,6 +25,7 @@ from .email_templates import (
     THEME,
     client_signature_confirmation_template,
     contract_fully_executed_template,
+    contract_fully_executed_schedule_invitation_template,
     contract_signed_notification_template,
     email_verification_template,
     form_submission_confirmation_template,
@@ -535,6 +536,30 @@ async def send_quote_approved_email(
     return await send_email(
         to=to,
         subject=f"{subject} - {business_name}",
+        mjml_content=mjml_content,
+    )
+
+
+async def send_schedule_invitation_after_signing(
+    to: str,
+    client_name: str,
+    business_name: str,
+    contract_title: str,
+    contract_id: str,
+    client_public_id: str,
+) -> dict:
+    """Send email to client inviting them to schedule after both parties sign the MSA"""
+    mjml_content = contract_fully_executed_schedule_invitation_template(
+        client_name=client_name,
+        business_name=business_name,
+        contract_title=contract_title,
+        contract_id=contract_id,
+        client_public_id=client_public_id,
+    )
+
+    return await send_email(
+        to=to,
+        subject=f"Schedule Your First Cleaning - {business_name}",
         mjml_content=mjml_content,
     )
 

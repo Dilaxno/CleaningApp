@@ -160,6 +160,9 @@ class ContractService:
             # Both parties signed - mark as fully executed
             contract = self.repo.mark_contract_fully_executed(self.db, contract)
 
+            # Update client onboarding status to pending_scheduling
+            contract.client_onboarding_status = "pending_scheduling"
+
             # Update client status
             client = self.repo.get_client_by_id(self.db, contract.client_id)
             if client:
@@ -184,12 +187,28 @@ class ContractService:
                     business_name=business_name,
                     contract_title=contract.title or "Service Agreement",
                     contract_id=formatted_contract_id,
-                    service_type=contract.service_type or "Cleaning Service",
+                    service_type=contract.contract_type or "Cleaning Service",
                     total_value=contract.total_value,
                 )
                 logger.info(f"✅ Sent fully executed email for contract {contract.id}")
             except Exception as e:
                 logger.error(f"Failed to send fully executed email: {e}")
+
+            # Send scheduling invitation to client
+            try:
+                from ..email_service import send_schedule_invitation_after_signing
+
+                await send_schedule_invitation_after_signing(
+                    to=client.email,
+                    client_name=client.business_name or client.contact_name,
+                    business_name=business_name,
+                    contract_title=contract.title or "Service Agreement",
+                    contract_id=formatted_contract_id,
+                    client_public_id=client.public_id,
+                )
+                logger.info(f"✅ Sent scheduling invitation for contract {contract.id}")
+            except Exception as e:
+                logger.error(f"Failed to send scheduling invitation: {e}")
 
         # Get business config for provider name
         business_config = (
