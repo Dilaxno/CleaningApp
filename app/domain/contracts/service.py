@@ -196,7 +196,7 @@ class ContractService:
 
             # Send scheduling invitation to client
             try:
-                from ..email_service import send_schedule_invitation_after_signing
+                from ...email_service import send_schedule_invitation_after_signing
 
                 await send_schedule_invitation_after_signing(
                     to=client.email,

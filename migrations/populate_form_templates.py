@@ -234,37 +234,11 @@ def get_universal_operations_section():
         "description": "Logistics and special requirements.",
         "fields": [
             {
-                "id": "suppliesProvidedBy",
-                "label": "Cleaning supplies provided by",
-                "type": "radio",
-                "options": ["Client", "Cleaning company"],
-                "required": True,
-            },
-            {
                 "id": "accessMethod",
                 "label": "Access method",
                 "type": "select",
                 "options": ["Key", "Access code", "On-site staff", "Other"],
                 "required": True,
-            },
-            {
-                "id": "propertyShots",
-                "label": "Property shots (optional)",
-                "type": "file",
-                "accept": "image/*",
-                "required": False,
-                "multiple": True,
-                "uploadMode": "client-r2",
-                "hint": "Upload multiple photos of the property to help us understand the space better",
-            },
-            {
-                "id": "videoWalkthrough",
-                "label": "Video walkthrough (optional)",
-                "type": "file",
-                "accept": "video/*",
-                "required": False,
-                "uploadMode": "client-r2",
-                "hint": "Upload a video walkthrough of the property for a comprehensive view",
             },
             {
                 "id": "specialInstructions",
@@ -273,6 +247,28 @@ def get_universal_operations_section():
                 "placeholder": "Any specific requirements, areas to focus on, or things we should know...",
                 "required": False,
                 "maxLength": 1000,
+            },
+        ],
+    }
+
+
+def get_universal_media_section():
+    """Universal Media Upload Section - Property Photos and Video Walkthrough"""
+    return {
+        "id": "media-uploads",
+        "title": "Property Media",
+        "description": "Help us understand your space better.",
+        "fields": [
+            {
+                "id": "propertyShots",
+                "label": "Property photos",
+                "type": "file",
+                "accept": "image/*",
+                "required": True,
+                "multiple": True,
+                "maxFiles": 10,
+                "uploadMode": "client-r2",
+                "hint": "Upload at least 2 photos of the property to help us provide an accurate quote",
             },
         ],
     }
@@ -419,6 +415,7 @@ SYSTEM_TEMPLATES = [
                         },
                     ],
                 },
+                get_universal_media_section(),
                 get_universal_operations_section(),
             ]
         },
