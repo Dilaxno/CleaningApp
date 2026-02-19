@@ -8,11 +8,20 @@ import os
 
 from arq.connections import RedisSettings
 
-from . import models_invoice  # noqa: F401 - Ensure Invoice model is registered
-
 # Import all models at module level to ensure SQLAlchemy can resolve relationships
 # This must happen before any database operations
 from .database import SessionLocal
+
+# Import all model files to ensure all models are registered
+from . import models  # noqa: F401 - Main models
+from . import models_invoice  # noqa: F401 - Invoice models
+from . import models_google_calendar  # noqa: F401 - Google Calendar models
+from . import models_quickbooks  # noqa: F401 - QuickBooks models
+from . import models_square  # noqa: F401 - Square models
+from . import models_twilio  # noqa: F401 - Twilio models
+from . import models_visit  # noqa: F401 - Visit models
+
+# Import specific models needed for type hints
 from .models import BusinessConfig, Client, Contract, User
 
 logger = logging.getLogger(__name__)
