@@ -291,7 +291,7 @@ async def generate_contract_with_scope(
     from fastapi import HTTPException
     from ...models import BusinessConfig, Client, Contract, User
     from ...services.exhibit_a_generator import generate_exhibit_a_pdf
-    from ...routes.upload import upload_to_r2
+    from ...routes.upload import get_r2_client, R2_BUCKET_NAME
 
     # Find contract
     contract = service.db.query(Contract).filter(Contract.public_id == contract_public_id).first()
@@ -327,10 +327,13 @@ async def generate_contract_with_scope(
         )
         exhibit_key = f"contracts/{contract.user_id}/{exhibit_filename}"
 
-        upload_to_r2(
-            file_content=exhibit_pdf_bytes,
-            key=exhibit_key,
-            content_type="application/pdf",
+        # Upload to R2
+        r2 = get_r2_client()
+        r2.put_object(
+            Bucket=R2_BUCKET_NAME,
+            Key=exhibit_key,
+            Body=exhibit_pdf_bytes,
+            ContentType="application/pdf",
         )
 
         # Store scope of work data and exhibit key
