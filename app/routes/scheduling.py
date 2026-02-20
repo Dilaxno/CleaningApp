@@ -905,6 +905,8 @@ async def get_public_scheduling_info(contract_public_id: str, db: Session = Depe
         "contract_id": contract.id,
         "contract_public_id": contract.public_id,
         "contract_title": sanitize_string(contract.title),
+        "client_id": client.id,
+        "client_public_id": client.public_id,
         "client_name": sanitize_string(client.contact_name or client.business_name),
         "business_name": sanitize_string(business_name),
         "logo_url": logo_url,
@@ -923,6 +925,10 @@ async def get_public_scheduling_info(contract_public_id: str, db: Session = Depe
             contract.client_signature_timestamp.isoformat()
             if contract.client_signature_timestamp
             else None
+        ),
+        "provider_signature": contract.provider_signature,
+        "provider_signed_at": (
+            contract.provider_signed_at.isoformat() if contract.provider_signed_at else None
         ),
         "scheduled_date": scheduled_date,
         "scheduled_time": scheduled_time,

@@ -632,6 +632,19 @@ async def sign_contract_as_provider(
                 business_phone=business_phone,
                 contract_pdf_url=pdf_url,
             )
+
+            # Send scheduling invitation email
+            from ..email_service import send_schedule_invitation_after_signing
+
+            await send_schedule_invitation_after_signing(
+                to=client.email,
+                client_name=client.contact_name or client.business_name,
+                business_name=business_name,
+                contract_title=contract.title,
+                contract_id=formatted_contract_id,
+                client_public_id=client.public_id,
+            )
+            logger.info(f"✅ Sent scheduling invitation to client {client.email}")
         except Exception as e:
             logger.error(f"Failed to send client email: {e}")
             # Don't fail the signing if email fails
