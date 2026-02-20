@@ -82,6 +82,8 @@ class ContractResponse(BaseModel):
     providerSignedAt: Optional[datetime]  # When provider signed the contract
     createdAt: datetime
     defaultSignatureUrl: Optional[str] = None  # Provider's default signature from onboarding
+    exhibitAUrl: Optional[str] = None  # URL to download Exhibit A PDF
+    hasExhibitA: bool = False  # Whether Exhibit A exists
 
     class Config:
         from_attributes = True
@@ -108,6 +110,28 @@ def get_pdf_url(pdf_key: Optional[str], contract_public_id: Optional[str] = None
             backend_base = "https://api.cleanenroll.com"
 
         return f"{backend_base}/contracts/pdf/public/{contract_public_id}"
+    except Exception:
+        return None
+
+
+def get_exhibit_a_url(
+    exhibit_key: Optional[str], contract_public_id: Optional[str] = None
+) -> Optional[str]:
+    """Generate backend URL for Exhibit A PDF if key exists"""
+    if not exhibit_key or not contract_public_id:
+        return None
+    try:
+        from ..config import FRONTEND_URL
+
+        # Determine the backend base URL based on the frontend URL
+        if "localhost" in FRONTEND_URL:
+            backend_base = FRONTEND_URL.replace("localhost:5173", "localhost:8000").replace(
+                "localhost:5174", "localhost:8000"
+            )
+        else:
+            backend_base = "https://api.cleanenroll.com"
+
+        return f"{backend_base}/contracts/exhibit-a/public/{contract_public_id}"
     except Exception:
         return None
 
@@ -148,6 +172,7 @@ async def get_contracts(
     for c in contracts:
         client = db.query(Client).filter(Client.id == c.client_id).first()
         pdf_url = get_pdf_url(c.pdf_key, c.public_id)
+        exhibit_a_url = get_exhibit_a_url(c.exhibit_a_pdf_key, c.public_id)
         result.append(
             ContractResponse(
                 id=c.id,
@@ -173,6 +198,8 @@ async def get_contracts(
                 providerSignedAt=c.provider_signed_at,
                 createdAt=c.created_at,
                 defaultSignatureUrl=default_signature_url,
+                exhibitAUrl=exhibit_a_url,
+                hasExhibitA=bool(c.exhibit_a_pdf_key),
             )
         )
     return result
@@ -283,6 +310,8 @@ async def create_contract(
         clientSignatureTimestamp=contract.client_signature_timestamp,
         providerSignedAt=contract.provider_signed_at,
         createdAt=contract.created_at,
+        exhibitAUrl=None,
+        hasExhibitA=False,
     )
 
 
@@ -389,6 +418,7 @@ async def update_contract(
 
     client = db.query(Client).filter(Client.id == contract.client_id).first()
     pdf_url = get_pdf_url(contract.pdf_key, contract.public_id)
+    exhibit_a_url = get_exhibit_a_url(contract.exhibit_a_pdf_key, contract.public_id)
     return ContractResponse(
         id=contract.id,
         public_id=contract.public_id,
@@ -412,6 +442,8 @@ async def update_contract(
         clientSignatureTimestamp=contract.client_signature_timestamp,
         providerSignedAt=contract.provider_signed_at,
         createdAt=contract.created_at,
+        exhibitAUrl=exhibit_a_url,
+        hasExhibitA=bool(contract.exhibit_a_pdf_key),
     )
 
 
@@ -513,7 +545,7 @@ async def sign_contract_as_provider(
         import hashlib
 
         from .contracts_pdf import calculate_quote, generate_contract_html, html_to_pdf
-        from .upload import R2_BUCKET_NAME, get_r2_client
+        from .upload import R2_BUCKET_NAME, generate_presigned_url, get_r2_client
 
         # Get form data for regeneration
         form_data = client.form_data if client.form_data else {}
@@ -523,6 +555,19 @@ async def sign_contract_as_provider(
         logger.info(
             f"🖊️ [PROVIDER SIGN] Client signature: {'SET (' + str(len(contract.client_signature)) + ' chars)' if contract.client_signature else 'NOT SET'}"
         )
+
+        # Generate presigned URL for client signature if it's an R2 key
+        client_signature_for_pdf = contract.client_signature
+        if contract.client_signature and not contract.client_signature.startswith("data:image"):
+            # It's an R2 key, generate presigned URL
+            try:
+                client_signature_for_pdf = generate_presigned_url(
+                    contract.client_signature, expiration=604800
+                )
+                logger.info(f"✅ Generated presigned URL for client signature in provider sign")
+            except Exception as url_err:
+                logger.warning(f"⚠️ Failed to generate presigned URL: {url_err}")
+
         # Generate HTML with both signatures - use contract's created_at for consistent dates
         html = await generate_contract_html(
             business_config,
@@ -530,7 +575,7 @@ async def sign_contract_as_provider(
             form_data,
             quote,
             db,
-            client_signature=contract.client_signature,
+            client_signature=client_signature_for_pdf,
             provider_signature=signature_to_use,
             contract_created_at=contract.created_at,
             contract_public_id=contract.public_id,
@@ -628,6 +673,7 @@ async def sign_contract_as_provider(
             # Don't fail the signing if SMS fails
 
     pdf_url = get_pdf_url(contract.pdf_key, contract.public_id)
+    exhibit_a_url = get_exhibit_a_url(contract.exhibit_a_pdf_key, contract.public_id)
     return ContractResponse(
         id=contract.id,
         public_id=contract.public_id,
@@ -651,6 +697,8 @@ async def sign_contract_as_provider(
         clientSignatureTimestamp=contract.client_signature_timestamp,
         providerSignedAt=contract.provider_signed_at,
         createdAt=contract.created_at,
+        exhibitAUrl=exhibit_a_url,
+        hasExhibitA=bool(contract.exhibit_a_pdf_key),
     )
 
 
@@ -1013,6 +1061,34 @@ async def download_contract(contract_id: int, db: Session = Depends(get_db)):
         return RedirectResponse(url=pdf_url)
     except Exception as e:
         logger.error(f"Failed to generate PDF download URL: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to generate download link") from e
+
+
+@router.get("/exhibit-a/public/{public_id}")
+async def download_exhibit_a_by_public_id(public_id: str, db: Session = Depends(get_db)):
+    """
+    Download Exhibit A PDF by contract public ID
+    Public endpoint - accessible with contract public ID (UUID)
+    """
+    from fastapi.responses import RedirectResponse
+
+    if not validate_uuid(public_id):
+        raise HTTPException(status_code=400, detail="Invalid contract identifier")
+
+    contract = db.query(Contract).filter(Contract.public_id == public_id).first()
+
+    if not contract:
+        raise HTTPException(status_code=404, detail="Contract not found")
+
+    if not contract.exhibit_a_pdf_key:
+        raise HTTPException(status_code=404, detail="Exhibit A not available for this contract")
+
+    # Generate presigned URL for Exhibit A download
+    try:
+        exhibit_url = generate_presigned_url(contract.exhibit_a_pdf_key, expires_in=3600)
+        return RedirectResponse(url=exhibit_url)
+    except Exception as e:
+        logger.error(f"Failed to generate Exhibit A download URL: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to generate download link") from e
 
 

@@ -52,12 +52,15 @@ async def get_intercom_jwt(current_user: User = Depends(get_current_user)):
     if not INTERCOM_SECRET_KEY:
         raise HTTPException(status_code=500, detail="Intercom secret key not configured")
 
+    # Get user's display name (full_name or email prefix)
+    display_name = current_user.full_name or current_user.email.split("@")[0]
+
     # Prepare JWT payload
     now = int(time.time())
     payload = {
         "user_id": current_user.firebase_uid,
         "email": current_user.email,
-        "name": current_user.business_name or current_user.email.split("@")[0],
+        "name": display_name,
         "iat": now,  # Issued at
         "exp": now + 3600,  # Expires in 1 hour
     }
@@ -72,7 +75,7 @@ async def get_intercom_jwt(current_user: User = Depends(get_current_user)):
         jwt_token=token,
         user_id=current_user.firebase_uid,
         email=current_user.email,
-        name=current_user.business_name or current_user.email.split("@")[0],
+        name=display_name,
     )
 
 

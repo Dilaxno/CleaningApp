@@ -1792,7 +1792,7 @@ async def sign_contract(
         raise HTTPException(status_code=404, detail="Business not found")
 
     # Update contract with client signature audit trail
-    contract.client_signature = data.signature
+    contract.client_signature = data.signature  # Store base64 for immediate use
     contract.client_signature_ip = client_ip
     contract.client_signature_user_agent = user_agent[:500] if user_agent else None
     contract.client_signature_timestamp = datetime.now()
@@ -1812,8 +1812,8 @@ async def sign_contract(
     increment_client_count(user, db)
     logger.info(f"✅ Client count incremented for user {user.id} after client signature")
 
-    # Upload client signature to R2 for PDF rendering
-    client_signature_url = None
+    # Upload client signature to R2 and store the key (not presigned URL)
+    client_signature_key = None
     if data.signature and data.signature.startswith("data:image"):
         try:
             import base64
@@ -1823,22 +1823,23 @@ async def sign_contract(
             header, encoded = data.signature.split(",", 1)
             signature_bytes = base64.b64decode(encoded)
 
-            # Upload to R2
-            signature_key = f"signatures/clients/{user.firebase_uid}/{uuid.uuid4()}.png"
+            # Upload to R2 and store the key
+            client_signature_key = f"signatures/clients/{user.firebase_uid}/{uuid.uuid4()}.png"
             r2_client = get_r2_client()
             r2_client.put_object(
                 Bucket=R2_BUCKET_NAME,
-                Key=signature_key,
+                Key=client_signature_key,
                 Body=signature_bytes,
                 ContentType="image/png",
             )
 
-            # Generate presigned URL (7 days max for R2)
-            client_signature_url = generate_presigned_url(
-                signature_key, expiration=604800
-            )  # 7 days
+            # Store the R2 key in the contract for future use
+            contract.client_signature = client_signature_key
+            logger.info(f"✅ Client signature uploaded to R2: {client_signature_key}")
         except Exception as sig_err:
             logger.warning(f"⚠️ Failed to upload client signature to R2: {sig_err}")
+            # Keep the base64 data as fallback
+            contract.client_signature = data.signature
 
     # Regenerate PDF with client signature
     try:
@@ -1858,6 +1859,19 @@ async def sign_contract(
                 # Provider signature is base64, need to upload it too if not already done
                 provider_signature_url = contract.provider_signature
 
+            # Generate presigned URL for client signature if it's an R2 key
+            client_signature_for_pdf = data.signature  # Default to base64
+            if contract.client_signature and not contract.client_signature.startswith("data:image"):
+                # It's an R2 key, generate presigned URL
+                try:
+                    client_signature_for_pdf = generate_presigned_url(
+                        contract.client_signature, expiration=604800
+                    )
+                    logger.info(f"✅ Generated presigned URL for client signature")
+                except Exception as url_err:
+                    logger.warning(f"⚠️ Failed to generate presigned URL: {url_err}")
+                    client_signature_for_pdf = data.signature
+
             # Generate HTML with signature URLs - use contract's created_at for consistent dates
             html = await generate_contract_html(
                 config,
@@ -1865,17 +1879,15 @@ async def sign_contract(
                 form_data,
                 quote,
                 db,
-                client_signature=client_signature_url or data.signature,  # Use URL if available
+                client_signature=client_signature_for_pdf,
                 provider_signature=provider_signature_url,
                 contract_created_at=contract.created_at,
                 contract_public_id=contract.public_id,
             )
 
             # Verify signature URL is in HTML
-            if client_signature_url and client_signature_url in html:
-                pass  # Signature URL found
-            elif data.signature in html:
-                pass  # Signature data found
+            if client_signature_for_pdf and client_signature_for_pdf in html:
+                logger.info("✅ Client signature found in generated HTML")
             else:
                 logger.warning("⚠️ Client signature NOT found in generated HTML!")
 
