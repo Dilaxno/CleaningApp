@@ -743,14 +743,27 @@ async def generate_contract_html(
         special_requests = None
 
     # Service details (frequency already extracted above for start_date logic)
-    # Combine standard and custom inclusions/exclusions
-    standard_inclusions = business_config.standard_inclusions or []
-    custom_inclusions = business_config.custom_inclusions or []
-    inclusions = standard_inclusions + custom_inclusions
+    # Check if client has custom scope of work from scope builder
+    if client.scope_of_work and isinstance(client.scope_of_work, dict):
+        # Use client's custom scope of work selections
+        scope_data = client.scope_of_work
+        inclusions = scope_data.get("included", [])
+        exclusions = scope_data.get("excluded", [])
+        logger.info(
+            f"📋 Using client's custom scope of work - {len(inclusions)} inclusions, {len(exclusions)} exclusions"
+        )
+    else:
+        # Fallback to business config's standard inclusions/exclusions
+        standard_inclusions = business_config.standard_inclusions or []
+        custom_inclusions = business_config.custom_inclusions or []
+        inclusions = standard_inclusions + custom_inclusions
 
-    standard_exclusions = business_config.standard_exclusions or []
-    custom_exclusions = business_config.custom_exclusions or []
-    exclusions = standard_exclusions + custom_exclusions
+        standard_exclusions = business_config.standard_exclusions or []
+        custom_exclusions = business_config.custom_exclusions or []
+        exclusions = standard_exclusions + custom_exclusions
+        logger.info(
+            f"📋 Using business config scope - {len(inclusions)} inclusions, {len(exclusions)} exclusions"
+        )
 
     # Build inclusions/exclusions HTML
     inclusions_html = (
