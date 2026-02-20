@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 
-from ..auth import get_current_user
+from ..auth import get_current_user, get_current_user_with_plan
 from ..config import SMTP_ENCRYPTION_KEY
 from ..database import get_db
 from ..models import BusinessConfig, User
@@ -147,7 +147,7 @@ def test_smtp_connection(
 @router.post("/test")
 async def test_smtp_settings(
     request: TestSMTPRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_plan),
 ):
     """Test SMTP connection without saving settings"""
     success, message = test_smtp_connection(
@@ -165,7 +165,7 @@ async def test_smtp_settings(
 @router.post("/setup")
 async def setup_smtp(
     request: SetupSMTPRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_plan),
     db: Session = Depends(get_db),
 ):
     """
@@ -218,7 +218,7 @@ async def setup_smtp(
 
 @router.get("/status")
 async def get_smtp_status(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_plan),
     db: Session = Depends(get_db),
 ) -> SMTPStatusResponse:
     """Get current SMTP configuration status."""
@@ -252,7 +252,7 @@ async def get_smtp_status(
 
 @router.post("/verify")
 async def verify_smtp_connection(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_plan),
     db: Session = Depends(get_db),
 ):
     """Re-test existing SMTP connection (health check)"""
@@ -283,7 +283,7 @@ async def verify_smtp_connection(
 
 @router.delete("/remove")
 async def remove_smtp(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_plan),
     db: Session = Depends(get_db),
 ):
     """Remove custom SMTP and revert to CleanEnroll default"""

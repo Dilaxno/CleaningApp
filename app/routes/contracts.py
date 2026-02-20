@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ..auth import get_current_user
+from ..auth import get_current_user, get_current_user_with_plan
 from ..database import get_db
 from ..email_service import (
     send_contract_fully_executed_email,
@@ -114,7 +114,7 @@ def get_pdf_url(pdf_key: Optional[str], contract_public_id: Optional[str] = None
 
 @router.get("", response_model=list[ContractResponse])
 async def get_contracts(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_plan),
     db: Session = Depends(get_db),
     client_id: Optional[int] = Query(None, description="Filter contracts by client ID"),
     include_all: bool = Query(
@@ -181,7 +181,7 @@ async def get_contracts(
 @router.post("/initiate", response_model=dict)
 async def initiate_contract_process(
     data: ContractCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_plan),
     db: Session = Depends(get_db),
 ):
     """
@@ -229,7 +229,7 @@ async def initiate_contract_process(
 @router.post("", response_model=ContractResponse)
 async def create_contract(
     data: ContractCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_plan),
     db: Session = Depends(get_db),
 ):
     """Create a new contract"""
@@ -290,7 +290,7 @@ async def create_contract(
 async def update_contract(
     contract_id: int,
     data: ContractUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_plan),
     db: Session = Depends(get_db),
 ):
     """Update a contract"""
@@ -420,7 +420,7 @@ async def sign_contract_as_provider(
     contract_id: int,
     data: ProviderSignatureRequest,
     request: Request,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_plan),
     db: Session = Depends(get_db),
 ):
     """Provider signs the contract and sends notification to client"""
@@ -656,7 +656,9 @@ async def sign_contract_as_provider(
 
 @router.delete("/{contract_id}")
 async def delete_contract(
-    contract_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    contract_id: int,
+    current_user: User = Depends(get_current_user_with_plan),
+    db: Session = Depends(get_db),
 ):
     """Delete a contract and its related invoices"""
     from ..models_invoice import Invoice
@@ -694,7 +696,7 @@ class BatchDeleteRequest(BaseModel):
 @router.post("/batch-delete")
 async def batch_delete_contracts(
     data: BatchDeleteRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_plan),
     db: Session = Depends(get_db),
 ):
     """Delete multiple contracts and their related data"""

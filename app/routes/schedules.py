@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ..auth import get_current_user
+from ..auth import get_current_user, get_current_user_with_plan
 from ..database import get_db
 from ..models import BusinessConfig, Client, Contract, Schedule, User
 
@@ -90,7 +90,7 @@ class ScheduleResponse(BaseModel):
 
 @router.get("", response_model=list[ScheduleResponse])
 async def get_schedules(
-    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user_with_plan), db: Session = Depends(get_db)
 ):
     """Get all schedules for the current user"""
     schedules = (
@@ -162,7 +162,7 @@ async def get_schedules(
 @router.post("", response_model=ScheduleResponse)
 async def create_schedule(
     data: ScheduleCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_plan),
     db: Session = Depends(get_db),
 ):
     """Create a new schedule"""
@@ -223,7 +223,7 @@ async def create_schedule(
 async def update_schedule(
     schedule_id: int,
     data: ScheduleUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_plan),
     db: Session = Depends(get_db),
 ):
     """Update a schedule"""
@@ -307,7 +307,9 @@ async def update_schedule(
 
 @router.delete("/{schedule_id}")
 async def delete_schedule(
-    schedule_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    schedule_id: int,
+    current_user: User = Depends(get_current_user_with_plan),
+    db: Session = Depends(get_db),
 ):
     """Delete a schedule"""
     from ..services.google_calendar_service import delete_calendar_event
@@ -346,7 +348,7 @@ class ScheduleApprovalRequest(BaseModel):
 async def approve_schedule(
     schedule_id: int,
     request: ScheduleApprovalRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_plan),
     db: Session = Depends(get_db),
 ):
     """Accept or request change for a pending schedule"""

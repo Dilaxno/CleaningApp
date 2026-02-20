@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ..auth import get_current_user
+from ..auth import get_current_user, get_current_user_with_plan
 from ..config import SECRET_KEY
 from ..database import get_db
 from ..models import User
@@ -99,7 +99,7 @@ async def verify_twilio_credentials(
 # Routes
 @router.get("/status", response_model=TwilioStatusResponse)
 async def get_twilio_status(
-    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user_with_plan), db: Session = Depends(get_db)
 ):
     """Get Twilio integration status"""
     integration = (
@@ -131,7 +131,7 @@ async def get_twilio_status(
 @router.post("/connect")
 async def connect_twilio(
     credentials: TwilioCredentials,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_plan),
     db: Session = Depends(get_db),
 ):
     """Connect Twilio account with credentials"""
@@ -194,7 +194,7 @@ async def connect_twilio(
 
 @router.post("/disconnect")
 async def disconnect_twilio(
-    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user_with_plan), db: Session = Depends(get_db)
 ):
     """Disconnect Twilio integration"""
     integration = (
@@ -215,7 +215,7 @@ async def disconnect_twilio(
 @router.put("/settings")
 async def update_twilio_settings(
     settings: TwilioSettings,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_plan),
     db: Session = Depends(get_db),
 ):
     """Update Twilio SMS notification settings"""
@@ -246,7 +246,7 @@ async def update_twilio_settings(
 @router.post("/test-sms")
 async def send_test_sms(
     request: TestSMSRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_plan),
     db: Session = Depends(get_db),
 ):
     """Send a test SMS to verify Twilio configuration"""
@@ -353,7 +353,7 @@ async def send_test_sms(
 @router.get("/logs")
 async def get_sms_logs(
     limit: int = 50,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_plan),
     db: Session = Depends(get_db),
 ):
     """Get SMS activity logs"""

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ..auth import get_current_user
+from ..auth import get_current_user, get_current_user_with_plan
 from ..database import get_db
 from ..models import BusinessConfig, User
 from .upload import generate_presigned_url
@@ -168,7 +168,7 @@ def get_public_business_info(firebase_uid: str, request: Request, db: Session = 
 
 @router.get("")
 def get_current_user_business_config(
-    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user_with_plan), db: Session = Depends(get_db)
 ):
     """Get business config for the currently authenticated user"""
     logger.info(f"📥 Getting business config for current user: {current_user.id}")

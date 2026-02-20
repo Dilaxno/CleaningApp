@@ -3,11 +3,11 @@ Intercom Integration Routes
 Handles secure JWT generation for Intercom Messenger authentication
 """
 
-import hashlib
-import hmac
 import os
+import time
 
 from fastapi import APIRouter, Depends, HTTPException
+from jose import jwt
 from pydantic import BaseModel
 
 from ..auth import get_current_user
@@ -19,27 +19,32 @@ router = APIRouter(prefix="/intercom", tags=["intercom"])
 INTERCOM_SECRET_KEY = os.getenv("INTERCOM_SECRET_KEY", "")
 
 
-class IntercomHashResponse(BaseModel):
-    """Response model for Intercom user hash"""
+class IntercomJWTResponse(BaseModel):
+    """Response model for Intercom JWT token"""
 
-    user_hash: str
+    jwt_token: str
+    user_id: str
+    email: str
+    name: str
 
 
-@router.get("/user-hash", response_model=IntercomHashResponse)
-async def get_intercom_user_hash(current_user: User = Depends(get_current_user)):
+@router.get("/jwt", response_model=IntercomJWTResponse)
+async def get_intercom_jwt(current_user: User = Depends(get_current_user)):
     """
-    Generate a secure HMAC SHA256 hash for Intercom identity verification.
+    Generate a secure JWT token for Intercom identity verification.
 
-    This endpoint creates a user_hash that proves the user's identity to Intercom,
+    This endpoint creates a JWT that proves the user's identity to Intercom,
     preventing user impersonation and ensuring secure communication.
 
-    The hash is generated using:
-    - User's Firebase UID as the identifier
-    - Intercom Secret Key (from environment)
-    - HMAC SHA256 algorithm
+    The JWT includes:
+    - User ID (Firebase UID)
+    - User email
+    - User name
+    - Issued at timestamp
+    - Expiration (1 hour)
 
     Returns:
-        IntercomHashResponse: Contains the user_hash for Intercom authentication
+        IntercomJWTResponse: Contains the JWT token and user details
 
     Raises:
         HTTPException: If Intercom secret key is not configured
@@ -47,15 +52,28 @@ async def get_intercom_user_hash(current_user: User = Depends(get_current_user))
     if not INTERCOM_SECRET_KEY:
         raise HTTPException(status_code=500, detail="Intercom secret key not configured")
 
-    # Generate HMAC SHA256 hash using user's Firebase UID
-    user_id = current_user.firebase_uid
+    # Prepare JWT payload
+    now = int(time.time())
+    payload = {
+        "user_id": current_user.firebase_uid,
+        "email": current_user.email,
+        "name": current_user.business_name or current_user.email.split("@")[0],
+        "iat": now,  # Issued at
+        "exp": now + 3600,  # Expires in 1 hour
+    }
 
-    # Create HMAC hash
-    user_hash = hmac.new(
-        INTERCOM_SECRET_KEY.encode("utf-8"), user_id.encode("utf-8"), hashlib.sha256
-    ).hexdigest()
+    # Generate JWT token
+    try:
+        token = jwt.encode(payload, INTERCOM_SECRET_KEY, algorithm="HS256")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate JWT: {str(e)}")
 
-    return IntercomHashResponse(user_hash=user_hash)
+    return IntercomJWTResponse(
+        jwt_token=token,
+        user_id=current_user.firebase_uid,
+        email=current_user.email,
+        name=current_user.business_name or current_user.email.split("@")[0],
+    )
 
 
 @router.get("/health")

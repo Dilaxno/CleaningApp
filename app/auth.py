@@ -302,3 +302,22 @@ async def get_current_user(
     except Exception as e:
         logger.error(f"❌ Authentication failed: {str(e)}")
         raise HTTPException(status_code=401, detail="Authentication failed") from e
+
+
+async def get_current_user_with_plan(
+    user: User = Depends(get_current_user),
+) -> User:
+    """
+    Get current user and verify they have an active plan.
+    Use this dependency for all dashboard routes that require a paid plan.
+    """
+    if not user.plan or user.plan.strip() == "":
+        logger.warning(f"⚠️ User {user.email} attempted to access protected route without a plan")
+        raise HTTPException(
+            status_code=403,
+            detail="Plan required. Please select a plan to access this feature.",
+            headers={"X-Plan-Required": "true"},
+        )
+
+    logger.debug(f"✅ User {user.email} has plan: {user.plan}")
+    return user

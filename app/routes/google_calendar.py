@@ -10,7 +10,7 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
-from ..auth import get_current_user
+from ..auth import get_current_user, get_current_user_with_plan
 from ..config import GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI
 from ..database import get_db
 from ..models import User
@@ -31,7 +31,7 @@ GOOGLE_CALENDAR_SCOPES = [
 
 @router.get("/status")
 async def get_google_calendar_status(
-    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user_with_plan), db: Session = Depends(get_db)
 ):
     """Get Google Calendar connection status"""
     from ..models_google_calendar import GoogleCalendarIntegration
@@ -59,7 +59,7 @@ async def get_google_calendar_status(
 
 
 @router.get("/connect")
-async def initiate_google_calendar_oauth(current_user: User = Depends(get_current_user)):
+async def initiate_google_calendar_oauth(current_user: User = Depends(get_current_user_with_plan)):
     """Initiate Google Calendar OAuth flow"""
     if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
         raise HTTPException(status_code=500, detail="Google Calendar not configured")
@@ -84,7 +84,9 @@ async def initiate_google_calendar_oauth(current_user: User = Depends(get_curren
 
 @router.post("/callback")
 async def handle_google_calendar_callback(
-    request: Request, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    request: Request,
+    current_user: User = Depends(get_current_user_with_plan),
+    db: Session = Depends(get_db),
 ):
     """Handle Google Calendar OAuth callback"""
     from cryptography.fernet import Fernet
@@ -204,7 +206,7 @@ async def handle_google_calendar_callback(
 
 @router.post("/disconnect")
 async def disconnect_google_calendar(
-    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user_with_plan), db: Session = Depends(get_db)
 ):
     """Disconnect Google Calendar integration"""
     from ..models_google_calendar import GoogleCalendarIntegration

@@ -12,7 +12,7 @@ from pydantic import BaseModel, field_validator
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
-from ..auth import get_current_user
+from ..auth import get_current_user, get_current_user_with_plan
 from ..database import get_db
 from ..models import BusinessConfig, Client, Contract, Schedule, User
 from ..rate_limiter import create_rate_limiter
@@ -126,7 +126,7 @@ class ClientResponse(BaseModel):
 
 @router.get("", response_model=list[ClientResponse])
 async def get_clients(
-    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user_with_plan), db: Session = Depends(get_db)
 ):
     """Get all clients for the current user (excludes pending_signature clients)"""
     # Filter out clients with "pending_signature" status - they haven't signed the contract yet
@@ -156,7 +156,7 @@ async def get_clients(
 
 @router.get("/export")
 async def export_clients_csv(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_plan),
     db: Session = Depends(get_db),
     status: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
@@ -283,7 +283,7 @@ async def export_clients_csv(
 
 @router.get("/quote-requests/stats/summary")
 async def get_quote_requests_stats(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_plan),
     db: Session = Depends(get_db),
 ):
     """
@@ -334,7 +334,7 @@ async def get_quote_requests_stats(
 @router.get("/quote-requests")
 async def get_quote_requests(
     status: Optional[str] = Query(None, description="Filter by quote status"),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_plan),
     db: Session = Depends(get_db),
 ):
     """
@@ -393,7 +393,7 @@ async def get_quote_requests(
 @router.get("/quote-requests/{client_id}")
 async def get_quote_request_detail(
     client_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_plan),
     db: Session = Depends(get_db),
 ):
     """
@@ -505,7 +505,7 @@ class BatchDeleteQuoteRequestsRequest(BaseModel):
 @router.post("/quote-requests/batch-delete")
 async def batch_delete_quote_requests(
     data: BatchDeleteQuoteRequestsRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_plan),
     db: Session = Depends(get_db),
 ):
     """
@@ -542,7 +542,7 @@ async def batch_delete_quote_requests(
 @router.get("/{client_id}", response_model=ClientResponse)
 async def get_client(
     client_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_plan),
     db: Session = Depends(get_db),
 ):
     """Get a specific client with detailed information including form_data"""
@@ -573,7 +573,7 @@ async def get_client(
 @router.post("", response_model=ClientResponse)
 async def create_client(
     data: ClientCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_plan),
     db: Session = Depends(get_db),
 ):
     """Create a new client"""
@@ -624,7 +624,7 @@ async def create_client(
 async def update_client(
     client_id: int,
     data: ClientUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_plan),
     db: Session = Depends(get_db),
 ):
     """Update a client"""
@@ -674,7 +674,7 @@ async def update_client(
 @router.delete("/{client_id}")
 async def delete_client(
     client_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_plan),
     db: Session = Depends(get_db),
 ):
     """Delete a client"""
@@ -708,7 +708,7 @@ class BatchDeleteRequest(BaseModel):
 @router.post("/batch-delete")
 async def batch_delete_clients(
     data: BatchDeleteRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_plan),
     db: Session = Depends(get_db),
 ):
     """Batch delete multiple clients"""

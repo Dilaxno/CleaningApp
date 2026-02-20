@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ..auth import get_current_user
+from ..auth import get_current_user, get_current_user_with_plan
 from ..config import FRONTEND_URL, SECRET_KEY
 from ..database import get_db
 from ..models import User
@@ -78,7 +78,7 @@ async def test_config():
 
 @router.post("/oauth/initiate")
 async def initiate_oauth(
-    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user_with_plan), db: Session = Depends(get_db)
 ):
     """
     Initiate Square OAuth 2.0 flow
@@ -119,7 +119,7 @@ async def initiate_oauth(
 async def oauth_callback_handler(
     code: str,
     state: str | None = None,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_plan),
     db: Session = Depends(get_db),
 ):
     """
@@ -220,7 +220,9 @@ async def oauth_callback_handler(
 
 
 @router.get("/status")
-async def get_status(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def get_status(
+    current_user: User = Depends(get_current_user_with_plan), db: Session = Depends(get_db)
+):
     """Check if user has Square connected"""
     integration = (
         db.query(SquareIntegration)
@@ -238,7 +240,9 @@ async def get_status(current_user: User = Depends(get_current_user), db: Session
 
 
 @router.post("/disconnect")
-async def disconnect(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def disconnect(
+    current_user: User = Depends(get_current_user_with_plan), db: Session = Depends(get_db)
+):
     """Disconnect Square integration"""
     integration = (
         db.query(SquareIntegration)
@@ -280,7 +284,7 @@ async def disconnect(current_user: User = Depends(get_current_user), db: Session
 
 @router.get("/invoices")
 async def get_paid_invoices(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_with_plan),
     db: Session = Depends(get_db),
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
