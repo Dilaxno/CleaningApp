@@ -764,7 +764,7 @@ def quote_submitted_confirmation_template(
     </mj-text>
     
     <mj-text font-size="14px" color="{THEME['text_muted']}" padding="25px 0 0 0">
-      <strong>Expected response time:</strong> Within 24-48 hours
+      <strong>Expected response time:</strong> Within minutes to hours
     </mj-text>
     """
 
@@ -801,7 +801,7 @@ def quote_review_notification_template(
     </mj-text>
     
     <mj-text font-size="14px" color="{THEME['text_muted']}" padding="25px 0 0 0">
-      <strong>Recommended response time:</strong> Within 24-48 hours
+      <strong>Recommended response time:</strong> Within minutes to hours
     </mj-text>
     """
 
