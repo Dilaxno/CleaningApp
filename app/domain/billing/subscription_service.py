@@ -17,7 +17,6 @@ logger = logging.getLogger(__name__)
 
 # Plan limits configuration
 PLAN_LIMITS = {
-    "solo": {"clients": 10, "contracts": 10, "schedules": 10},
     "team": {"clients": 50, "contracts": 50, "schedules": 50},
     "enterprise": {"clients": 999999, "contracts": 999999, "schedules": 999999},
 }

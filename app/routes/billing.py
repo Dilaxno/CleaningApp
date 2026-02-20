@@ -75,7 +75,7 @@ rate_limit_billing_webhook = create_rate_limiter(
 class CheckoutRequest(BaseModel):
     product_id: str
     # Optional plan metadata for your app state
-    plan: Optional[str] = None  # "solo" | "team" | "enterprise"
+    plan: Optional[str] = None  # "team" | "enterprise"
     billing_cycle: Optional[str] = None  # "monthly" | "yearly"
     quantity: int = 1
     # Optional override return url
@@ -107,7 +107,7 @@ class CheckoutRequest(BaseModel):
 
 
 class UpdatePlanRequest(BaseModel):
-    plan: str  # "solo", "team", "enterprise"
+    plan: str  # "team", "enterprise"
 
 
 class CancelRequest(BaseModel):
@@ -121,13 +121,12 @@ class ChangePlanRequest(BaseModel):
     product_id: str
     quantity: int = 1
     proration_billing_mode: str = "prorated_immediately"  # per docs
-    # optional local plan update for app gating ("solo" | "team" | "enterprise")
+    # optional local plan update for app gating ("team" | "enterprise")
     plan: Optional[str] = None
 
 
 # Plan limits configuration
 PLAN_LIMITS = {
-    "solo": {"clients": 10, "contracts": 10, "schedules": 10},
     "team": {"clients": 50, "contracts": 50, "schedules": 50},
     "enterprise": {"clients": 999999, "contracts": 999999, "schedules": 999999},  # Unlimited
 }
@@ -195,7 +194,7 @@ async def get_usage_stats(
     # Get plan limits (no plan = no access until they select one)
     plan = user.plan
     if plan:
-        limits = PLAN_LIMITS.get(plan, PLAN_LIMITS["solo"])
+        limits = PLAN_LIMITS.get(plan, PLAN_LIMITS["team"])
     else:
         limits = NO_PLAN_LIMITS
 
@@ -223,7 +222,7 @@ async def update_user_plan(
     Manually update user's plan. Used after successful checkout verification.
     In production, this should verify the subscription status with Dodo Payments.
     """
-    allowed_plans = {"solo", "team", "enterprise"}
+    allowed_plans = {"team", "enterprise"}
     if body.plan not in allowed_plans:
         raise HTTPException(
             status_code=400, detail=f"Invalid plan. Must be one of: {allowed_plans}"
@@ -301,7 +300,7 @@ async def manually_activate_plan(
     plan = request.get("plan")
     billing_cycle = request.get("billing_cycle", "yearly")
 
-    if not plan or plan not in ["solo", "team"]:
+    if not plan or plan not in ["team", "enterprise"]:
         raise HTTPException(status_code=400, detail="Invalid plan")
 
     try:
@@ -942,7 +941,7 @@ async def test_byte_perfect_signature():
     webhook_secret = os.getenv("DODO_PAYMENTS_WEBHOOK_SECRET", "")
 
     # Sample body as bytes (approximate)
-    sample_body = b'{"business_id":"bus_OumfAar4K7irg6ZTZlqcD","data":{"billing":{"city":"Camden","country":"US","state":"Delaware","street":"2140 S Dupont Hwy, 2140 South Dupont Highway","zipcode":"19934"},"brand_id":"brand_123","metadata":{"firebase_uid":"test_uid","selected_plan":"solo","billing_cycle":"yearly"}}}'
+    sample_body = b'{"business_id":"bus_OumfAar4K7irg6ZTZlqcD","data":{"billing":{"city":"Camden","country":"US","state":"Delaware","street":"2140 S Dupont Hwy, 2140 South Dupont Highway","zipcode":"19934"},"brand_id":"brand_123","metadata":{"firebase_uid":"test_uid","selected_plan":"team","billing_cycle":"yearly"}}}'
 
     # Svix canonical: id.timestamp.body (all bytes, no JSON reserialization)
     signed_payload = (

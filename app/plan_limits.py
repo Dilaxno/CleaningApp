@@ -10,14 +10,14 @@ from sqlalchemy.orm import Session
 from .models import User
 
 # Plan limits configuration (no free plan - all users must have paid plans)
-PLAN_LIMITS = {"solo": 10, "team": 50, "enterprise": None}  # None means unlimited
+PLAN_LIMITS = {"team": 50, "enterprise": None}  # None means unlimited
 
 
 def get_plan_limit(plan: Optional[str]) -> Optional[int]:
     """Get the client limit for a given plan. Returns None for unlimited, 0 for no plan."""
     if not plan:
         return 0  # No plan = no clients allowed
-    return PLAN_LIMITS.get(plan.lower(), PLAN_LIMITS["solo"])
+    return PLAN_LIMITS.get(plan.lower(), PLAN_LIMITS["team"])
 
 
 def _calculate_next_reset_date(subscription_start: datetime, current_time: datetime) -> datetime:
