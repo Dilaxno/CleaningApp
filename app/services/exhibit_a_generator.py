@@ -8,93 +8,107 @@ Uses Playwright (Chromium) for PDF generation - same as contract PDFs.
 
 import asyncio
 import base64
+import json
 import os
 import subprocess
 import sys
 from datetime import datetime
-from typing import Dict, Any
+from typing import Any, Dict
 
-# Service area definitions (matching frontend)
-SERVICE_AREAS = {
-    "dining-area": {"name": "Dining Area", "icon": "🍽️"},
-    "kitchen": {"name": "Kitchen", "icon": "🍳"},
-    "restrooms": {"name": "Restrooms", "icon": "🚻"},
-    "offices": {"name": "Offices", "icon": "💼"},
-    "floors": {"name": "Floors", "icon": "🧹"},
-    "windows": {"name": "Windows", "icon": "🪟"},
-    "trash-recycling": {"name": "Trash & Recycling", "icon": "♻️"},
-    "high-touch": {"name": "High-Touch Surfaces", "icon": "🤚"},
-}
 
-# Task definitions (matching frontend)
-TASK_DEFINITIONS = {
-    "dining-area": {
-        "wipe-tables": "Wipe down all tables and chairs",
-        "sanitize-surfaces": "Sanitize high-touch surfaces",
-        "vacuum-carpet": "Vacuum carpeted areas",
-        "mop-floors": "Mop hard floor surfaces",
-        "empty-trash": "Empty trash receptacles",
-        "clean-light-fixtures": "Dust light fixtures and ceiling fans",
-    },
-    "kitchen": {
-        "clean-countertops": "Clean and sanitize all countertops",
-        "clean-appliances": "Clean exterior of appliances",
-        "clean-sink": "Clean and sanitize sink and faucet",
-        "clean-microwave": "Clean microwave interior and exterior",
-        "clean-refrigerator": "Clean refrigerator exterior and handles",
-        "mop-floor": "Sweep and mop floor",
-        "empty-trash": "Empty trash and replace liners",
-        "wipe-cabinets": "Wipe down cabinet fronts",
-    },
-    "restrooms": {
-        "clean-toilets": "Clean and disinfect toilets",
-        "clean-sinks": "Clean and disinfect sinks and faucets",
-        "clean-mirrors": "Clean mirrors and glass surfaces",
-        "refill-supplies": "Refill soap, paper towels, and toilet paper",
-        "mop-floors": "Sweep and mop floors with disinfectant",
-        "empty-trash": "Empty trash receptacles and replace liners",
-        "sanitize-touchpoints": "Sanitize door handles and light switches",
-        "clean-partitions": "Wipe down stall partitions",
-    },
-    "offices": {
-        "dust-surfaces": "Dust all horizontal surfaces",
-        "vacuum-carpet": "Vacuum carpeted areas",
-        "mop-floors": "Mop hard floor surfaces",
-        "empty-trash": "Empty trash and recycling bins",
-        "clean-desks": "Wipe down desks and work surfaces",
-        "sanitize-phones": "Sanitize phones and keyboards",
-        "clean-windows": "Clean interior window sills",
-    },
-    "floors": {
-        "vacuum-all": "Vacuum all carpeted areas",
-        "sweep-hard": "Sweep all hard floor surfaces",
-        "mop-hard": "Mop all hard floor surfaces",
-        "spot-clean": "Spot clean stains and spills",
-        "edge-cleaning": "Edge cleaning along baseboards",
-        "floor-buffing": "Buff and polish hard floors (periodic)",
-    },
-    "windows": {
-        "interior-windows": "Clean interior window glass",
-        "window-sills": "Wipe down window sills and frames",
-        "exterior-windows": "Clean exterior window glass (ground level)",
-        "glass-doors": "Clean glass doors and partitions",
-    },
-    "trash-recycling": {
-        "empty-all-bins": "Empty all trash receptacles",
-        "replace-liners": "Replace trash can liners",
-        "empty-recycling": "Empty recycling bins",
-        "take-to-dumpster": "Transport waste to designated disposal area",
-        "clean-bins": "Clean and sanitize waste receptacles (periodic)",
-    },
-    "high-touch": {
-        "door-handles": "Sanitize all door handles and knobs",
-        "light-switches": "Sanitize light switches",
-        "handrails": "Sanitize handrails and banisters",
-        "elevator-buttons": "Sanitize elevator buttons",
-        "reception-desk": "Sanitize reception desk and counters",
-        "shared-equipment": "Sanitize shared equipment (copiers, printers)",
-    },
-}
+# Load service area and task definitions from JSON template file
+def load_template_definitions():
+    """Load service areas and tasks from the JSON template file"""
+    template_path = os.path.join(
+        os.path.dirname(__file__), "..", "..", "cleanenroll_scope_of_work_templates.json"
+    )
+
+    service_areas = {}
+    task_definitions = {}
+
+    if os.path.exists(template_path):
+        with open(template_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+            for template in data.get("templates", []):
+                for area in template.get("serviceAreas", []):
+                    area_id = area["name"].lower().replace(" ", "-").replace("/", "-")
+                    service_areas[area_id] = {
+                        "name": area["name"],
+                        "icon": get_area_icon(area["name"]),
+                    }
+
+                    # Build task definitions for this area
+                    if area_id not in task_definitions:
+                        task_definitions[area_id] = {}
+
+                    for task_label in area.get("tasks", []):
+                        task_id = (
+                            task_label.lower()
+                            .replace(" ", "-")
+                            .replace("/", "-")
+                            .replace("(", "")
+                            .replace(")", "")
+                        )
+                        task_definitions[area_id][task_id] = task_label
+
+    return service_areas, task_definitions
+
+
+def get_area_icon(area_name: str) -> str:
+    """Get an appropriate icon for a service area"""
+    area_lower = area_name.lower()
+
+    icon_map = {
+        "lobby": "🏢",
+        "reception": "🏢",
+        "workstation": "💼",
+        "office": "💼",
+        "conference": "📊",
+        "meeting": "📊",
+        "breakroom": "☕",
+        "kitchenette": "☕",
+        "kitchen": "🍳",
+        "restroom": "🚻",
+        "bathroom": "🚻",
+        "sales": "🛍️",
+        "retail": "🛍️",
+        "fitting": "👔",
+        "checkout": "💳",
+        "pos": "💳",
+        "stockroom": "📦",
+        "storage": "📦",
+        "warehouse": "📦",
+        "dining": "🍽️",
+        "cafeteria": "🍽️",
+        "bar": "🍸",
+        "grease": "🧴",
+        "exam": "🏥",
+        "medical": "🏥",
+        "waiting": "🪑",
+        "clinical": "🧪",
+        "biohazard": "⚠️",
+        "production": "🏭",
+        "industrial": "🏭",
+        "loading": "🚚",
+        "dock": "🚚",
+        "workout": "🏋️",
+        "gym": "🏋️",
+        "locker": "🚿",
+        "classroom": "📚",
+        "hallway": "🚶",
+        "common": "🚶",
+    }
+
+    for key, icon in icon_map.items():
+        if key in area_lower:
+            return icon
+
+    return "📋"
+
+
+# Load definitions at module level
+SERVICE_AREAS, TASK_DEFINITIONS = load_template_definitions()
 
 COMPLIANCE_CLAUSE = """All cleaning services shall be performed in accordance with applicable OSHA (Occupational Safety and Health Administration) standards and CDC (Centers for Disease Control and Prevention) guidelines for commercial cleaning and disinfection. Service Provider shall use EPA-registered disinfectants and follow manufacturer instructions for proper application and contact time."""
 
