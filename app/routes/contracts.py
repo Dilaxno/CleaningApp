@@ -1159,7 +1159,6 @@ async def generate_contract_with_scope(
     """
     from ..services.exhibit_a_generator import generate_exhibit_a_pdf
     from .upload import upload_to_r2
-    import hashlib
 
     # Find contract
     contract = db.query(Contract).filter(Contract.public_id == contract_public_id).first()

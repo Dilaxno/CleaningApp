@@ -4,14 +4,13 @@ Handles sending SMS notifications for various workflow events
 """
 
 import logging
-from datetime import datetime
 from typing import Optional
 
 import httpx
 from cryptography.fernet import Fernet
 from sqlalchemy.orm import Session
 
-from ..config import FRONTEND_URL, SECRET_KEY
+from ..config import SECRET_KEY
 from ..models_twilio import TwilioIntegration, TwilioSMSLog
 
 logger = logging.getLogger(__name__)

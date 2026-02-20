@@ -129,6 +129,11 @@ Thumbs.db
 *.log
 logs/
 
+# Security and analysis reports
+bandit_report.*
+vulture_report.*
+mypy_report.*
+
 # Local development
 *.local
 

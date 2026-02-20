@@ -372,7 +372,7 @@ async def sign_contract_public(
     This is used in the quote approval flow where clients schedule first, then sign.
     """
     from datetime import datetime
-    from fastapi import HTTPException, Request
+    from fastapi import HTTPException
     from ...models import BusinessConfig, Client, Contract
     from ...email_service import (
         send_client_signature_confirmation,

@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import func
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 
 from ...models import Client, QuoteHistory, User
 
@@ -13,23 +13,21 @@ class ClientRepository:
     """Repository for client database operations"""
 
     @staticmethod
-    def get_clients(db: Session, user_id: int, exclude_pending_signature: bool = True) -> list[Client]:
+    def get_clients(
+        db: Session, user_id: int, exclude_pending_signature: bool = True
+    ) -> list[Client]:
         """Get all clients for a user"""
         query = db.query(Client).filter(Client.user_id == user_id)
-        
+
         if exclude_pending_signature:
             query = query.filter(Client.status != "pending_signature")
-        
+
         return query.order_by(Client.created_at.desc()).all()
 
     @staticmethod
     def get_client_by_id(db: Session, client_id: int, user_id: int) -> Optional[Client]:
         """Get a specific client by ID"""
-        return (
-            db.query(Client)
-            .filter(Client.id == client_id, Client.user_id == user_id)
-            .first()
-        )
+        return db.query(Client).filter(Client.id == client_id, Client.user_id == user_id).first()
 
     @staticmethod
     def get_client_by_public_id(db: Session, public_id: str) -> Optional[Client]:
@@ -51,7 +49,7 @@ class ClientRepository:
         for key, value in updates.items():
             if value is not None and hasattr(client, key):
                 setattr(client, key, value)
-        
+
         db.commit()
         db.refresh(client)
         return client
@@ -73,15 +71,12 @@ class ClientRepository:
 
         for client_id in client_ids:
             client = (
-                db.query(Client)
-                .filter(Client.id == client_id, Client.user_id == user_id)
-                .first()
+                db.query(Client).filter(Client.id == client_id, Client.user_id == user_id).first()
             )
             if client:
                 # Check if client has signed the contract
                 has_signed_contract = any(
-                    c.client_signature or c.client_signature_timestamp 
-                    for c in client.contracts
+                    c.client_signature or c.client_signature_timestamp for c in client.contracts
                 )
                 if has_signed_contract:
                     signed_clients_count += 1
@@ -94,11 +89,7 @@ class ClientRepository:
 
     # Quote Request Methods
     @staticmethod
-    def get_quote_requests(
-        db: Session, 
-        user_id: int, 
-        status: Optional[str] = None
-    ) -> list[Client]:
+    def get_quote_requests(db: Session, user_id: int, status: Optional[str] = None) -> list[Client]:
         """Get quote requests with optional status filter"""
         query = db.query(Client).filter(Client.user_id == user_id)
 
@@ -173,8 +164,7 @@ class ClientRepository:
     ) -> list[Client]:
         """Search and filter clients"""
         query = db.query(Client).filter(
-            Client.user_id == user_id, 
-            Client.status != "pending_signature"
+            Client.user_id == user_id, Client.status != "pending_signature"
         )
 
         if status and status != "all":

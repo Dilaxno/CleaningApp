@@ -86,7 +86,9 @@ class ContractPDFService:
         return None
 
     @staticmethod
-    def get_pdf_url(pdf_key: Optional[str], contract_public_id: Optional[str] = None) -> Optional[str]:
+    def get_pdf_url(
+        pdf_key: Optional[str], contract_public_id: Optional[str] = None
+    ) -> Optional[str]:
         """Generate backend URL for PDF if key exists (avoids CORS issues)"""
         if not pdf_key or not contract_public_id:
             return None

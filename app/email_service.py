@@ -5,11 +5,10 @@ Provides email functionality using MJML templates for responsive design
 
 import io
 import logging
-import os
 import smtplib
 import ssl
 import zipfile
-from datetime import date, datetime
+from datetime import datetime
 from email import encoders
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
@@ -20,7 +19,7 @@ import aiohttp
 import resend
 from mjml import mjml_to_html
 
-from .config import EMAIL_FROM_ADDRESS, FRONTEND_URL, RESEND_API_KEY, SMTP_ENCRYPTION_KEY
+from .config import EMAIL_FROM_ADDRESS, RESEND_API_KEY, SMTP_ENCRYPTION_KEY
 from .email_templates import (
     THEME,
     client_signature_confirmation_template,
@@ -38,7 +37,6 @@ from .email_templates import (
     quote_approved_template,
     quote_review_notification_template,
     quote_submitted_confirmation_template,
-    schedule_confirmed_client_template,
     schedule_confirmed_provider_template,
     welcome_email_template,
 )
@@ -840,14 +838,6 @@ async def send_invoice_payment_link_email(
         deposit_percentage: Percentage of deposit (default 50)
         remaining_balance: Remaining balance due after job completion
     """
-    # Adjust invoice title and amount display for deposits
-    if is_deposit:
-        display_title = f"{invoice_title} - {deposit_percentage}% Deposit"
-        amount_note = f"Deposit Amount ({deposit_percentage}%)"
-    else:
-        display_title = invoice_title
-        amount_note = "Total Amount"
-
     mjml_content = invoice_ready_template(
         client_name=client_name,
         business_name=business_name,

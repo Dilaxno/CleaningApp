@@ -224,7 +224,7 @@ async def send_invoice_ready_email(client: Client, contract: Contract, user: Use
         business_name = business_config.business_name if business_config else "Service Provider"
         client_name = client.contact_name or client.business_name
 
-        html = f"""
+        f"""
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
                 <h1 style="color: white; margin: 0; font-size: 28px;">Invoice Ready! 💳</h1>

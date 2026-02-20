@@ -13,8 +13,6 @@ from typing import Any, Optional
 
 # Input sanitization
 import bleach
-from argon2 import PasswordHasher
-from argon2.exceptions import InvalidHash, VerifyMismatchError
 from bleach.css_sanitizer import CSSSanitizer
 
 # Token generation and validation
@@ -40,9 +38,8 @@ logger = logging.getLogger(__name__)
 SECRET_KEY = os.getenv("SECRET_KEY", secrets.token_urlsafe(32))
 ALGORITHM = "HS256"
 
-# Password hashing contexts
+# Password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-argon2_hasher = PasswordHasher()
 
 
 # ============================================================================
@@ -61,23 +58,6 @@ def verify_password_bcrypt(plain_password: str, hashed_password: str) -> bool:
         return pwd_context.verify(plain_password, hashed_password)
     except Exception as e:
         logger.error(f"Password verification error: {e}")
-        return False
-
-
-def hash_password_argon2(password: str) -> str:
-    """Hash password using Argon2 (modern, recommended for new applications)"""
-    return argon2_hasher.hash(password)
-
-
-def verify_password_argon2(plain_password: str, hashed_password: str) -> bool:
-    """Verify password against Argon2 hash"""
-    try:
-        argon2_hasher.verify(hashed_password, plain_password)
-        return True
-    except (VerifyMismatchError, InvalidHash):
-        return False
-    except Exception as e:
-        logger.error(f"Argon2 verification error: {e}")
         return False
 
 

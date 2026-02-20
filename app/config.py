@@ -34,7 +34,9 @@ if not SECRET_KEY:
     import warnings
 
     warnings.warn(
-        "SECRET_KEY not set! Using insecure default - DO NOT USE IN PRODUCTION", RuntimeWarning, stacklevel=2
+        "SECRET_KEY not set! Using insecure default - DO NOT USE IN PRODUCTION",
+        RuntimeWarning,
+        stacklevel=2,
     )
     SECRET_KEY = "INSECURE-DEV-KEY-CHANGE-IN-PRODUCTION"  # noqa: S105 - Dev fallback only
 

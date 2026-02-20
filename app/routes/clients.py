@@ -1551,7 +1551,6 @@ async def generate_contract_for_client(
 
         try:
             # Generate contract synchronously
-            from datetime import datetime
 
             from ..config import R2_BUCKET_NAME
             from ..routes.contracts_pdf import calculate_quote, generate_contract_html, html_to_pdf

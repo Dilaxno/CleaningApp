@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from ..config import FRONTEND_URL, SQUARE_WEBHOOK_SIGNATURE_KEY
 from ..database import get_db
-from ..email_service import send_email, send_payment_received_notification
+from ..email_service import send_email
 from ..email_templates import THEME
 from ..models import Client, Contract, User
 from ..services.square_subscription import create_square_subscription
@@ -398,7 +398,7 @@ async def send_payment_confirmation_email(client: Client, contract: Contract, us
                 </div>
                 """
 
-            client_html = f"""
+            f"""
             <!DOCTYPE html>
             <html lang="en">
             <head>
@@ -734,7 +734,7 @@ async def send_payment_confirmation_email(client: Client, contract: Contract, us
 
         # Email to owner
         if user.email:
-            owner_html = f"""
+            f"""
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
                 <div style="background: linear-gradient(135deg, #00C4B4 0%, #00A89A 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
                     <h1 style="color: white; margin: 0; font-size: 28px;">💰 Payment Received</h1>
@@ -865,7 +865,7 @@ async def send_subscription_confirmation_email(
         next_billing_str = next_billing_date.strftime("%B %d, %Y")
 
         if client.email:
-            html = f"""
+            f"""
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
                 <div style="background: linear-gradient(135deg, #00C4B4 0%, #00A89A 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
                     <h1 style="color: white; margin: 0; font-size: 28px;">🎉 Subscription Activated!</h1>
@@ -1019,7 +1019,7 @@ async def send_subscription_notification_to_owner(
         next_billing_str = next_billing_date.strftime("%B %d, %Y")
 
         if user.email:
-            html = f"""
+            f"""
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
                 <div style="background: linear-gradient(135deg, #00C4B4 0%, #00A89A 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
                     <h1 style="color: white; margin: 0; font-size: 28px;">🔄 Subscription Created</h1>
@@ -1198,7 +1198,7 @@ async def send_provider_payment_notification(
         client_name = client.contact_name or client.business_name
 
         if user.email:
-            html = f"""
+            f"""
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
                 <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
                     <h1 style="color: white; margin: 0; font-size: 28px;">💰 Payment Received!</h1>

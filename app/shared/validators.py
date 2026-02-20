@@ -17,13 +17,13 @@ def validate_uuid(value: str) -> bool:
 def validate_us_phone(phone: Optional[str]) -> Optional[str]:
     """
     Validate and normalize US phone number to E.164 format.
-    
+
     Args:
         phone: Phone number string in various formats
-        
+
     Returns:
         Normalized phone number in E.164 format (+1XXXXXXXXXX)
-        
+
     Raises:
         ValueError: If phone number is invalid
     """
@@ -48,13 +48,13 @@ def validate_us_phone(phone: Optional[str]) -> Optional[str]:
 def validate_email(email: Optional[str]) -> Optional[str]:
     """
     Validate email format.
-    
+
     Args:
         email: Email address string
-        
+
     Returns:
         Lowercase email address
-        
+
     Raises:
         ValueError: If email format is invalid
     """
@@ -62,26 +62,26 @@ def validate_email(email: Optional[str]) -> Optional[str]:
         return email
 
     email = email.strip().lower()
-    
+
     # Basic email validation pattern
     email_pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
-    
+
     if not re.match(email_pattern, email):
         raise ValueError("Invalid email format")
-    
+
     return email
 
 
 def validate_subdomain(subdomain: str) -> str:
     """
     Validate subdomain format.
-    
+
     Args:
         subdomain: Subdomain string (e.g., mail.example.com)
-        
+
     Returns:
         Lowercase, stripped subdomain
-        
+
     Raises:
         ValueError: If subdomain format is invalid
     """

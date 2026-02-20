@@ -9,7 +9,7 @@ from typing import List, Optional
 from sqlalchemy import and_, desc
 from sqlalchemy.orm import Session
 
-from ..models import Client, Contract, User
+from ..models import Contract
 from ..models_invoice import Invoice
 from ..models_visit import Visit
 

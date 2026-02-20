@@ -4,7 +4,6 @@ Handles Twilio credential management and SMS sending
 """
 
 import logging
-import os
 from datetime import datetime
 from typing import Optional
 
@@ -14,7 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ..auth import get_current_user, get_current_user_with_plan
+from ..auth import get_current_user_with_plan
 from ..config import SECRET_KEY
 from ..database import get_db
 from ..models import User

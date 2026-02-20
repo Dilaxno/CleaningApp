@@ -117,9 +117,9 @@ class ClientService:
             if client:
                 contract_ids = [c.id for c in client.contracts]
                 if contract_ids:
-                    self.db.query(Invoice).filter(
-                        Invoice.contract_id.in_(contract_ids)
-                    ).delete(synchronize_session=False)
+                    self.db.query(Invoice).filter(Invoice.contract_id.in_(contract_ids)).delete(
+                        synchronize_session=False
+                    )
 
         # Delete clients
         deleted_count, signed_clients_count = self.repo.batch_delete_clients(
@@ -163,9 +163,7 @@ class ClientService:
                     logger.warning(f"Invalid end_date format: {end_date} - {e}")
 
             # Get filtered clients
-            clients = self.repo.search_clients(
-                self.db, user.id, status, search, start_dt, end_dt
-            )
+            clients = self.repo.search_clients(self.db, user.id, status, search, start_dt, end_dt)
             logger.info(f"Found {len(clients)} clients to export")
 
             # Create CSV
@@ -173,35 +171,43 @@ class ClientService:
             writer = csv.writer(output)
 
             # Write header
-            writer.writerow([
-                "ID",
-                "Business Name",
-                "Contact Name",
-                "Email",
-                "Phone",
-                "Property Type",
-                "Property Size (sq ft)",
-                "Frequency",
-                "Status",
-                "Notes",
-                "Created At",
-            ])
+            writer.writerow(
+                [
+                    "ID",
+                    "Business Name",
+                    "Contact Name",
+                    "Email",
+                    "Phone",
+                    "Property Type",
+                    "Property Size (sq ft)",
+                    "Frequency",
+                    "Status",
+                    "Notes",
+                    "Created At",
+                ]
+            )
 
             # Write data
             for client in clients:
-                writer.writerow([
-                    client.id,
-                    client.business_name or "",
-                    client.contact_name or "",
-                    client.email or "",
-                    client.phone or "",
-                    client.property_type or "",
-                    client.property_size or "",
-                    client.frequency or "",
-                    client.status or "",
-                    client.notes or "",
-                    client.created_at.strftime("%Y-%m-%d %H:%M:%S") if client.created_at else "",
-                ])
+                writer.writerow(
+                    [
+                        client.id,
+                        client.business_name or "",
+                        client.contact_name or "",
+                        client.email or "",
+                        client.phone or "",
+                        client.property_type or "",
+                        client.property_size or "",
+                        client.frequency or "",
+                        client.status or "",
+                        client.notes or "",
+                        (
+                            client.created_at.strftime("%Y-%m-%d %H:%M:%S")
+                            if client.created_at
+                            else ""
+                        ),
+                    ]
+                )
 
             # Prepare response
             output.seek(0)
@@ -234,29 +240,31 @@ class ClientService:
 
         quote_requests = []
         for client in clients:
-            quote_requests.append({
-                "id": client.id,
-                "public_id": client.public_id,
-                "business_name": client.business_name,
-                "contact_name": client.contact_name,
-                "email": client.email,
-                "phone": client.phone,
-                "property_type": client.property_type,
-                "property_size": client.property_size,
-                "frequency": client.frequency,
-                "quote_status": client.quote_status,
-                "quote_submitted_at": (
-                    client.quote_submitted_at.isoformat() if client.quote_submitted_at else None
-                ),
-                "quote_approved_at": (
-                    client.quote_approved_at.isoformat() if client.quote_approved_at else None
-                ),
-                "original_quote_amount": client.original_quote_amount,
-                "adjusted_quote_amount": client.adjusted_quote_amount,
-                "quote_adjustment_notes": client.quote_adjustment_notes,
-                "form_data": client.form_data,
-                "created_at": client.created_at.isoformat() if client.created_at else None,
-            })
+            quote_requests.append(
+                {
+                    "id": client.id,
+                    "public_id": client.public_id,
+                    "business_name": client.business_name,
+                    "contact_name": client.contact_name,
+                    "email": client.email,
+                    "phone": client.phone,
+                    "property_type": client.property_type,
+                    "property_size": client.property_size,
+                    "frequency": client.frequency,
+                    "quote_status": client.quote_status,
+                    "quote_submitted_at": (
+                        client.quote_submitted_at.isoformat() if client.quote_submitted_at else None
+                    ),
+                    "quote_approved_at": (
+                        client.quote_approved_at.isoformat() if client.quote_approved_at else None
+                    ),
+                    "original_quote_amount": client.original_quote_amount,
+                    "adjusted_quote_amount": client.adjusted_quote_amount,
+                    "quote_adjustment_notes": client.quote_adjustment_notes,
+                    "form_data": client.form_data,
+                    "created_at": client.created_at.isoformat() if client.created_at else None,
+                }
+            )
 
         return {
             "quote_requests": quote_requests,
@@ -275,14 +283,16 @@ class ClientService:
         history = self.repo.get_quote_history(self.db, client_id)
         history_entries = []
         for entry in history:
-            history_entries.append({
-                "id": entry.id,
-                "action": entry.action,
-                "amount": entry.amount,
-                "notes": entry.notes,
-                "created_by": entry.created_by,
-                "created_at": entry.created_at.isoformat() if entry.created_at else None,
-            })
+            history_entries.append(
+                {
+                    "id": entry.id,
+                    "action": entry.action,
+                    "amount": entry.amount,
+                    "notes": entry.notes,
+                    "created_by": entry.created_by,
+                    "created_at": entry.created_at.isoformat() if entry.created_at else None,
+                }
+            )
 
         # Process form data (property shots, virtual walkthrough)
         form_data = client.form_data or {}
