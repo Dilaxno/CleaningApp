@@ -1462,6 +1462,7 @@ class GenerateContractRequest(BaseModel):
     """Schema for generating contract for existing client"""
 
     formData: dict
+    scopeOfWork: Optional[dict] = None
 
 
 # Rate limiter for contract signing - 10 per hour per IP
@@ -1508,6 +1509,12 @@ async def generate_contract_for_client(
     # Update client's form_data if provided
     if data.formData:
         client.form_data = data.formData
+
+    # Update client's scope_of_work if provided
+    if data.scopeOfWork:
+        client.scope_of_work = data.scopeOfWork
+
+    if data.formData or data.scopeOfWork:
         db.commit()
         db.refresh(client)
 
