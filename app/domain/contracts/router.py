@@ -433,18 +433,13 @@ async def sign_contract_public(
         )
 
         # Calculate quote
-        quote = calculate_quote(
-            client.form_data,
-            business_config,
-            service.db,
-            client_id=client.id,
-            user_id=user.id,
-        )
+        quote = calculate_quote(business_config, client.form_data)
 
         # Generate HTML with client signature
         html_content = await generate_contract_html(
             business_config,
             client,
+            client.form_data,
             quote,
             service.db,
             client_signature=signature_data,

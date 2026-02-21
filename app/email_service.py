@@ -720,6 +720,61 @@ async def send_scheduling_accepted_email(
     )
 
 
+async def send_appointment_confirmed_to_client(
+    client_email: str,
+    client_name: str,
+    provider_name: str,
+    confirmed_date: str,
+    confirmed_start_time: str,
+    confirmed_end_time: str,
+) -> dict:
+    """Send appointment confirmation email to client"""
+    from .email_templates import schedule_confirmed_client_template
+
+    scheduled_time = f"{confirmed_start_time} - {confirmed_end_time}"
+    mjml_content = schedule_confirmed_client_template(
+        client_name=client_name,
+        business_name=provider_name,
+        scheduled_date=confirmed_date,
+        scheduled_time=scheduled_time,
+    )
+
+    return await send_email(
+        to=client_email,
+        subject=f"Your Cleaning is Scheduled! - {provider_name}",
+        mjml_content=mjml_content,
+        is_user_email=False,
+    )
+
+
+async def send_schedule_accepted_confirmation_to_provider(
+    provider_email: str,
+    provider_name: str,
+    client_name: str,
+    confirmed_date: str,
+    confirmed_start_time: str,
+    confirmed_end_time: str,
+    client_address: Optional[str] = None,
+) -> dict:
+    """Send schedule confirmation email to provider"""
+    from .email_templates import schedule_confirmed_provider_template
+
+    scheduled_time = f"{confirmed_start_time} - {confirmed_end_time}"
+    mjml_content = schedule_confirmed_provider_template(
+        provider_name=provider_name,
+        client_name=client_name,
+        scheduled_date=confirmed_date,
+        scheduled_time=scheduled_time,
+    )
+
+    return await send_email(
+        to=provider_email,
+        subject=f"Schedule Confirmed: {client_name} - {confirmed_date}",
+        mjml_content=mjml_content,
+        is_user_email=True,
+    )
+
+
 async def send_scheduling_counter_proposal_email(
     provider_email: str,
     provider_name: str,

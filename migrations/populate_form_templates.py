@@ -58,10 +58,28 @@ def load_scope_templates():
     with open(scope_file, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    # Convert to dict keyed by template name
+    # Convert to dict keyed by template name (lowercase for matching)
     scope_templates = {}
     for template in data.get("templates", []):
-        scope_templates[template["name"].lower()] = {"serviceAreas": template["serviceAreas"]}
+        template_name = template["name"].lower()
+        # Convert serviceAreas to the format expected by frontend
+        service_areas = []
+        for idx, area in enumerate(template["serviceAreas"]):
+            # Generate ID from area name
+            area_id = area["name"].lower().replace(" / ", "-").replace(" ", "-")
+            service_areas.append(
+                {
+                    "id": area_id,
+                    "name": area["name"],
+                    "icon": "🧹",  # Default icon, can be customized per area
+                    "tasks": [
+                        {"id": f"{area_id}-task-{i}", "label": task, "description": None}
+                        for i, task in enumerate(area["tasks"])
+                    ],
+                }
+            )
+
+        scope_templates[template_name] = {"serviceAreas": service_areas}
 
     return scope_templates
 
@@ -445,6 +463,7 @@ def populate_templates(db: Session):
     # Load scope templates
     scope_templates = load_scope_templates()
     print(f"📋 Loaded {len(scope_templates)} scope templates")
+    print(f"   Available scope templates: {list(scope_templates.keys())}")
 
     for template_data in SYSTEM_TEMPLATES:
         # Check if template already exists
@@ -458,8 +477,14 @@ def populate_templates(db: Session):
         )
 
         # Get scope template for this template
-        template_name = template_data["name"].lower()
-        scope_template = scope_templates.get(template_name)
+        # Match by template_id (e.g., "office" matches "office")
+        template_id = template_data["template_id"].lower()
+        scope_template = scope_templates.get(template_id)
+
+        if scope_template:
+            print(f"✅ Found scope template for '{template_data['name']}' (id: {template_id})")
+        else:
+            print(f"⚠️  No scope template found for '{template_data['name']}' (id: {template_id})")
 
         if existing:
             print(f"⚠️  Template '{template_data['name']}' already exists, updating...")
