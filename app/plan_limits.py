@@ -119,11 +119,44 @@ def get_usage_stats(user: User, db: Session) -> dict:
     """
     Get current usage statistics for the user.
     Returns dict with limit, current, remaining, and reset_date.
+    Counts clients with 'scheduled' or 'active' status created this month.
     """
+    from datetime import datetime
+    from ..models import Client
+
     check_and_reset_monthly_counter(user, db)
 
     limit = get_plan_limit(user.plan)
-    current = user.clients_this_month
+
+    # Count actual clients with scheduled or active status from this month
+    # Use subscription_start_date or month_reset_date to determine the billing period
+    if user.month_reset_date:
+        # Calculate the start of the current billing period
+        from dateutil.relativedelta import relativedelta
+
+        billing_start = user.month_reset_date - relativedelta(months=1)
+    elif user.subscription_start_date:
+        billing_start = user.subscription_start_date
+    else:
+        # Fallback to start of current calendar month
+        now = datetime.utcnow()
+        billing_start = datetime(now.year, now.month, 1)
+
+    # Count clients with scheduled or active status created in this billing period
+    current = (
+        db.query(Client)
+        .filter(
+            Client.user_id == user.id,
+            Client.status.in_(["scheduled", "active"]),
+            Client.created_at >= billing_start,
+        )
+        .count()
+    )
+
+    # Update the counter in the database to match actual count
+    if user.clients_this_month != current:
+        user.clients_this_month = current
+        db.commit()
 
     return {
         "plan": user.plan,
