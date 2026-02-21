@@ -232,6 +232,26 @@ class ContractService:
             "message": "Contract signed successfully",
             "status": contract.status,
             "fullyExecuted": contract.status == "signed",
+            # Return full contract data for frontend
+            "id": contract.id,
+            "title": contract.title,
+            "description": contract.description,
+            "clientName": contract.client.business_name or contract.client.contact_name,
+            "clientId": contract.client_id,
+            "totalValue": contract.total_value,
+            "status": contract.status,
+            "pdfUrl": self.pdf_service.get_pdf_url(contract.pdf_key, contract.public_id),
+            "signedAt": contract.signed_at.isoformat() if contract.signed_at else None,
+            "clientSignatureTimestamp": (
+                contract.client_signature_timestamp.isoformat()
+                if contract.client_signature_timestamp
+                else None
+            ),
+            "providerSignedAt": (
+                contract.provider_signed_at.isoformat() if contract.provider_signed_at else None
+            ),
+            "createdAt": contract.created_at.isoformat() if contract.created_at else None,
+            "defaultSignatureUrl": (business_config.signature_url if business_config else None),
         }
 
     def get_contract_with_details(self, contract_id: int, user: User) -> dict:
