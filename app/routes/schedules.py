@@ -402,6 +402,13 @@ async def approve_schedule(
         # Mark onboarding complete ONLY after provider acceptance.
         contract.client_onboarding_status = "completed"
 
+        # Set contract start date to the scheduled date
+        if schedule.scheduled_date and not contract.start_date:
+            contract.start_date = schedule.scheduled_date
+            logger.info(
+                f"📅 Setting contract {contract.id} start_date to {schedule.scheduled_date}"
+            )
+
         # NOTE: Client count is NOT incremented here anymore
         # Client count is incremented when client signs the contract (in clients.py)
         # This ensures the count reflects when the client commits to the service
@@ -503,11 +510,14 @@ async def approve_schedule(
                 )
                 business_name = config.business_name if config else current_user.email
 
+                # Format date properly for email
+                formatted_date = schedule.scheduled_date.strftime("%B %d, %Y")
+
                 await email_service.send_appointment_confirmed_to_client(
                     client_email=client.email,
                     client_name=client.business_name or client.contact_name or "Client",
                     provider_name=business_name,
-                    confirmed_date=schedule.scheduled_date,
+                    confirmed_date=formatted_date,
                     confirmed_start_time=schedule.start_time,
                     confirmed_end_time=schedule.end_time,
                 )
@@ -518,11 +528,14 @@ async def approve_schedule(
         # Send confirmation email to provider
         if current_user.email:
             try:
+                # Format date properly for email
+                formatted_date = schedule.scheduled_date.strftime("%B %d, %Y")
+
                 await email_service.send_schedule_accepted_confirmation_to_provider(
                     provider_email=current_user.email,
                     provider_name=current_user.full_name or "Provider",
                     client_name=client.business_name or client.contact_name or "Client",
-                    confirmed_date=schedule.scheduled_date,
+                    confirmed_date=formatted_date,
                     confirmed_start_time=schedule.start_time,
                     confirmed_end_time=schedule.end_time,
                     client_address=client.address if hasattr(client, "address") else None,

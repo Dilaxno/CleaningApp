@@ -4,7 +4,7 @@ Visit Management Models for Contract Execution
 
 import uuid
 
-from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import ARRAY, Column, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -73,6 +73,11 @@ class Visit(Base):
     provider_notes = Column(Text, nullable=True)
     client_notes = Column(Text, nullable=True)
     completion_notes = Column(Text, nullable=True)
+
+    # Photo proof of service (required for completion)
+    photo_proof_urls = Column(ARRAY(Text), nullable=True)  # R2 URLs for photos (min 2, max 10)
+    photo_count = Column(Integer, default=0, nullable=False)  # Number of photos uploaded
+    photos_uploaded_at = Column(DateTime, nullable=True)  # When photos were uploaded
 
     # Audit trail
     started_by = Column(String(255), nullable=True)
