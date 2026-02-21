@@ -908,7 +908,8 @@ async def bypass_signature_webhook(request: Request, db: Session = Depends(get_d
         ):
             firebase_uid = meta.get("firebase_uid")
             email = (data.get("customer") or {}).get("email") or data.get("email")
-            selected_plan = meta.get("selected_plan")
+            # Support both 'selected_plan' (new) and 'plan' (legacy) keys for backward compatibility
+            selected_plan = meta.get("selected_plan") or meta.get("plan")
             billing_cycle = meta.get("billing_cycle")
 
             logger.info(
@@ -1177,7 +1178,8 @@ async def manual_fix_from_webhook_logs(request: Request, db: Session = Depends(g
         meta = data.get("metadata") or {}
 
         firebase_uid = meta.get("firebase_uid")
-        selected_plan = meta.get("selected_plan")
+        # Support both 'selected_plan' (new) and 'plan' (legacy) keys for backward compatibility
+        selected_plan = meta.get("selected_plan") or meta.get("plan")
         billing_cycle = meta.get("billing_cycle")
 
         if not firebase_uid:
@@ -1375,7 +1377,8 @@ async def handle_dodopayments_webhook(
                 logger.info(f"🔍 User lookup by email: {'found' if user else 'not found'}")
 
             # Determine target plan from metadata
-            selected_plan = meta.get("selected_plan")
+            # Support both 'selected_plan' (new) and 'plan' (legacy) keys for backward compatibility
+            selected_plan = meta.get("selected_plan") or meta.get("plan")
             billing_cycle = meta.get("billing_cycle")  # "monthly" or "yearly"
             subscription_id = data.get("subscription_id") or data.get("id")
 
