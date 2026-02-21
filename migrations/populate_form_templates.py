@@ -140,15 +140,6 @@ def get_universal_property_section():
                 "options": ["Yes", "No"],
                 "required": True,
             },
-            {
-                "id": "propertyImage",
-                "label": "Property / Space image (optional)",
-                "type": "file",
-                "accept": "image/*",
-                "required": False,
-                "uploadMode": "client-r2",
-                "hint": "Upload a photo of the space to help us provide an accurate quote",
-            },
         ],
     }
 
