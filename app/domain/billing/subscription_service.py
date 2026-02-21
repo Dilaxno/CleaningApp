@@ -86,7 +86,7 @@ class SubscriptionService:
             "user_email": user.email,
         }
         if request.plan:
-            metadata["plan"] = request.plan
+            metadata["selected_plan"] = request.plan
         if request.billing_cycle:
             metadata["billing_cycle"] = request.billing_cycle
 
