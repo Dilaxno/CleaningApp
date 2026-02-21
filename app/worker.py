@@ -117,13 +117,34 @@ async def generate_contract_pdf_task(
             logger.error(f"❌ Quote calculation failed: {str(e)}")
             raise Exception(f"Failed to calculate quote: {str(e)}") from e
 
+        # Override quote with adjusted amount if provider adjusted the price
+        if client.adjusted_quote_amount is not None:
+            logger.info(
+                f"💰 Using adjusted quote amount: ${client.adjusted_quote_amount} (original: ${client.original_quote_amount})"
+            )
+            quote["final_price"] = client.adjusted_quote_amount
+            quote["base_price"] = client.adjusted_quote_amount
+            # Keep discount amounts at 0 since adjusted price is already final
+            quote["discount_amount"] = 0
+            quote["discount_percent"] = 0
+            quote["first_cleaning_discount_amount"] = 0
+            quote["addon_amount"] = 0
+            quote["addon_details"] = []
+
         # Create contract record first to get public_id for secure contract numbering
         logger.info(f"📝 Creating contract record...")
+
+        # Use adjusted quote amount if available, otherwise use calculated quote
+        contract_amount = client.adjusted_quote_amount or quote.get(
+            "final_price", quote.get("total", 0)
+        )
+        logger.info(f"💰 Contract amount: ${contract_amount}")
+
         contract = Contract(
             user_id=user.id,
             client_id=client_id,
             title=f"Cleaning Contract - {client.business_name or client.contact_name}",
-            total_value=quote.get("final_price", quote.get("total", 0)),
+            total_value=contract_amount,
             status="new" if not signature else "signed",
         )
 
