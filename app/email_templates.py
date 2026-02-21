@@ -260,10 +260,7 @@ def email_verification_template(user_name: str, otp: str) -> str:
           
           <!-- OTP Card -->
           <mj-section padding="0 24px 24px 24px">
-            <mj-column>
-              <mj-section background-color="{THEME['primary_light']}" border-radius="6px" padding="24px 16px">
-                <mj-section padding="0">
-                  <mj-column>
+            <mj-column background-color="{THEME['primary_light']}" border-radius="6px">
                     <mj-text 
                       align="center" 
                       font-size="13px" 
@@ -271,7 +268,7 @@ def email_verification_template(user_name: str, otp: str) -> str:
                       text-transform="uppercase" 
                       letter-spacing="1px" 
                       font-weight="600" 
-                      padding="0 0 12px 0"
+                      padding="24px 16px 12px 16px"
                       line-height="1.5">
                       Verification Code
                     </mj-text>
@@ -282,14 +279,11 @@ def email_verification_template(user_name: str, otp: str) -> str:
                       color="{THEME['text_primary']}" 
                       letter-spacing="8px" 
                       font-family="'Courier New', monospace" 
-                      padding="0"
+                      padding="0 16px 24px 16px"
                       css-class="mobile-otp">
                       {otp}
                     </mj-text>
                   </mj-column>
-                </mj-section>
-              </mj-section>
-            </mj-column>
           </mj-section>
           
           <mj-section padding="0 24px 32px 24px">
@@ -389,16 +383,10 @@ def password_reset_template(reset_link: str) -> str:
           <!-- Info Card -->
           <mj-section padding="0 24px 24px 24px">
             <mj-column>
-              <mj-section background-color="{THEME['background']}" border-radius="6px" padding="16px">
-                <mj-section padding="0">
-                  <mj-column>
                     <mj-text font-size="14px" color="{THEME['text_muted']}" padding="0" line-height="1.5">
                       If you didn't request this, you can safely ignore this email. Your password won't be changed.
                     </mj-text>
                   </mj-column>
-                </mj-section>
-              </mj-section>
-            </mj-column>
           </mj-section>
           
           <!-- CTA Button -->
