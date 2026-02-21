@@ -447,7 +447,7 @@ async def sign_contract_public(
         )
 
         # Convert to PDF
-        pdf_bytes = html_to_pdf(html_content)
+        pdf_bytes = await html_to_pdf(html_content)
 
         # Upload to R2
         r2_client = get_r2_client()
