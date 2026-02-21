@@ -417,6 +417,65 @@ async def sign_contract_public(
         f"✅ Contract {contract.id} signed by client via public endpoint - awaiting provider signature"
     )
 
+    # Regenerate PDF with client signature
+    try:
+        from arq import create_pool
+        from ...worker import get_redis_settings
+        from ...routes.contracts_pdf import calculate_quote, generate_contract_html, html_to_pdf
+        from ...routes.upload import get_r2_client
+        from ...config import R2_BUCKET_NAME
+
+        logger.info(f"🔄 Regenerating PDF with client signature for contract {contract.id}")
+
+        # Get business config for quote calculation
+        business_config = (
+            service.db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
+        )
+
+        # Calculate quote
+        quote = calculate_quote(
+            client.form_data,
+            business_config,
+            service.db,
+            client_id=client.id,
+            user_id=user.id,
+        )
+
+        # Generate HTML with client signature
+        html_content = await generate_contract_html(
+            business_config,
+            client,
+            quote,
+            service.db,
+            client_signature=signature_data,
+            contract_public_id=contract.public_id,
+        )
+
+        # Convert to PDF
+        pdf_bytes = html_to_pdf(html_content)
+
+        # Upload to R2
+        r2_client = get_r2_client()
+        pdf_key = f"contracts/{user.firebase_uid}/{contract.public_id}.pdf"
+
+        r2_client.put_object(
+            Bucket=R2_BUCKET_NAME,
+            Key=pdf_key,
+            Body=pdf_bytes,
+            ContentType="application/pdf",
+        )
+
+        # Update contract with new PDF key
+        contract.pdf_key = pdf_key
+        service.db.commit()
+
+        logger.info(f"✅ PDF regenerated successfully with client signature: {pdf_key}")
+
+    except Exception as e:
+        logger.error(f"❌ Failed to regenerate PDF with client signature: {e}")
+        # Don't fail the signing process if PDF regeneration fails
+        pass
+
     # Send confirmation emails
     business_name = "Service Provider"
     business_config = (
