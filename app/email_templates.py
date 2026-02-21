@@ -1118,12 +1118,14 @@ def new_schedule_request_template(
         if client_phone:
             contact_lines.append(f"Phone: {client_phone}")
 
+        text_color = THEME["text_primary"]
+        bg_color = THEME["background"]
         contact_info = f"""
     
-        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">
+        <mj-text font-size="14px" color="{text_color}" padding="0 0 4px 0" line-height="1.5" container-background-color="{bg_color}" border-radius="6px">
           Client: {client_name}
         </mj-text>
-        {"".join([f'<mj-text font-size="14px" color="{THEME["text_primary"]}" padding="0 0 4px 0" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">{line}</mj-text>' for line in contact_lines])}
+        {"".join([f'<mj-text font-size="14px" color="{text_color}" padding="0 0 4px 0" line-height="1.5" container-background-color="{bg_color}" border-radius="6px">{line}</mj-text>' for line in contact_lines])}
       
         """
 
