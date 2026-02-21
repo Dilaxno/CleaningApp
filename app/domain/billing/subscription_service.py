@@ -100,11 +100,15 @@ class SubscriptionService:
                 metadata=metadata,
             )
 
-            logger.info(f"✅ Created checkout session for user {user.id}: {response.get('id')}")
+            # Handle response object attributes
+            checkout_url = getattr(response, "checkout_url", None) or getattr(response, "url", None)
+            session_id = getattr(response, "session_id", None) or getattr(response, "id", None)
+
+            logger.info(f"✅ Created checkout session for user {user.id}: {session_id}")
 
             return {
-                "checkout_url": response.get("url"),
-                "session_id": response.get("id"),
+                "checkout_url": checkout_url,
+                "session_id": session_id,
             }
         except Exception as e:
             logger.error(f"Failed to create checkout session for user {user.id}: {e}")

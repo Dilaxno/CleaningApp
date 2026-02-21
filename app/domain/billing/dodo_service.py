@@ -171,12 +171,13 @@ class DodoPaymentsService:
         quantity: int = 1,
         proration_billing_mode: str = "prorated_immediately",
     ) -> dict:
-        """Update a subscription (change plan)"""
+        """Update a subscription (change plan) using change_plan API"""
         if not self.client:
             raise Exception("Dodo Payments client not initialized")
 
         try:
-            response = await self.client.subscriptions.update(
+            # Use change_plan method instead of update
+            response = await self.client.subscriptions.change_plan(
                 subscription_id=subscription_id,
                 product_id=product_id,
                 quantity=quantity,
