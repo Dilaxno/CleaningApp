@@ -85,10 +85,9 @@ def get_base_template(
         </mj-style>
       </mj-head>
       <mj-body background-color="{THEME['background']}">
-        <mj-section background-color="#ffffff" padding="0">
           
           <!-- Header with Logo -->
-          <mj-section padding="32px 24px 24px 24px">
+          <mj-section background-color="#ffffff" padding="32px 24px 24px 24px">
             <mj-column>
               <mj-image 
                 src="{LOGO_URL}" 
@@ -100,14 +99,14 @@ def get_base_template(
           </mj-section>
           
           <!-- Divider -->
-          <mj-section padding="0 24px">
+          <mj-section background-color="#ffffff" padding="0 24px">
             <mj-column>
               <mj-divider border-color="{THEME['border']}" border-width="1px" padding="0" />
             </mj-column>
           </mj-section>
 
           <!-- Main Content -->
-          <mj-section padding="32px 24px 24px 24px" css-class="mobile-padding">
+          <mj-section background-color="#ffffff" padding="32px 24px 24px 24px" css-class="mobile-padding">
             <mj-column>
               <mj-text 
                 font-size="32px" 
@@ -124,8 +123,6 @@ def get_base_template(
           </mj-section>
 
           {cta_section}
-
-        </mj-section>
 
         <!-- Footer -->
         <mj-section padding="32px 24px">
@@ -210,10 +207,9 @@ def email_verification_template(user_name: str, otp: str) -> str:
         </mj-style>
       </mj-head>
       <mj-body background-color="{THEME['background']}">
-        <mj-section background-color="#ffffff" padding="0">
           
           <!-- Header with Logo -->
-          <mj-section padding="32px 24px 24px 24px">
+          <mj-section background-color="#ffffff" padding="32px 24px 24px 24px">
             <mj-column>
               <mj-image 
                 src="{LOGO_URL}" 
@@ -225,14 +221,14 @@ def email_verification_template(user_name: str, otp: str) -> str:
           </mj-section>
           
           <!-- Divider -->
-          <mj-section padding="0 24px">
+          <mj-section background-color="#ffffff" padding="0 24px">
             <mj-column>
               <mj-divider border-color="{THEME['border']}" border-width="1px" padding="0" />
             </mj-column>
           </mj-section>
 
           <!-- Main Content -->
-          <mj-section padding="32px 24px 24px 24px" css-class="mobile-padding">
+          <mj-section background-color="#ffffff" padding="32px 24px 24px 24px" css-class="mobile-padding">
             <mj-column>
               <mj-text 
                 font-size="32px" 
@@ -259,7 +255,7 @@ def email_verification_template(user_name: str, otp: str) -> str:
           </mj-section>
           
           <!-- OTP Card -->
-          <mj-section padding="0 24px 24px 24px">
+          <mj-section background-color="#ffffff" padding="0 24px 24px 24px">
             <mj-column background-color="{THEME['primary_light']}" border-radius="6px">
                     <mj-text 
                       align="center" 
@@ -286,15 +282,13 @@ def email_verification_template(user_name: str, otp: str) -> str:
                   </mj-column>
           </mj-section>
           
-          <mj-section padding="0 24px 32px 24px">
+          <mj-section background-color="#ffffff" padding="0 24px 32px 24px">
             <mj-column>
               <mj-text color="{THEME['text_muted']}" font-size="14px" padding="0" line-height="1.5">
                 If you didn't request this code, you can safely ignore this email.
               </mj-text>
             </mj-column>
           </mj-section>
-
-        </mj-section>
 
         <!-- Footer -->
         <mj-section padding="32px 24px">
@@ -336,10 +330,9 @@ def password_reset_template(reset_link: str) -> str:
         </mj-style>
       </mj-head>
       <mj-body background-color="{THEME['background']}">
-        <mj-section background-color="#ffffff" padding="0">
           
           <!-- Header with Logo -->
-          <mj-section padding="32px 24px 24px 24px">
+          <mj-section background-color="#ffffff" padding="32px 24px 24px 24px">
             <mj-column>
               <mj-image 
                 src="{LOGO_URL}" 
@@ -351,14 +344,14 @@ def password_reset_template(reset_link: str) -> str:
           </mj-section>
           
           <!-- Divider -->
-          <mj-section padding="0 24px">
+          <mj-section background-color="#ffffff" padding="0 24px">
             <mj-column>
               <mj-divider border-color="{THEME['border']}" border-width="1px" padding="0" />
             </mj-column>
           </mj-section>
 
           <!-- Main Content -->
-          <mj-section padding="32px 24px 24px 24px" css-class="mobile-padding">
+          <mj-section background-color="#ffffff" padding="32px 24px 24px 24px" css-class="mobile-padding">
             <mj-column>
               <mj-text 
                 font-size="32px" 
@@ -381,16 +374,16 @@ def password_reset_template(reset_link: str) -> str:
           </mj-section>
           
           <!-- Info Card -->
-          <mj-section padding="0 24px 24px 24px">
+          <mj-section background-color="#ffffff" padding="0 24px 24px 24px">
             <mj-column>
-                    <mj-text font-size="14px" color="{THEME['text_muted']}" padding="0" line-height="1.5">
-                      If you didn't request this, you can safely ignore this email. Your password won't be changed.
-                    </mj-text>
-                  </mj-column>
+              <mj-text font-size="14px" color="{THEME['text_muted']}" padding="0" line-height="1.5">
+                If you didn't request this, you can safely ignore this email. Your password won't be changed.
+              </mj-text>
+            </mj-column>
           </mj-section>
           
           <!-- CTA Button -->
-          <mj-section padding="0 24px 32px 24px">
+          <mj-section background-color="#ffffff" padding="0 24px 32px 24px">
             <mj-column>
               <mj-button 
                 href="{reset_link}" 
@@ -406,8 +399,6 @@ def password_reset_template(reset_link: str) -> str:
               </mj-button>
             </mj-column>
           </mj-section>
-
-        </mj-section>
 
         <!-- Footer -->
         <mj-section padding="32px 24px">
