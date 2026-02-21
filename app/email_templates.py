@@ -734,16 +734,12 @@ def quote_submitted_confirmation_template(
       Thank you for submitting your quote request. We've received your approval and {business_name} will review it shortly.
     </mj-text>
     
-    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="24px 16px">
-      <mj-column>
-        <mj-text align="center" font-size="32px" font-weight="700" color="{THEME['text_primary']}" padding="0 0 8px 0" line-height="1.2">
-          ${quote_amount:,.2f}
-        </mj-text>
-        <mj-text align="center" font-size="14px" color="{THEME['text_muted']}" padding="0" line-height="1.5">
-          This is an automated estimate. Final pricing will be confirmed by {business_name}.
-        </mj-text>
-      </mj-column>
-    </mj-section>
+    <mj-text align="center" font-size="32px" font-weight="700" color="{THEME['text_primary']}" padding="24px 16px 8px 16px" line-height="1.2" container-background-color="{THEME['background']}" border-radius="6px">
+      ${quote_amount:,.2f}
+    </mj-text>
+    <mj-text align="center" font-size="14px" color="{THEME['text_muted']}" padding="0 16px 24px 16px" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">
+      This is an automated estimate. Final pricing will be confirmed by {business_name}.
+    </mj-text>
     
     <mj-text font-size="14px" color="{THEME['text_muted']}" padding="24px 0 0 0" line-height="1.5">
       Expected response time: Within minutes to hours
