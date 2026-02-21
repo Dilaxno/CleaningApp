@@ -122,7 +122,7 @@ def get_usage_stats(user: User, db: Session) -> dict:
     Counts clients with 'scheduled' or 'active' status created this month.
     """
     from datetime import datetime
-    from ..models import Client
+    from .models import Client
 
     check_and_reset_monthly_counter(user, db)
 
