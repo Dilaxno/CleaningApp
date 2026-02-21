@@ -269,6 +269,29 @@ def patch_user(
     return update_user(firebase_uid, data, current_user, db)
 
 
+@router.post("/{firebase_uid}/skip-sms-onboarding")
+def skip_sms_onboarding(
+    firebase_uid: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Mark that user skipped SMS setup during onboarding"""
+    if not validate_firebase_uid(firebase_uid):
+        raise HTTPException(status_code=400, detail="Invalid user identifier")
+
+    verify_user_access(firebase_uid, current_user)
+
+    try:
+        current_user.sms_onboarding_skipped = True
+        db.commit()
+        logger.info(f"📱 User {current_user.id} skipped SMS onboarding")
+        return {"success": True, "message": "SMS onboarding skipped"}
+    except Exception as e:
+        logger.error(f"❌ Error marking SMS onboarding as skipped: {str(e)}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 # Payout Information Models
 class PayoutInfoUpdate(BaseModel):
     country: str  # ISO country code
