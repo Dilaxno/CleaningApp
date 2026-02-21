@@ -590,6 +590,9 @@ class FormTemplate(Base):
     )  # true for pre-built templates
     is_active = Column(Boolean, default=True, nullable=False)
     template_data = Column(JSON, nullable=False)  # stores the complete template structure
+    scope_template = Column(
+        JSON, nullable=True
+    )  # default scope of work template (service areas and tasks)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 

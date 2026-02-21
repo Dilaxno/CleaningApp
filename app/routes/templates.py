@@ -54,6 +54,7 @@ class FormTemplateSchema(BaseModel):
     image: str
     color: str
     sections: list[FormSectionSchema]
+    scope_template: Optional[dict] = None
     base_template_id: Optional[str] = None
 
 
@@ -159,6 +160,7 @@ async def get_templates(
                 image=template.image or "",
                 color=template.color or "#00C4B4",
                 sections=safe_get_sections(template_data),
+                scope_template=template.scope_template,
             )
         )
 
@@ -172,6 +174,7 @@ async def get_templates(
                 image=template.image or "",
                 color=template.color or "#00C4B4",
                 sections=safe_get_sections(template.template_data),
+                scope_template=template.scope_template,
             )
         )
 
@@ -241,6 +244,7 @@ async def get_template(
         image=template.image or "",
         color=template.color or "#00C4B4",
         sections=safe_get_sections(template_data),
+        scope_template=template.scope_template,
     )
 
 
@@ -296,6 +300,7 @@ async def create_template(
         image=template.image or "",
         color=template.color or "#00C4B4",
         sections=safe_get_sections(template_data),
+        scope_template=template.scope_template,
     )
 
 
@@ -566,6 +571,7 @@ async def get_templates_by_domain(request: Request, db: Session = Depends(get_db
                 image=template.image or "",
                 color=template.color or "#00C4B4",
                 sections=safe_get_sections(template_data),
+                scope_template=template.scope_template,
             )
         )
 
@@ -579,6 +585,7 @@ async def get_templates_by_domain(request: Request, db: Session = Depends(get_db
                 image=template.image or "",
                 color=template.color or "#00C4B4",
                 sections=safe_get_sections(template.template_data),
+                scope_template=template.scope_template,
             )
         )
 
@@ -652,6 +659,7 @@ async def get_template_by_domain(template_id: str, request: Request, db: Session
         image=template.image or "",
         color=template.color or "#00C4B4",
         sections=safe_get_sections(template_data),
+        scope_template=template.scope_template,
     )
 
 
@@ -732,6 +740,7 @@ async def get_public_templates(owner_uid: str, request: Request, db: Session = D
                 image=template.image or "",
                 color=template.color or "#00C4B4",
                 sections=safe_get_sections(template_data),
+                scope_template=template.scope_template,
             )
         )
 
@@ -745,6 +754,7 @@ async def get_public_templates(owner_uid: str, request: Request, db: Session = D
                 image=template.image or "",
                 color=template.color or "#00C4B4",
                 sections=safe_get_sections(template.template_data),
+                scope_template=template.scope_template,
             )
         )
 
@@ -822,4 +832,5 @@ async def get_public_template(
         image=template.image or "",
         color=template.color or "#00C4B4",
         sections=safe_get_sections(template_data),
+        scope_template=template.scope_template,
     )
