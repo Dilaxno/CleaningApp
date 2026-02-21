@@ -529,6 +529,13 @@ async def change_subscription_plan(
     """
     Change plan for an active subscription (paid→paid) using Dodo Change Plan API.
     Charges are handled by Dodo per proration_billing_mode; no checkout required.
+
+    NOTE: This endpoint is currently NOT used by the frontend. Users are always redirected
+    to checkout to complete payment for plan upgrades/downgrades. This ensures proper
+    payment confirmation and a consistent user experience.
+
+    This endpoint is kept for potential future use or API consumers.
+
     Docs:
       - Change Plan: https://docs.dodopayments.com/api-reference/subscriptions/change-plan
       - Proration guidance: https://docs.dodopayments.com/developer-resources/subscription-upgrade-downgrade
