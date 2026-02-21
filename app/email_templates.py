@@ -453,30 +453,22 @@ def new_client_notification_template(
     
     {property_shots_section}
     
-    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="16px">
-      <mj-column>
-        <mj-text font-size="15px" font-weight="600" color="{THEME['text_primary']}" padding="0 0 12px 0" line-height="1.5">
-          Key Details Captured
-        </mj-text>
-        <mj-text font-size="14px" color="{THEME['text_muted']}" padding="0 0 4px 0" line-height="1.5">
-          Property type: {property_type}
-        </mj-text>
-        <mj-text font-size="14px" color="{THEME['text_muted']}" padding="0" line-height="1.5">
-          Full intake details available in dashboard (sq ft, peak hours, security codes, fragile displays)
-        </mj-text>
-      </mj-column>
-    </mj-section>
+    <mj-text font-size="15px" font-weight="600" color="{THEME['text_primary']}" padding="16px 16px 12px 16px" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">
+      Key Details Captured
+    </mj-text>
+    <mj-text font-size="14px" color="{THEME['text_muted']}" padding="0 16px 4px 16px" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">
+      Property type: {property_type}
+    </mj-text>
+    <mj-text font-size="14px" color="{THEME['text_muted']}" padding="0 16px 16px 16px" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">
+      Full intake details available in dashboard (sq ft, peak hours, security codes, fragile displays)
+    </mj-text>
     
-    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="16px">
-      <mj-column>
-        <mj-text font-size="15px" font-weight="600" color="{THEME['text_primary']}" padding="0 0 12px 0" line-height="1.5">
-          Next Steps
-        </mj-text>
-        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0" line-height="1.6">
-          Review property specifics in dashboard, then wait for auto-generated contract to be reviewed and signed by client.
-        </mj-text>
-      </mj-column>
-    </mj-section>
+    <mj-text font-size="15px" font-weight="600" color="{THEME['text_primary']}" padding="24px 16px 12px 16px" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">
+      Next Steps
+    </mj-text>
+    <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 16px 16px 16px" line-height="1.6" container-background-color="{THEME['background']}" border-radius="6px">
+      Review property specifics in dashboard, then wait for auto-generated contract to be reviewed and signed by client.
+    </mj-text>
     
     <mj-text padding="24px 0 0 0" line-height="1.6">
       Best,
@@ -519,22 +511,18 @@ def form_submission_confirmation_template(
       Your property details (square footage, peak hours, security codes, fragile displays) and proposed schedule have been received and processed successfully.
     </mj-text>
     
-    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="16px">
-      <mj-column>
-        <mj-text font-size="15px" font-weight="600" color="{THEME['text_primary']}" padding="0 0 12px 0" line-height="1.5">
-          What's Next
-        </mj-text>
-        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 8px 0" line-height="1.6">
-          Auto-generated contract with dynamic pricing sent to your email
-        </mj-text>
-        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 8px 0" line-height="1.6">
-          Review and sign at your convenience
-        </mj-text>
-        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0" line-height="1.6">
-          {business_name} will review your proposed schedule and confirm
-        </mj-text>
-      </mj-column>
-    </mj-section>
+    <mj-text font-size="15px" font-weight="600" color="{THEME['text_primary']}" padding="16px 16px 12px 16px" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">
+      What's Next
+    </mj-text>
+    <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 16px 8px 16px" line-height="1.6" container-background-color="{THEME['background']}" border-radius="6px">
+      Auto-generated contract with dynamic pricing sent to your email
+    </mj-text>
+    <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 16px 8px 16px" line-height="1.6" container-background-color="{THEME['background']}" border-radius="6px">
+      Review and sign at your convenience
+    </mj-text>
+    <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 16px 16px 16px" line-height="1.6" container-background-color="{THEME['background']}" border-radius="6px">
+      {business_name} will review your proposed schedule and confirm
+    </mj-text>
     
     <mj-text color="{THEME['text_muted']}" font-size="14px" padding="24px 0 0 0" line-height="1.5">
       Questions? Contact {business_name} directly.
@@ -568,19 +556,17 @@ def contract_signed_notification_template(
       Great news! {client_name} has signed their contract.
     </mj-text>
     
-    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="16px">
-      <mj-column>
-        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5">
+    
+        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">
           Contract: {contract_title}
         </mj-text>
-        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5">
+        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">
           Client: {client_name}
         </mj-text>
-        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0" line-height="1.5">
+        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">
           Status: Awaiting Your Signature
         </mj-text>
-      </mj-column>
-    </mj-section>
+      
     
     <mj-text padding="24px 0 0 0" line-height="1.6">
       The contract is now awaiting your signature to be fully executed. Review the client's proposed schedule and sign to complete the agreement.
@@ -613,16 +599,14 @@ def client_signature_confirmation_template(
       Thank you for signing your contract with {business_name}.
     </mj-text>
     
-    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="16px">
-      <mj-column>
-        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5">
+    
+        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">
           Contract: {contract_title}
         </mj-text>
-        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0" line-height="1.5">
+        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">
           Status: Awaiting Provider Signature
         </mj-text>
-      </mj-column>
-    </mj-section>
+      
     
     <mj-text padding="24px 0 0 0" line-height="1.6">
       Your signature has been recorded successfully. The service provider will review and sign the contract shortly.
@@ -678,17 +662,15 @@ def contract_fully_executed_template(
       Perfect! {business_name} has reviewed and signed your service agreement{f' for {property_address}' if property_address else ''}.
     </mj-text>
     
-    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="16px">
-      <mj-column>
-        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5">
+    
+        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">
           Contract ID: {contract_id}
         </mj-text>
-        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5">
+        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">
           Service Type: {service_type}
         </mj-text>
         {total_section}
-      </mj-column>
-    </mj-section>
+      
     
     <mj-text padding="24px 0 0 0" line-height="1.6">
       Your signed contract PDF is attached. Your schedule has been confirmed.
@@ -772,19 +754,15 @@ def quote_review_notification_template(
       {client_name} has approved an automated quote and is waiting for your review.
     </mj-text>
     
-    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="16px">
-      <mj-column>
-        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5">
-          Name: {client_name}
-        </mj-text>
-        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5">
-          Email: {client_email}
-        </mj-text>
-        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0" line-height="1.5">
-          Automated Quote: ${quote_amount:,.2f}
-        </mj-text>
-      </mj-column>
-    </mj-section>
+    <mj-text font-size="14px" color="{THEME['text_primary']}" padding="16px" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">
+      Name: {client_name}
+    </mj-text>
+    <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 16px 4px 16px" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">
+      Email: {client_email}
+    </mj-text>
+    <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 16px 16px 16px" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">
+      Automated Quote: ${quote_amount:,.2f}
+    </mj-text>
     
     <mj-text font-size="14px" color="{THEME['text_muted']}" padding="24px 0 0 0" line-height="1.5">
       Recommended response time: Within minutes to hours
@@ -815,16 +793,14 @@ def quote_approved_template(
     adjustment_section = ""
     if was_adjusted and adjustment_notes:
         adjustment_section = f"""
-    <mj-section background-color="#fef3c7" border-radius="6px" padding="16px">
-      <mj-column>
-        <mj-text font-size="14px" font-weight="600" color="#92400e" padding="0 0 8px 0" line-height="1.5">
+    
+        <mj-text font-size="14px" font-weight="600" color="#92400e" padding="0 0 8px 0" line-height="1.5" container-background-color="#fef3c7" border-radius="6px">
           Quote Adjusted
         </mj-text>
-        <mj-text font-size="14px" color="#92400e" padding="0" line-height="1.5">
+        <mj-text font-size="14px" color="#92400e" padding="0" line-height="1.5" container-background-color="#fef3c7" border-radius="6px">
           {adjustment_notes}
         </mj-text>
-      </mj-column>
-    </mj-section>
+      
         """
 
     subject = "Your Quote Has Been Updated" if was_adjusted else "Your Quote Has Been Approved"
@@ -838,13 +814,11 @@ def quote_approved_template(
       Great news! {business_name} has reviewed and approved your quote. The next step is to define your specific cleaning needs.
     </mj-text>
     
-    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="24px 16px">
-      <mj-column>
-        <mj-text align="center" font-size="36px" font-weight="700" color="{THEME['text_primary']}" padding="0" line-height="1.2">
+    
+        <mj-text align="center" font-size="36px" font-weight="700" color="{THEME['text_primary']}" padding="0" line-height="1.2" container-background-color="{THEME['background']}" border-radius="6px">
           ${final_quote_amount:,.2f}
         </mj-text>
-      </mj-column>
-    </mj-section>
+      
     
     {adjustment_section}
     
@@ -893,39 +867,33 @@ def payment_received_notification_template(
       Excellent news! {client_name} has just paid their invoice.
     </mj-text>
     
-    <mj-section background-color="{THEME['primary_light']}" border-radius="6px" padding="24px 16px">
-      <mj-column>
-        <mj-text align="center" font-size="32px" color="{THEME['primary']}" font-weight="700" padding="0 0 8px 0" line-height="1.2">
+    
+        <mj-text align="center" font-size="32px" color="{THEME['primary']}" font-weight="700" padding="0 0 8px 0" line-height="1.2" container-background-color="{THEME['primary_light']}" border-radius="6px">
           ${amount:,.2f} {currency}
         </mj-text>
-        <mj-text align="center" color="{THEME['primary_dark']}" font-size="16px" font-weight="600" padding="0" line-height="1.5">
+        <mj-text align="center" color="{THEME['primary_dark']}" font-size="16px" font-weight="600" padding="0" line-height="1.5" container-background-color="{THEME['primary_light']}" border-radius="6px">
           Payment Received
         </mj-text>
-      </mj-column>
-    </mj-section>
+      
     
-    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="16px">
-      <mj-column>
-        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5">
+    
+        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">
           Invoice: {invoice_number}
         </mj-text>
-        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5">
+        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">
           Client: {client_name}
         </mj-text>
         {payment_date_section}
-      </mj-column>
-    </mj-section>
+      
     
-    <mj-section background-color="#fef3c7" border-radius="6px" padding="16px">
-      <mj-column>
-        <mj-text font-size="14px" font-weight="600" color="#92400e" padding="0 0 8px 0" line-height="1.5">
+    
+        <mj-text font-size="14px" font-weight="600" color="#92400e" padding="0 0 8px 0" line-height="1.5" container-background-color="#fef3c7" border-radius="6px">
           Ready for Payout
         </mj-text>
-        <mj-text font-size="14px" color="#92400e" padding="0" line-height="1.5">
+        <mj-text font-size="14px" color="#92400e" padding="0" line-height="1.5" container-background-color="#fef3c7" border-radius="6px">
           This payment has been added to your available balance and is ready for withdrawal.
         </mj-text>
-      </mj-column>
-    </mj-section>
+      
     """
 
     return get_base_template(
@@ -958,16 +926,14 @@ def contract_fully_executed_schedule_invitation_template(
       Congratulations! Your service agreement with {business_name} is now fully executed and ready to go.
     </mj-text>
     
-    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="16px">
-      <mj-column>
-        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5">
+    
+        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">
           Contract: {contract_title}
         </mj-text>
-        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0" line-height="1.5">
+        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">
           Contract ID: {contract_id}
         </mj-text>
-      </mj-column>
-    </mj-section>
+      
     
     <mj-text padding="24px 0 0 0" line-height="1.6">
       The next step is to schedule your first cleaning session. Click the button below to choose your preferred date and time.
@@ -1003,19 +969,17 @@ def schedule_confirmed_client_template(
       Great news! {business_name} has confirmed your preferred cleaning schedule.
     </mj-text>
     
-    <mj-section background-color="{THEME['primary_light']}" border-radius="6px" padding="24px 16px">
-      <mj-column>
-        <mj-text align="center" font-size="16px" font-weight="600" color="{THEME['success']}" padding="0 0 16px 0" line-height="1.5">
+    
+        <mj-text align="center" font-size="16px" font-weight="600" color="{THEME['success']}" padding="0 0 16px 0" line-height="1.5" container-background-color="{THEME['primary_light']}" border-radius="6px">
           Confirmed Cleaning Date & Time
         </mj-text>
-        <mj-text align="center" font-size="16px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5">
+        <mj-text align="center" font-size="16px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5" container-background-color="{THEME['primary_light']}" border-radius="6px">
           {scheduled_date}
         </mj-text>
-        <mj-text align="center" font-size="16px" color="{THEME['text_primary']}" padding="0" line-height="1.5">
+        <mj-text align="center" font-size="16px" color="{THEME['text_primary']}" padding="0" line-height="1.5" container-background-color="{THEME['primary_light']}" border-radius="6px">
           {scheduled_time}
         </mj-text>
-      </mj-column>
-    </mj-section>
+      
     
     <mj-text padding="24px 0 0 0" line-height="1.6">
       Your first cleaning is all set. We look forward to serving you.
@@ -1045,13 +1009,11 @@ def schedule_confirmed_provider_template(
       You confirmed a cleaning schedule for {client_name}.
     </mj-text>
     
-    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="16px">
-      <mj-column>
-        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0" line-height="1.5">
+    
+        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">
           {scheduled_date} {scheduled_time}
         </mj-text>
-      </mj-column>
-    </mj-section>
+      
     """
 
     return get_base_template(
@@ -1078,19 +1040,17 @@ def alternative_time_proposed_client_template(
       {business_name} has proposed an alternative cleaning time for your convenience.
     </mj-text>
     
-    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="24px 16px">
-      <mj-column>
-        <mj-text align="center" font-size="16px" color="{THEME['primary']}" font-weight="600" padding="0 0 16px 0" line-height="1.5">
+    
+        <mj-text align="center" font-size="16px" color="{THEME['primary']}" font-weight="600" padding="0 0 16px 0" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">
           Proposed Alternative Time
         </mj-text>
-        <mj-text align="center" font-size="16px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5">
+        <mj-text align="center" font-size="16px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">
           {proposed_date}
         </mj-text>
-        <mj-text align="center" font-size="16px" color="{THEME['text_primary']}" padding="0" line-height="1.5">
+        <mj-text align="center" font-size="16px" color="{THEME['text_primary']}" padding="0" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">
           {proposed_time}
         </mj-text>
-      </mj-column>
-    </mj-section>
+      
     
     <mj-text padding="24px 0 0 0" line-height="1.6">
       The service provider will reach out to you shortly to confirm this new time or discuss other options that work for both of you.
@@ -1124,13 +1084,11 @@ def alternative_time_proposed_provider_template(
       You proposed an alternative time for {client_name}.
     </mj-text>
     
-    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="16px">
-      <mj-column>
-        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0" line-height="1.5">
+    
+        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">
           Proposed: {proposed_date} {proposed_time}
         </mj-text>
-      </mj-column>
-    </mj-section>
+      
     """
 
     return get_base_template(
@@ -1161,14 +1119,12 @@ def new_schedule_request_template(
             contact_lines.append(f"Phone: {client_phone}")
 
         contact_info = f"""
-    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="16px">
-      <mj-column>
-        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5">
+    
+        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">
           Client: {client_name}
         </mj-text>
-        {"".join([f'<mj-text font-size="14px" color="{THEME["text_primary"]}" padding="0 0 4px 0" line-height="1.5">{line}</mj-text>' for line in contact_lines])}
-      </mj-column>
-    </mj-section>
+        {"".join([f'<mj-text font-size="14px" color="{THEME["text_primary"]}" padding="0 0 4px 0" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">{line}</mj-text>' for line in contact_lines])}
+      
         """
 
     content = f"""
@@ -1180,33 +1136,29 @@ def new_schedule_request_template(
       {client_name} has selected their preferred cleaning time.
     </mj-text>
     
-    <mj-section background-color="{THEME['primary_light']}" border-radius="6px" padding="16px">
-      <mj-column>
-        <mj-text font-size="15px" font-weight="600" color="{THEME['primary']}" padding="0 0 12px 0" line-height="1.5">
+    
+        <mj-text font-size="15px" font-weight="600" color="{THEME['primary']}" padding="0 0 12px 0" line-height="1.5" container-background-color="{THEME['primary_light']}" border-radius="6px">
           Requested Cleaning Schedule
         </mj-text>
-        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5">
+        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5" container-background-color="{THEME['primary_light']}" border-radius="6px">
           Date: {scheduled_date}
         </mj-text>
-        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5">
+        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5" container-background-color="{THEME['primary_light']}" border-radius="6px">
           Time: {scheduled_time}
         </mj-text>
-        <mj-text font-size="13px" color="{THEME['text_muted']}" padding="0" line-height="1.5">
+        <mj-text font-size="13px" color="{THEME['text_muted']}" padding="0" line-height="1.5" container-background-color="{THEME['primary_light']}" border-radius="6px">
           Duration: {duration_minutes} minutes
         </mj-text>
-      </mj-column>
-    </mj-section>
+      
     
-    <mj-section background-color="#fef3c7" border-radius="6px" padding="16px">
-      <mj-column>
-        <mj-text font-size="14px" font-weight="600" color="#92400e" padding="0 0 8px 0" line-height="1.5">
+    
+        <mj-text font-size="14px" font-weight="600" color="#92400e" padding="0 0 8px 0" line-height="1.5" container-background-color="#fef3c7" border-radius="6px">
           Action Required
         </mj-text>
-        <mj-text font-size="14px" color="#92400e" padding="0" line-height="1.5">
+        <mj-text font-size="14px" color="#92400e" padding="0" line-height="1.5" container-background-color="#fef3c7" border-radius="6px">
           Please review and confirm this schedule in your dashboard, or propose an alternative time if needed.
         </mj-text>
-      </mj-column>
-    </mj-section>
+      
     
     {contact_info}
     """
@@ -1238,30 +1190,26 @@ def payment_confirmation_client_template(
       Thank you! Your payment for {contract_title} has been successfully processed.
     </mj-text>
     
-    <mj-section background-color="{THEME['primary_light']}" border-radius="6px" padding="24px 16px">
-      <mj-column>
-        <mj-text align="center" font-size="36px" font-weight="700" color="{THEME['success']}" padding="0 0 8px 0" line-height="1.2">
+    
+        <mj-text align="center" font-size="36px" font-weight="700" color="{THEME['success']}" padding="0 0 8px 0" line-height="1.2" container-background-color="{THEME['primary_light']}" border-radius="6px">
           ${amount:,.2f}
         </mj-text>
-        <mj-text align="center" color="{THEME['primary_dark']}" font-size="16px" font-weight="600" padding="0" line-height="1.5">
+        <mj-text align="center" color="{THEME['primary_dark']}" font-size="16px" font-weight="600" padding="0" line-height="1.5" container-background-color="{THEME['primary_light']}" border-radius="6px">
           Payment Received
         </mj-text>
-      </mj-column>
-    </mj-section>
+      
     
-    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="16px">
-      <mj-column>
-        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5">
+    
+        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">
           Payment Date: {payment_date}
         </mj-text>
-        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5">
+        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">
           Service: {contract_title}
         </mj-text>
-        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0" line-height="1.5">
+        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">
           Provider: {business_name}
         </mj-text>
-      </mj-column>
-    </mj-section>
+      
     
     <mj-text font-size="13px" color="{THEME['text_muted']}" padding="24px 0 0 0" line-height="1.5">
       This is an automated confirmation email. Please do not reply to this message.
@@ -1292,16 +1240,14 @@ def subscription_activated_template(
       Great news! Your {frequency} subscription for {contract_title} is now active.
     </mj-text>
     
-    <mj-section background-color="{THEME['primary_light']}" border-radius="6px" padding="24px 16px">
-      <mj-column>
-        <mj-text align="center" font-size="32px" font-weight="700" color="{THEME['success']}" padding="0 0 8px 0" line-height="1.2">
+    
+        <mj-text align="center" font-size="32px" font-weight="700" color="{THEME['success']}" padding="0 0 8px 0" line-height="1.2" container-background-color="{THEME['primary_light']}" border-radius="6px">
           ${amount:,.2f}
         </mj-text>
-        <mj-text align="center" font-size="16px" color="{THEME['text_muted']}" padding="0" line-height="1.5">
+        <mj-text align="center" font-size="16px" color="{THEME['text_muted']}" padding="0" line-height="1.5" container-background-color="{THEME['primary_light']}" border-radius="6px">
           per {frequency}
         </mj-text>
-      </mj-column>
-    </mj-section>
+      
     
     <mj-text padding="24px 0 0 0" line-height="1.6">
       Your card will be automatically charged on the scheduled date. You'll receive a confirmation email after each payment.
@@ -1351,22 +1297,20 @@ def invoice_ready_template(
     if is_deposit and remaining_balance:
         total_job_amount = amount + remaining_balance
         deposit_info = f"""
-    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="16px">
-      <mj-column>
-        <mj-text font-size="14px" font-weight="600" color="{THEME['text_primary']}" padding="0 0 12px 0" line-height="1.5">
+    
+        <mj-text font-size="14px" font-weight="600" color="{THEME['text_primary']}" padding="0 0 12px 0" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">
           Payment Structure
         </mj-text>
-        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5">
+        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">
           Total Job Amount: ${total_job_amount:,.2f}
         </mj-text>
-        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5">
+        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">
           Deposit ({deposit_percentage}%): ${amount:,.2f}
         </mj-text>
-        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0" line-height="1.5">
+        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">
           Balance Due After Completion: ${remaining_balance:,.2f}
         </mj-text>
-      </mj-column>
-    </mj-section>
+      
     
     <mj-text padding="24px 0 0 0" line-height="1.6">
       This {deposit_percentage}% deposit secures your service appointment. The remaining balance of ${remaining_balance:,.2f} will be invoiced after your service is completed.
@@ -1388,25 +1332,21 @@ def invoice_ready_template(
       Your {'deposit ' if is_deposit else ''}invoice from {business_name} is ready for payment.
     </mj-text>
     
-    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="24px 16px">
-      <mj-column>
-        <mj-text align="center" font-size="32px" font-weight="700" color="{THEME['text_primary']}" padding="0 0 8px 0" line-height="1.2">
+    
+        <mj-text align="center" font-size="32px" font-weight="700" color="{THEME['text_primary']}" padding="0 0 8px 0" line-height="1.2" container-background-color="{THEME['background']}" border-radius="6px">
           ${amount:,.2f}
         </mj-text>
-        <mj-text align="center" font-size="14px" color="{THEME['text_muted']}" padding="0" line-height="1.5">
+        <mj-text align="center" font-size="14px" color="{THEME['text_muted']}" padding="0" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">
           Invoice: {invoice_number}
         </mj-text>
-      </mj-column>
-    </mj-section>
+      
     
-    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="16px">
-      <mj-column>
-        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5">
+    
+        <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5" container-background-color="{THEME['background']}" border-radius="6px">
           Invoice: {invoice_number}
         </mj-text>
         {due_date_section}
-      </mj-column>
-    </mj-section>
+      
     
     {deposit_info}
     """
