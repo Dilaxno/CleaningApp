@@ -203,7 +203,12 @@ async def generate_contract_pdf_task(
             f"✅ ARQ Worker: Contract generation completed successfully: ID={contract.id}, Public ID={contract.public_id}"
         )
 
-        return {"contract_id": contract.id, "pdf_url": backend_pdf_url, "status": "completed"}
+        return {
+            "contract_id": contract.id,
+            "contract_public_id": contract.public_id,
+            "pdf_url": backend_pdf_url,
+            "status": "completed",
+        }
 
     except Exception as e:
         logger.error(f"❌ ARQ Worker: Contract generation failed: {type(e).__name__}: {str(e)}")
