@@ -64,9 +64,13 @@ async def get_scheduling_info_by_client(client_id: str, db: Session = Depends(ge
         # First check if there's a contract for this client
         from ..models import Contract
 
+        # Convert client_id to int if it's a digit string for the query
+        client_id_int = int(client_id) if client_id.isdigit() else client.id
         contract = (
             db.query(Contract)
-            .filter(Contract.client_id == client_id, Contract.status.in_(["new", "sent", "signed"]))
+            .filter(
+                Contract.client_id == client_id_int, Contract.status.in_(["new", "sent", "signed"])
+            )
             .order_by(Contract.created_at.desc())
             .first()
         )

@@ -551,6 +551,28 @@ async def sign_contract_as_provider(
         form_data = client.form_data if client.form_data else {}
         quote = calculate_quote(business_config, form_data)
 
+        # Check if provider adjusted the quote - if so, use adjusted amount
+        if client.adjusted_quote_amount is not None:
+            logger.info(
+                f"💰 Using provider's adjusted quote: ${client.adjusted_quote_amount:,.2f} (original: ${quote['final_price']:,.2f})"
+            )
+            # Override the quote with adjusted values
+            quote["final_price"] = float(client.adjusted_quote_amount)
+            quote["base_price"] = float(client.adjusted_quote_amount)
+            # Reset discounts and addons since adjusted price is final
+            quote["discount_amount"] = 0.0
+            quote["discount_percent"] = 0.0
+            quote["addon_amount"] = 0.0
+            quote["addon_details"] = []
+            if quote.get("total_term_rate"):
+                # Recalculate total term rate with adjusted price
+                quote["total_term_rate"] = float(client.adjusted_quote_amount) * quote.get(
+                    "service_occurrences", 1
+                )
+                logger.info(
+                    f"📊 Recalculated total term rate: ${quote['total_term_rate']:,.2f} ({quote.get('service_occurrences', 1)} occurrences)"
+                )
+
         # Debug the signatures being passed to HTML generation
         logger.info(
             f"🖊️ [PROVIDER SIGN] Client signature: {'SET (' + str(len(contract.client_signature)) + ' chars)' if contract.client_signature else 'NOT SET'}"
