@@ -1240,7 +1240,7 @@ def payment_confirmation_client_template(
       ${amount:,.2f}
     </mj-text>
     
-    <mj-text align="center" color="{THEME['success_light']}" font-size="16px" font-weight="600">
+    <mj-text align="center" color="{THEME['primary_light']}" font-size="16px" font-weight="600">
       Payment Received
     </mj-text>
     
