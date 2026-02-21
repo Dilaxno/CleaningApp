@@ -85,7 +85,7 @@ def get_base_template(
         </mj-style>
       </mj-head>
       <mj-body background-color="{THEME['background']}">
-        <mj-wrapper background-color="#ffffff" padding="0">
+        <mj-section background-color="#ffffff" padding="0">
           
           <!-- Header with Logo -->
           <mj-section padding="32px 24px 24px 24px">
@@ -125,7 +125,7 @@ def get_base_template(
 
           {cta_section}
 
-        </mj-wrapper>
+        </mj-section>
 
         <!-- Footer -->
         <mj-section padding="32px 24px">
@@ -210,7 +210,7 @@ def email_verification_template(user_name: str, otp: str) -> str:
         </mj-style>
       </mj-head>
       <mj-body background-color="{THEME['background']}">
-        <mj-wrapper background-color="#ffffff" padding="0">
+        <mj-section background-color="#ffffff" padding="0">
           
           <!-- Header with Logo -->
           <mj-section padding="32px 24px 24px 24px">
@@ -261,7 +261,7 @@ def email_verification_template(user_name: str, otp: str) -> str:
           <!-- OTP Card -->
           <mj-section padding="0 24px 24px 24px">
             <mj-column>
-              <mj-wrapper background-color="{THEME['primary_light']}" border-radius="6px" padding="24px 16px">
+              <mj-section background-color="{THEME['primary_light']}" border-radius="6px" padding="24px 16px">
                 <mj-section padding="0">
                   <mj-column>
                     <mj-text 
@@ -288,7 +288,7 @@ def email_verification_template(user_name: str, otp: str) -> str:
                     </mj-text>
                   </mj-column>
                 </mj-section>
-              </mj-wrapper>
+              </mj-section>
             </mj-column>
           </mj-section>
           
@@ -300,7 +300,7 @@ def email_verification_template(user_name: str, otp: str) -> str:
             </mj-column>
           </mj-section>
 
-        </mj-wrapper>
+        </mj-section>
 
         <!-- Footer -->
         <mj-section padding="32px 24px">
@@ -342,7 +342,7 @@ def password_reset_template(reset_link: str) -> str:
         </mj-style>
       </mj-head>
       <mj-body background-color="{THEME['background']}">
-        <mj-wrapper background-color="#ffffff" padding="0">
+        <mj-section background-color="#ffffff" padding="0">
           
           <!-- Header with Logo -->
           <mj-section padding="32px 24px 24px 24px">
@@ -389,7 +389,7 @@ def password_reset_template(reset_link: str) -> str:
           <!-- Info Card -->
           <mj-section padding="0 24px 24px 24px">
             <mj-column>
-              <mj-wrapper background-color="{THEME['background']}" border-radius="6px" padding="16px">
+              <mj-section background-color="{THEME['background']}" border-radius="6px" padding="16px">
                 <mj-section padding="0">
                   <mj-column>
                     <mj-text font-size="14px" color="{THEME['text_muted']}" padding="0" line-height="1.5">
@@ -397,7 +397,7 @@ def password_reset_template(reset_link: str) -> str:
                     </mj-text>
                   </mj-column>
                 </mj-section>
-              </mj-wrapper>
+              </mj-section>
             </mj-column>
           </mj-section>
           
@@ -419,7 +419,7 @@ def password_reset_template(reset_link: str) -> str:
             </mj-column>
           </mj-section>
 
-        </mj-wrapper>
+        </mj-section>
 
         <!-- Footer -->
         <mj-section padding="32px 24px">
@@ -474,7 +474,7 @@ def new_client_notification_template(
     
     {property_shots_section}
     
-    <mj-wrapper background-color="{THEME['background']}" border-radius="6px" padding="16px">
+    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="16px">
       <mj-section padding="0">
         <mj-column>
           <mj-text font-size="15px" font-weight="600" color="{THEME['text_primary']}" padding="0 0 12px 0" line-height="1.5">
@@ -488,9 +488,9 @@ def new_client_notification_template(
           </mj-text>
         </mj-column>
       </mj-section>
-    </mj-wrapper>
+    </mj-section>
     
-    <mj-wrapper background-color="{THEME['background']}" border-radius="6px" padding="16px">
+    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="16px">
       <mj-section padding="0">
         <mj-column>
           <mj-text font-size="15px" font-weight="600" color="{THEME['text_primary']}" padding="0 0 12px 0" line-height="1.5">
@@ -501,7 +501,7 @@ def new_client_notification_template(
           </mj-text>
         </mj-column>
       </mj-section>
-    </mj-wrapper>
+    </mj-section>
     
     <mj-text padding="24px 0 0 0" line-height="1.6">
       Best,
@@ -544,7 +544,7 @@ def form_submission_confirmation_template(
       Your property details (square footage, peak hours, security codes, fragile displays) and proposed schedule have been received and processed successfully.
     </mj-text>
     
-    <mj-wrapper background-color="{THEME['background']}" border-radius="6px" padding="16px">
+    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="16px">
       <mj-section padding="0">
         <mj-column>
           <mj-text font-size="15px" font-weight="600" color="{THEME['text_primary']}" padding="0 0 12px 0" line-height="1.5">
@@ -561,7 +561,7 @@ def form_submission_confirmation_template(
           </mj-text>
         </mj-column>
       </mj-section>
-    </mj-wrapper>
+    </mj-section>
     
     <mj-text color="{THEME['text_muted']}" font-size="14px" padding="24px 0 0 0" line-height="1.5">
       Questions? Contact {business_name} directly.
@@ -595,7 +595,7 @@ def contract_signed_notification_template(
       Great news! {client_name} has signed their contract.
     </mj-text>
     
-    <mj-wrapper background-color="{THEME['background']}" border-radius="6px" padding="16px">
+    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="16px">
       <mj-section padding="0">
         <mj-column>
           <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5">
@@ -609,7 +609,7 @@ def contract_signed_notification_template(
           </mj-text>
         </mj-column>
       </mj-section>
-    </mj-wrapper>
+    </mj-section>
     
     <mj-text padding="24px 0 0 0" line-height="1.6">
       The contract is now awaiting your signature to be fully executed. Review the client's proposed schedule and sign to complete the agreement.
@@ -642,7 +642,7 @@ def client_signature_confirmation_template(
       Thank you for signing your contract with {business_name}.
     </mj-text>
     
-    <mj-wrapper background-color="{THEME['background']}" border-radius="6px" padding="16px">
+    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="16px">
       <mj-section padding="0">
         <mj-column>
           <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5">
@@ -653,7 +653,7 @@ def client_signature_confirmation_template(
           </mj-text>
         </mj-column>
       </mj-section>
-    </mj-wrapper>
+    </mj-section>
     
     <mj-text padding="24px 0 0 0" line-height="1.6">
       Your signature has been recorded successfully. The service provider will review and sign the contract shortly.
@@ -709,7 +709,7 @@ def contract_fully_executed_template(
       Perfect! {business_name} has reviewed and signed your service agreement{f' for {property_address}' if property_address else ''}.
     </mj-text>
     
-    <mj-wrapper background-color="{THEME['background']}" border-radius="6px" padding="16px">
+    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="16px">
       <mj-section padding="0">
         <mj-column>
           <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5">
@@ -721,7 +721,7 @@ def contract_fully_executed_template(
           {total_section}
         </mj-column>
       </mj-section>
-    </mj-wrapper>
+    </mj-section>
     
     <mj-text padding="24px 0 0 0" line-height="1.6">
       Your signed contract PDF is attached. Your schedule has been confirmed.
@@ -767,7 +767,7 @@ def quote_submitted_confirmation_template(
       Thank you for submitting your quote request. We've received your approval and {business_name} will review it shortly.
     </mj-text>
     
-    <mj-wrapper background-color="{THEME['background']}" border-radius="6px" padding="24px 16px">
+    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="24px 16px">
       <mj-section padding="0">
         <mj-column>
           <mj-text align="center" font-size="32px" font-weight="700" color="{THEME['text_primary']}" padding="0 0 8px 0" line-height="1.2">
@@ -778,7 +778,7 @@ def quote_submitted_confirmation_template(
           </mj-text>
         </mj-column>
       </mj-section>
-    </mj-wrapper>
+    </mj-section>
     
     <mj-text font-size="14px" color="{THEME['text_muted']}" padding="24px 0 0 0" line-height="1.5">
       Expected response time: Within minutes to hours
@@ -811,7 +811,7 @@ def quote_review_notification_template(
       {client_name} has approved an automated quote and is waiting for your review.
     </mj-text>
     
-    <mj-wrapper background-color="{THEME['background']}" border-radius="6px" padding="16px">
+    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="16px">
       <mj-section padding="0">
         <mj-column>
           <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5">
@@ -825,7 +825,7 @@ def quote_review_notification_template(
           </mj-text>
         </mj-column>
       </mj-section>
-    </mj-wrapper>
+    </mj-section>
     
     <mj-text font-size="14px" color="{THEME['text_muted']}" padding="24px 0 0 0" line-height="1.5">
       Recommended response time: Within minutes to hours
@@ -856,7 +856,7 @@ def quote_approved_template(
     adjustment_section = ""
     if was_adjusted and adjustment_notes:
         adjustment_section = f"""
-    <mj-wrapper background-color="#fef3c7" border-radius="6px" padding="16px">
+    <mj-section background-color="#fef3c7" border-radius="6px" padding="16px">
       <mj-section padding="0">
         <mj-column>
           <mj-text font-size="14px" font-weight="600" color="#92400e" padding="0 0 8px 0" line-height="1.5">
@@ -867,7 +867,7 @@ def quote_approved_template(
           </mj-text>
         </mj-column>
       </mj-section>
-    </mj-wrapper>
+    </mj-section>
         """
 
     subject = "Your Quote Has Been Updated" if was_adjusted else "Your Quote Has Been Approved"
@@ -881,7 +881,7 @@ def quote_approved_template(
       Great news! {business_name} has reviewed and approved your quote. The next step is to define your specific cleaning needs.
     </mj-text>
     
-    <mj-wrapper background-color="{THEME['background']}" border-radius="6px" padding="24px 16px">
+    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="24px 16px">
       <mj-section padding="0">
         <mj-column>
           <mj-text align="center" font-size="36px" font-weight="700" color="{THEME['text_primary']}" padding="0" line-height="1.2">
@@ -889,7 +889,7 @@ def quote_approved_template(
           </mj-text>
         </mj-column>
       </mj-section>
-    </mj-wrapper>
+    </mj-section>
     
     {adjustment_section}
     
@@ -938,7 +938,7 @@ def payment_received_notification_template(
       Excellent news! {client_name} has just paid their invoice.
     </mj-text>
     
-    <mj-wrapper background-color="{THEME['primary_light']}" border-radius="6px" padding="24px 16px">
+    <mj-section background-color="{THEME['primary_light']}" border-radius="6px" padding="24px 16px">
       <mj-section padding="0">
         <mj-column>
           <mj-text align="center" font-size="32px" color="{THEME['primary']}" font-weight="700" padding="0 0 8px 0" line-height="1.2">
@@ -949,9 +949,9 @@ def payment_received_notification_template(
           </mj-text>
         </mj-column>
       </mj-section>
-    </mj-wrapper>
+    </mj-section>
     
-    <mj-wrapper background-color="{THEME['background']}" border-radius="6px" padding="16px">
+    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="16px">
       <mj-section padding="0">
         <mj-column>
           <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5">
@@ -963,9 +963,9 @@ def payment_received_notification_template(
           {payment_date_section}
         </mj-column>
       </mj-section>
-    </mj-wrapper>
+    </mj-section>
     
-    <mj-wrapper background-color="#fef3c7" border-radius="6px" padding="16px">
+    <mj-section background-color="#fef3c7" border-radius="6px" padding="16px">
       <mj-section padding="0">
         <mj-column>
           <mj-text font-size="14px" font-weight="600" color="#92400e" padding="0 0 8px 0" line-height="1.5">
@@ -976,7 +976,7 @@ def payment_received_notification_template(
           </mj-text>
         </mj-column>
       </mj-section>
-    </mj-wrapper>
+    </mj-section>
     """
 
     return get_base_template(
@@ -1009,7 +1009,7 @@ def contract_fully_executed_schedule_invitation_template(
       Congratulations! Your service agreement with {business_name} is now fully executed and ready to go.
     </mj-text>
     
-    <mj-wrapper background-color="{THEME['background']}" border-radius="6px" padding="16px">
+    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="16px">
       <mj-section padding="0">
         <mj-column>
           <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5">
@@ -1020,7 +1020,7 @@ def contract_fully_executed_schedule_invitation_template(
           </mj-text>
         </mj-column>
       </mj-section>
-    </mj-wrapper>
+    </mj-section>
     
     <mj-text padding="24px 0 0 0" line-height="1.6">
       The next step is to schedule your first cleaning session. Click the button below to choose your preferred date and time.
@@ -1056,7 +1056,7 @@ def schedule_confirmed_client_template(
       Great news! {business_name} has confirmed your preferred cleaning schedule.
     </mj-text>
     
-    <mj-wrapper background-color="{THEME['primary_light']}" border-radius="6px" padding="24px 16px">
+    <mj-section background-color="{THEME['primary_light']}" border-radius="6px" padding="24px 16px">
       <mj-section padding="0">
         <mj-column>
           <mj-text align="center" font-size="16px" font-weight="600" color="{THEME['success']}" padding="0 0 16px 0" line-height="1.5">
@@ -1070,7 +1070,7 @@ def schedule_confirmed_client_template(
           </mj-text>
         </mj-column>
       </mj-section>
-    </mj-wrapper>
+    </mj-section>
     
     <mj-text padding="24px 0 0 0" line-height="1.6">
       Your first cleaning is all set. We look forward to serving you.
@@ -1100,7 +1100,7 @@ def schedule_confirmed_provider_template(
       You confirmed a cleaning schedule for {client_name}.
     </mj-text>
     
-    <mj-wrapper background-color="{THEME['background']}" border-radius="6px" padding="16px">
+    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="16px">
       <mj-section padding="0">
         <mj-column>
           <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0" line-height="1.5">
@@ -1108,7 +1108,7 @@ def schedule_confirmed_provider_template(
           </mj-text>
         </mj-column>
       </mj-section>
-    </mj-wrapper>
+    </mj-section>
     """
 
     return get_base_template(
@@ -1135,7 +1135,7 @@ def alternative_time_proposed_client_template(
       {business_name} has proposed an alternative cleaning time for your convenience.
     </mj-text>
     
-    <mj-wrapper background-color="{THEME['background']}" border-radius="6px" padding="24px 16px">
+    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="24px 16px">
       <mj-section padding="0">
         <mj-column>
           <mj-text align="center" font-size="16px" color="{THEME['primary']}" font-weight="600" padding="0 0 16px 0" line-height="1.5">
@@ -1149,7 +1149,7 @@ def alternative_time_proposed_client_template(
           </mj-text>
         </mj-column>
       </mj-section>
-    </mj-wrapper>
+    </mj-section>
     
     <mj-text padding="24px 0 0 0" line-height="1.6">
       The service provider will reach out to you shortly to confirm this new time or discuss other options that work for both of you.
@@ -1183,7 +1183,7 @@ def alternative_time_proposed_provider_template(
       You proposed an alternative time for {client_name}.
     </mj-text>
     
-    <mj-wrapper background-color="{THEME['background']}" border-radius="6px" padding="16px">
+    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="16px">
       <mj-section padding="0">
         <mj-column>
           <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0" line-height="1.5">
@@ -1191,7 +1191,7 @@ def alternative_time_proposed_provider_template(
           </mj-text>
         </mj-column>
       </mj-section>
-    </mj-wrapper>
+    </mj-section>
     """
 
     return get_base_template(
@@ -1222,7 +1222,7 @@ def new_schedule_request_template(
             contact_lines.append(f"Phone: {client_phone}")
 
         contact_info = f"""
-    <mj-wrapper background-color="{THEME['background']}" border-radius="6px" padding="16px">
+    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="16px">
       <mj-section padding="0">
         <mj-column>
           <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5">
@@ -1231,7 +1231,7 @@ def new_schedule_request_template(
           {"".join([f'<mj-text font-size="14px" color="{THEME["text_primary"]}" padding="0 0 4px 0" line-height="1.5">{line}</mj-text>' for line in contact_lines])}
         </mj-column>
       </mj-section>
-    </mj-wrapper>
+    </mj-section>
         """
 
     content = f"""
@@ -1243,7 +1243,7 @@ def new_schedule_request_template(
       {client_name} has selected their preferred cleaning time.
     </mj-text>
     
-    <mj-wrapper background-color="{THEME['primary_light']}" border-radius="6px" padding="16px">
+    <mj-section background-color="{THEME['primary_light']}" border-radius="6px" padding="16px">
       <mj-section padding="0">
         <mj-column>
           <mj-text font-size="15px" font-weight="600" color="{THEME['primary']}" padding="0 0 12px 0" line-height="1.5">
@@ -1260,9 +1260,9 @@ def new_schedule_request_template(
           </mj-text>
         </mj-column>
       </mj-section>
-    </mj-wrapper>
+    </mj-section>
     
-    <mj-wrapper background-color="#fef3c7" border-radius="6px" padding="16px">
+    <mj-section background-color="#fef3c7" border-radius="6px" padding="16px">
       <mj-section padding="0">
         <mj-column>
           <mj-text font-size="14px" font-weight="600" color="#92400e" padding="0 0 8px 0" line-height="1.5">
@@ -1273,7 +1273,7 @@ def new_schedule_request_template(
           </mj-text>
         </mj-column>
       </mj-section>
-    </mj-wrapper>
+    </mj-section>
     
     {contact_info}
     """
@@ -1305,7 +1305,7 @@ def payment_confirmation_client_template(
       Thank you! Your payment for {contract_title} has been successfully processed.
     </mj-text>
     
-    <mj-wrapper background-color="{THEME['primary_light']}" border-radius="6px" padding="24px 16px">
+    <mj-section background-color="{THEME['primary_light']}" border-radius="6px" padding="24px 16px">
       <mj-section padding="0">
         <mj-column>
           <mj-text align="center" font-size="36px" font-weight="700" color="{THEME['success']}" padding="0 0 8px 0" line-height="1.2">
@@ -1316,9 +1316,9 @@ def payment_confirmation_client_template(
           </mj-text>
         </mj-column>
       </mj-section>
-    </mj-wrapper>
+    </mj-section>
     
-    <mj-wrapper background-color="{THEME['background']}" border-radius="6px" padding="16px">
+    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="16px">
       <mj-section padding="0">
         <mj-column>
           <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5">
@@ -1332,7 +1332,7 @@ def payment_confirmation_client_template(
           </mj-text>
         </mj-column>
       </mj-section>
-    </mj-wrapper>
+    </mj-section>
     
     <mj-text font-size="13px" color="{THEME['text_muted']}" padding="24px 0 0 0" line-height="1.5">
       This is an automated confirmation email. Please do not reply to this message.
@@ -1363,7 +1363,7 @@ def subscription_activated_template(
       Great news! Your {frequency} subscription for {contract_title} is now active.
     </mj-text>
     
-    <mj-wrapper background-color="{THEME['primary_light']}" border-radius="6px" padding="24px 16px">
+    <mj-section background-color="{THEME['primary_light']}" border-radius="6px" padding="24px 16px">
       <mj-section padding="0">
         <mj-column>
           <mj-text align="center" font-size="32px" font-weight="700" color="{THEME['success']}" padding="0 0 8px 0" line-height="1.2">
@@ -1374,7 +1374,7 @@ def subscription_activated_template(
           </mj-text>
         </mj-column>
       </mj-section>
-    </mj-wrapper>
+    </mj-section>
     
     <mj-text padding="24px 0 0 0" line-height="1.6">
       Your card will be automatically charged on the scheduled date. You'll receive a confirmation email after each payment.
@@ -1424,7 +1424,7 @@ def invoice_ready_template(
     if is_deposit and remaining_balance:
         total_job_amount = amount + remaining_balance
         deposit_info = f"""
-    <mj-wrapper background-color="{THEME['background']}" border-radius="6px" padding="16px">
+    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="16px">
       <mj-section padding="0">
         <mj-column>
           <mj-text font-size="14px" font-weight="600" color="{THEME['text_primary']}" padding="0 0 12px 0" line-height="1.5">
@@ -1441,7 +1441,7 @@ def invoice_ready_template(
           </mj-text>
         </mj-column>
       </mj-section>
-    </mj-wrapper>
+    </mj-section>
     
     <mj-text padding="24px 0 0 0" line-height="1.6">
       This {deposit_percentage}% deposit secures your service appointment. The remaining balance of ${remaining_balance:,.2f} will be invoiced after your service is completed.
@@ -1463,7 +1463,7 @@ def invoice_ready_template(
       Your {'deposit ' if is_deposit else ''}invoice from {business_name} is ready for payment.
     </mj-text>
     
-    <mj-wrapper background-color="{THEME['background']}" border-radius="6px" padding="24px 16px">
+    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="24px 16px">
       <mj-section padding="0">
         <mj-column>
           <mj-text align="center" font-size="32px" font-weight="700" color="{THEME['text_primary']}" padding="0 0 8px 0" line-height="1.2">
@@ -1474,9 +1474,9 @@ def invoice_ready_template(
           </mj-text>
         </mj-column>
       </mj-section>
-    </mj-wrapper>
+    </mj-section>
     
-    <mj-wrapper background-color="{THEME['background']}" border-radius="6px" padding="16px">
+    <mj-section background-color="{THEME['background']}" border-radius="6px" padding="16px">
       <mj-section padding="0">
         <mj-column>
           <mj-text font-size="14px" color="{THEME['text_primary']}" padding="0 0 4px 0" line-height="1.5">
@@ -1485,7 +1485,7 @@ def invoice_ready_template(
           {due_date_section}
         </mj-column>
       </mj-section>
-    </mj-wrapper>
+    </mj-section>
     
     {deposit_info}
     """
