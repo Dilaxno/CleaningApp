@@ -744,7 +744,11 @@ async def generate_contract_html(
 
     # Service details (frequency already extracted above for start_date logic)
     # Check if client has custom scope of work from scope builder
-    if client.scope_of_work and isinstance(client.scope_of_work, dict):
+    if (
+        hasattr(client, "scope_of_work")
+        and client.scope_of_work
+        and isinstance(client.scope_of_work, dict)
+    ):
         # Use client's custom scope of work selections
         scope_data = client.scope_of_work
         inclusions = scope_data.get("included", [])
