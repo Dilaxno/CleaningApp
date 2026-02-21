@@ -86,6 +86,20 @@ def create_or_update_user(data: UserCreate, db: Session = Depends(get_db)):
     logger.info(f"📥 Creating/updating user: {data.firebaseUid}")
     logger.info(f"📋 Data received: accountType={data.accountType}, hearAbout={data.hearAbout}")
 
+    # Validate profile picture URL - reject data URIs (too long for database)
+    profile_picture_url = None
+    if data.profilePictureUrl:
+        if data.profilePictureUrl.startswith("data:"):
+            logger.warning(
+                f"⚠️ Ignoring data URI profile picture (too long for storage): {data.profilePictureUrl[:50]}..."
+            )
+        elif data.profilePictureUrl.startswith("http"):
+            # Accept HTTP/HTTPS URLs (Google profile pictures, etc.)
+            profile_picture_url = data.profilePictureUrl
+        else:
+            # Accept R2 storage keys
+            profile_picture_url = data.profilePictureUrl
+
     try:
         user = db.query(User).filter(User.firebase_uid == data.firebaseUid).first()
 
@@ -99,8 +113,8 @@ def create_or_update_user(data: UserCreate, db: Session = Depends(get_db)):
             if data.hearAbout:
                 user.hear_about = data.hearAbout
             # Set profile picture from Google if provided and user doesn't have one
-            if data.profilePictureUrl and not user.profile_picture_url:
-                user.profile_picture_url = data.profilePictureUrl
+            if profile_picture_url and not user.profile_picture_url:
+                user.profile_picture_url = profile_picture_url
         else:
             logger.info(f"🆕 Creating new user for firebase_uid: {data.firebaseUid}")
             # Only set profile picture if explicitly provided
@@ -110,7 +124,7 @@ def create_or_update_user(data: UserCreate, db: Session = Depends(get_db)):
                 full_name=data.fullName,
                 account_type=data.accountType,
                 hear_about=data.hearAbout,
-                profile_picture_url=data.profilePictureUrl,  # Only set if provided, otherwise None
+                profile_picture_url=profile_picture_url,  # Only set if provided, otherwise None
                 plan=None,  # Users must select a paid plan after onboarding
             )
             db.add(user)
@@ -215,7 +229,16 @@ def update_user(
         if data.email is not None:
             current_user.email = data.email
         if data.profilePictureUrl is not None:
-            current_user.profile_picture_url = data.profilePictureUrl
+            # Validate profile picture URL - reject data URIs (too long for database)
+            if data.profilePictureUrl.startswith("data:"):
+                logger.warning(
+                    f"⚠️ Ignoring data URI profile picture (too long for storage): {data.profilePictureUrl[:50]}..."
+                )
+            elif data.profilePictureUrl.startswith("http") or not data.profilePictureUrl.startswith(
+                "data:"
+            ):
+                # Accept HTTP/HTTPS URLs or R2 storage keys
+                current_user.profile_picture_url = data.profilePictureUrl
         if data.accountType is not None:
             current_user.account_type = data.accountType
         if data.hearAbout is not None:
