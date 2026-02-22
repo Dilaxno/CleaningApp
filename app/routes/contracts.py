@@ -1010,6 +1010,75 @@ async def provider_sign_contract(
 
         logger.info(f"✅ Contract {contract_id} fully signed by both parties")
 
+        # Regenerate PDF with provider signature
+        try:
+            import hashlib
+
+            from .contracts_pdf import calculate_quote, generate_contract_html, html_to_pdf
+            from .upload import R2_BUCKET_NAME, generate_presigned_url, get_r2_client
+
+            # Get form data for regeneration
+            form_data = client.form_data if client.form_data else {}
+            business_config = (
+                db.query(BusinessConfig).filter(BusinessConfig.user_id == current_user.id).first()
+            )
+            quote = calculate_quote(business_config, form_data)
+
+            # Check if provider adjusted the quote
+            if client.adjusted_quote_amount is not None:
+                logger.info(
+                    f"💰 Using provider's adjusted quote: ${client.adjusted_quote_amount:,.2f}"
+                )
+                quote["final_price"] = float(client.adjusted_quote_amount)
+                quote["base_price"] = float(client.adjusted_quote_amount)
+                quote["discount_amount"] = 0.0
+                quote["discount_percent"] = 0.0
+                quote["addon_amount"] = 0.0
+                quote["addon_details"] = []
+
+            # Generate presigned URL for client signature if it's an R2 key
+            client_signature_for_pdf = contract.client_signature
+            if contract.client_signature and not contract.client_signature.startswith("data:image"):
+                try:
+                    client_signature_for_pdf = generate_presigned_url(
+                        contract.client_signature, expiration=604800
+                    )
+                    logger.info(f"✅ Generated presigned URL for client signature")
+                except Exception as url_err:
+                    logger.warning(f"⚠️ Failed to generate presigned URL: {url_err}")
+
+            # Generate HTML with both signatures
+            html = await generate_contract_html(
+                business_config,
+                client,
+                form_data,
+                quote,
+                db,
+                client_signature=client_signature_for_pdf,
+                provider_signature=contract.provider_signature,
+                contract_created_at=contract.created_at,
+                contract_public_id=contract.public_id,
+            )
+
+            # Convert to PDF
+            pdf_bytes = await html_to_pdf(html)
+            pdf_hash = hashlib.sha256(pdf_bytes).hexdigest()
+
+            # Upload to R2
+            r2 = get_r2_client()
+            pdf_key = f"contracts/{current_user.id}/{contract.id}_signed.pdf"
+            r2.put_object(
+                Bucket=R2_BUCKET_NAME, Key=pdf_key, Body=pdf_bytes, ContentType="application/pdf"
+            )
+
+            # Update contract with new PDF
+            contract.pdf_key = pdf_key
+            contract.pdf_hash = pdf_hash
+            logger.info(f"✅ Regenerated PDF with provider signature for contract {contract_id}")
+        except Exception as e:
+            logger.error(f"❌ Failed to regenerate PDF with provider signature: {e}")
+            # Continue even if PDF regeneration fails
+
         # Send confirmation emails
         try:
             # Get client info
