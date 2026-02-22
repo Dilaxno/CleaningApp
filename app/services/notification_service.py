@@ -279,6 +279,7 @@ async def send_contract_fully_executed_notification(
     contract_pdf_url: Optional[str] = None,
     scheduled_time_confirmed: bool = False,
     scheduled_start_time: Optional[str] = None,
+    contract_numeric_id: Optional[int] = None,
 ) -> dict:
     """Send contract fully executed notification via email and SMS"""
     from ..email_service import send_contract_fully_executed_email
@@ -312,6 +313,6 @@ async def send_contract_fully_executed_notification(
             "db": db,
             "user_id": user_id,
             "client_name": client_name,
-            "contract_id": int(contract_id) if contract_id else 0,
+            "contract_id": contract_numeric_id if contract_numeric_id else 0,
         },
     )

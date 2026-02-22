@@ -211,6 +211,7 @@ class ContractService:
                     contract_id=formatted_contract_id,
                     service_type=contract.contract_type or "Cleaning Service",
                     total_value=contract.total_value,
+                    contract_numeric_id=contract.id,
                 )
                 logger.info(f"✅ Sent fully executed notification for contract {contract.id}")
             except Exception as e:

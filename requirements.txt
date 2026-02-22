@@ -30,5 +30,6 @@ python-jose[cryptography]==3.3.0  # JWT token handling with cryptographic signin
 passlib[bcrypt]==1.7.4  # Password hashing with bcrypt
 slowapi==0.1.9  # Rate limiting middleware for FastAPI
 bleach==6.1.0  # HTML sanitization to prevent XSS attacks
+tinycss2==1.2.1  # CSS parsing for bleach sanitizer
 pydantic[email]==2.9.2  # Email validation (already using pydantic)
 
