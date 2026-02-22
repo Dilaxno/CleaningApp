@@ -78,7 +78,6 @@ async def create_square_subscription(
     try:
         # Check if this is a recurring service
         if not contract.frequency or contract.frequency.lower() in [
-            "one-time",
             "per-turnover",
             "on-demand",
             "as-needed",

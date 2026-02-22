@@ -194,7 +194,7 @@ def get_universal_cleaning_scope_section():
                 "id": "cleaningFrequency",
                 "label": "How often do you need cleaning?",
                 "type": "select",
-                "options": ["One-time", "Weekly", "Bi-weekly", "Monthly", "Custom schedule"],
+                "options": ["Weekly", "Bi-weekly", "Monthly", "Custom schedule"],
                 "required": True,
             },
             {

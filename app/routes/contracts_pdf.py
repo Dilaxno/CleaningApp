@@ -484,17 +484,8 @@ def calculate_quote(config: BusinessConfig, form_data: dict) -> dict:
     total_term_rate = None
     service_occurrences = None
 
-    # Check if this is a one-time service (no contract duration needed)
-    one_time_frequencies = [
-        "One-time",
-        "One-time deep clean",
-        "Per turnover",
-        "On-demand",
-        "As needed",
-    ]
-    is_one_time = frequency in one_time_frequencies
-
-    if term_duration and not is_one_time:
+    # All services in CleanEnroll are recurring and require contract duration
+    if term_duration:
         try:
             duration_value = int(term_duration)
             # Convert term to months
@@ -692,24 +683,12 @@ async def generate_contract_html(
         else f"CLN-DRAFT-{base_date.strftime('%Y%m%d')}"
     )
 
-    # Smart start date logic based on service type
+    # Smart start date logic - all services are recurring
     frequency = quote["frequency"]
-    one_time_frequencies = [
-        "One-time",
-        "One-time deep clean",
-        "Per turnover",
-        "On-demand",
-        "As needed",
-        "one-time",
-    ]
-    is_recurring = frequency not in one_time_frequencies
 
-    if is_recurring:
-        # Recurring contracts: billing starts on signing date
-        start_date = base_date.strftime("%B %d, %Y")
-    else:
-        # One-time/deep cleans: align with service date (typically 7 days out)
-        start_date = (base_date + timedelta(days=7)).strftime("%B %d, %Y")
+    # All services in CleanEnroll are recurring
+    # Recurring contracts: billing starts on signing date
+    start_date = base_date.strftime("%B %d, %Y")
 
     payment_due_days = business_config.payment_due_days or 15
     late_fee = business_config.late_fee_percent or 1.5
@@ -1237,7 +1216,7 @@ async def generate_contract_html(
                 {"<tr><td>First Cleaning Discount</td><td>" + (f"${quote['first_cleaning_discount_value']:.2f} off" if quote.get('first_cleaning_discount_type') == 'fixed' else f"{quote['first_cleaning_discount_value']:.0f}% off") + " for first visit</td><td style='text-align: right; color: #10B981;'>-USD $" + f"{quote['first_cleaning_discount_amount']:,.2f}" + "</td></tr>" if quote.get('first_cleaning_discount_amount', 0) > 0 else ""}
                 {"".join([f"<tr><td>{addon['name']}</td><td>{addon['quantity']} × ${addon['unit_price']:,.2f} {addon['pricing_metric']}</td><td style='text-align: right;'>USD ${addon['total_price']:,.2f}</td></tr>" for addon in quote.get('addon_details', [])]) if quote.get('addon_details') else ""}
                 <tr class="total-row">
-                    <td><strong>{"Total" if frequency in ["One-time", "One-time deep clean", "Per turnover", "On-demand", "As needed", "one-time"] else "Total Per Visit"}</strong></td>
+                    <td><strong>Total Per Visit</strong></td>
                     <td>{"Service provider will provide quote" if quote.get('quote_pending') else f"Estimated {quote['estimated_hours']} hours, {quote['cleaners']} cleaner(s)"}</td>
                     <td style="text-align: right;"><strong>{"Quote Pending" if quote.get('quote_pending') else f"USD ${quote['final_price']:,.2f}"}</strong></td>
                 </tr>
@@ -1296,7 +1275,7 @@ async def generate_contract_html(
             <li><strong>Access:</strong> Client agrees to provide necessary access to the property</li>
             <li><strong>Liability:</strong> Service provider maintains appropriate insurance coverage</li>
         </ul>
-        <p class="terms-note">{'For recurring services, billing begins immediately upon signing, and the first cleaning will be scheduled separately based on your availability.' if is_recurring else 'For one-time services, the Service Start Date aligns with your scheduled service appointment.'}</p>
+        <p class="terms-note">For recurring services, billing begins immediately upon signing, and the first cleaning will be scheduled separately based on your availability.</p>
     </div>
 
     <!-- 7. Legal Provisions -->
@@ -1520,24 +1499,14 @@ async def generate_contract_pdf(data: ContractGenerateRequest, db: Session = Dep
         quote = calculate_quote(config, data.formData)
 
         # Create contract record first to get public_id for secure contract numbering
+        # All services in CleanEnroll are recurring
         contract = Contract(
             user_id=user.id,
             client_id=client.id,
             title=f"Service Agreement - {client.business_name}",
             description=f"Auto-generated contract for {quote['frequency']} cleaning service",
-            contract_type=(
-                "recurring"
-                if quote["frequency"]
-                not in [
-                    "One-time",
-                    "One-time deep clean",
-                    "Per turnover",
-                    "On-demand",
-                    "As needed",
-                    "one-time",
-                ]
-                else "one-time"
-            ),
+            contract_type="recurring",
+            frequency=quote["frequency"] if quote["frequency"] else "Weekly",
             status="new",
             total_value=quote["final_price"],
             payment_terms=f"Net {config.payment_due_days or 15} days",

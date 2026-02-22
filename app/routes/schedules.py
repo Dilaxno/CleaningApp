@@ -446,11 +446,8 @@ async def approve_schedule(
                     try:
                         from ..email_service import send_invoice_payment_link_email
 
-                        # Determine if recurring
-                        is_recurring = contract.frequency and contract.frequency not in [
-                            "one-time",
-                            "One-time",
-                        ]
+                        # All services in CleanEnroll are recurring
+                        is_recurring = contract.frequency and contract.frequency.strip() != ""
 
                         logger.info(f"📧 Sending Square deposit invoice email to {client.email}")
 

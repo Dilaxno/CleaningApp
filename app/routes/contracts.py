@@ -902,8 +902,8 @@ async def send_square_invoice_email(
     )
 
     try:
-        # Determine if recurring
-        is_recurring = contract.frequency and contract.frequency not in ["one-time", "One-time"]
+        # All services in CleanEnroll are recurring
+        is_recurring = contract.frequency and contract.frequency.strip() != ""
 
         # Calculate due date (15 days from now if not set)
         due_date = None

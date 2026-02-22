@@ -227,7 +227,6 @@ class BusinessConfig(Base):
     accepted_frequencies = Column(
         JSON,
         default=[
-            "one-time",
             "daily",
             "2x-per-week",
             "3x-per-week",
@@ -370,7 +369,7 @@ class Contract(Base):
     client_id = Column(Integer, ForeignKey("clients.id"), nullable=False)
     title = Column(String(255), nullable=False)
     description = Column(String(2000), nullable=True)
-    contract_type = Column(String(100), nullable=True)  # one-time, recurring, maintenance
+    contract_type = Column(String(100), nullable=True)  # recurring, maintenance
     # Status workflow: new → signed → active → completed/cancelled
     # new: Initial contract sent to client for signature
     # signed: Contract signed by both provider and client

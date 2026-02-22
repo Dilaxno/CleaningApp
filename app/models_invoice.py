@@ -39,7 +39,7 @@ class Invoice(Base):
     description = Column(Text, nullable=True)
 
     # Pricing
-    service_type = Column(String(100), nullable=True)  # one-time, weekly, bi-weekly, monthly
+    service_type = Column(String(100), nullable=True)  # weekly, bi-weekly, monthly, daily
     base_amount = Column(Float, nullable=False)  # Base service rate
     frequency_discount = Column(Float, default=0)  # Discount for recurring
     addon_amount = Column(Float, default=0)  # Additional services

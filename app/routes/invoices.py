@@ -43,7 +43,7 @@ class InvoiceCreate(BaseModel):
     schedule_id: Optional[int] = None
     title: str
     description: Optional[str] = None
-    service_type: Optional[str] = None  # one-time, weekly, bi-weekly, monthly
+    service_type: Optional[str] = None  # weekly, bi-weekly, monthly, etc.
     base_amount: float
     addon_amount: float = 0
     tax_rate: float = 0  # Percentage
@@ -200,7 +200,7 @@ async def create_invoice(
 
     # Calculate amounts
     frequency_discount = calculate_frequency_discount(
-        data.base_amount, data.service_type or "one-time", business_config
+        data.base_amount, data.service_type or "weekly", business_config
     )
 
     subtotal = data.base_amount - frequency_discount + data.addon_amount
@@ -650,16 +650,9 @@ async def auto_create_invoice_from_schedule(
         raise HTTPException(status_code=400, detail="Cannot create invoice with zero amount")
 
     # Determine service type from client frequency
-    service_type = client.frequency or "one-time"
-    one_time_frequencies = [
-        "one-time",
-        "One-time",
-        "One-time deep clean",
-        "Per turnover",
-        "On-demand",
-        "As needed",
-    ]
-    is_recurring = service_type not in one_time_frequencies
+    service_type = client.frequency or "weekly"
+    # All services in CleanEnroll are recurring
+    is_recurring = True
 
     # Calculate addon amount from contract
     addon_amount = 0.0

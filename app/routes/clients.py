@@ -1234,15 +1234,9 @@ async def submit_public_form(
     if not frequency and data.formData:
         frequency = data.formData.get("cleaningFrequency")
 
-    # If still no frequency, infer from property type (e.g., move-in-out is always one-time)
+    # If still no frequency, default to weekly for commercial cleaning
     if not frequency and data.propertyType:
-        property_type_lower = data.propertyType.lower()
-        if "move" in property_type_lower:
-            frequency = "One-time"
-        elif "construction" in property_type_lower or "post-construction" in property_type_lower:
-            frequency = "One-time"
-        elif "event" in property_type_lower:
-            frequency = "One-time"
+        frequency = "Weekly"
 
     # Calculate quote amount if formData is provided
     quote_amount = None

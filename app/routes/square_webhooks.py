@@ -169,13 +169,8 @@ async def handle_invoice_payment(event_data: dict, db: Session):
                 logger.error(f"❌ Missing client or user for contract {contract.id}")
                 return
 
-            # Create subscription for recurring services
-            if contract.frequency and contract.frequency.lower() not in [
-                "one-time",
-                "per-turnover",
-                "on-demand",
-                "as-needed",
-            ]:
+            # All services in CleanEnroll are recurring - create subscription
+            if contract.frequency and contract.frequency.strip():
                 logger.info(f"🔄 Creating subscription for recurring service: {contract.frequency}")
 
                 subscription_result = await create_square_subscription(
@@ -290,13 +285,8 @@ async def handle_payment_event(event_data: dict, db: Session):
             client=client, contract=contract, user=user, payment_id=payment_id
         )
 
-        # Create subscription for recurring services
-        if contract.frequency and contract.frequency.lower() not in [
-            "one-time",
-            "per-turnover",
-            "on-demand",
-            "as-needed",
-        ]:
+        # All services in CleanEnroll are recurring - create subscription
+        if contract.frequency and contract.frequency.strip():
             logger.info(f"🔄 Creating subscription for recurring service: {contract.frequency}")
 
             subscription_result = await create_square_subscription(
@@ -367,13 +357,8 @@ async def send_payment_confirmation_email(client: Client, contract: Contract, us
 
         business_name = business_config.business_name if business_config else "CleanEnroll"
 
-        # Check if this is a recurring service
-        is_recurring = contract.frequency and contract.frequency.lower() not in [
-            "one-time",
-            "per-turnover",
-            "on-demand",
-            "as-needed",
-        ]
+        # All services in CleanEnroll are recurring
+        is_recurring = contract.frequency and contract.frequency.strip() != ""
 
         # Email to client
         if client.email:
@@ -1275,7 +1260,7 @@ async def send_provider_payment_notification(
                         </p>
                     </div>
 
-                    {f'<div style="background: #ecfdf5; border-left: 4px solid #10b981; padding: 15px; margin-bottom: 25px; border-radius: 4px;"><p style="margin: 0; color: #065f46; font-weight: 600;">🔄 Recurring Service Active</p><p style="margin: 8px 0 0 0; color: #1e293b; font-size: 14px;">This client is on a {contract.frequency} subscription. Future payments will be processed automatically.</p></div>' if contract.frequency and contract.frequency.lower() not in ["one-time", "per-turnover", "on-demand", "as-needed"] else ''}
+                    {f'<div style="background: #ecfdf5; border-left: 4px solid #10b981; padding: 15px; margin-bottom: 25px; border-radius: 4px;"><p style="margin: 0; color: #065f46; font-weight: 600;">🔄 Recurring Service Active</p><p style="margin: 8px 0 0 0; color: #1e293b; font-size: 14px;">This client is on a {contract.frequency} subscription. Future payments will be processed automatically.</p></div>' if contract.frequency and contract.frequency.lower() not in ["per-turnover", "on-demand", "as-needed"] else ''}
 
                     <div style="text-align: center; margin: 25px 0;">
                         <a href="{FRONTEND_URL}/dashboard/contracts/{contract.public_id}"

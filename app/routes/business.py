@@ -231,7 +231,6 @@ def get_current_user_business_config(
                 "deepTimeEstimate": None,
                 "activeTemplates": [],
                 "acceptedFrequencies": [
-                    "one-time",
                     "daily",
                     "2x-per-week",
                     "3x-per-week",
@@ -579,7 +578,6 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 active_templates=data.activeTemplates,
                 accepted_frequencies=data.acceptedFrequencies
                 or [
-                    "one-time",
                     "daily",
                     "2x-per-week",
                     "3x-per-week",
@@ -715,7 +713,7 @@ def get_business_config(firebase_uid: str, db: Session = Depends(get_db)):
         "customPackages": config.custom_packages,
         "brandColor": config.brand_color,  # Brand color for business settings
         "acceptedFrequencies": config.accepted_frequencies
-        or ["one-time", "daily", "2x-per-week", "3x-per-week", "weekly", "bi-weekly", "monthly"],
+        or ["daily", "2x-per-week", "3x-per-week", "weekly", "bi-weekly", "monthly"],
         "acceptedPaymentMethods": config.accepted_payment_methods or [],
     }
 
@@ -847,7 +845,7 @@ def get_public_addons(firebase_uid: str, request: Request, db: Session = Depends
         "discountBiweekly": config.discount_biweekly,
         "discountMonthly": config.discount_monthly,
         "acceptedFrequencies": config.accepted_frequencies
-        or ["one-time", "daily", "2x-per-week", "3x-per-week", "weekly", "bi-weekly", "monthly"],
+        or ["daily", "2x-per-week", "3x-per-week", "weekly", "bi-weekly", "monthly"],
     }
 
 
