@@ -641,8 +641,14 @@ async def sign_contract_as_provider(
                 f"CLN-{contract.public_id[:8].upper()}" if contract.public_id else f"#{contract.id}"
             )
 
-            await send_contract_fully_executed_email(
-                to=client.email,
+            # Send unified notification (email + SMS) for fully executed contract
+            from ..services.notification_service import send_contract_fully_executed_notification
+
+            await send_contract_fully_executed_notification(
+                db=db,
+                user_id=current_user.id,
+                client_email=client.email,
+                client_phone=client.phone,
                 client_name=client.contact_name or client.business_name,
                 business_name=business_name,
                 contract_title=contract.title,
@@ -668,8 +674,8 @@ async def sign_contract_as_provider(
             )
             logger.info(f"✅ Sent scheduling invitation to client {client.email}")
         except Exception as e:
-            logger.error(f"Failed to send client email: {e}")
-            # Don't fail the signing if email fails
+            logger.error(f"Failed to send client notification: {e}")
+            # Don't fail the signing if notification fails
 
     # Send confirmation email to provider
     if current_user.email:
@@ -1024,9 +1030,14 @@ async def provider_sign_contract(
                 else current_user.full_name or "Provider"
             )
 
-            # Send fully executed email to client
-            await send_contract_fully_executed_email(
-                to=client.email if client else "",
+            # Send unified notification (email + SMS) for fully executed contract
+            from ..services.notification_service import send_contract_fully_executed_notification
+
+            await send_contract_fully_executed_notification(
+                db=db,
+                user_id=current_user.id,
+                client_email=client.email if client else "",
+                client_phone=client.phone if client else None,
                 client_name=client.contact_name or client.business_name if client else "Client",
                 business_name=business_name,
                 contract_title=contract.title,
@@ -1056,7 +1067,7 @@ async def provider_sign_contract(
                 client_name=client.contact_name or client.business_name if client else "Client",
             )
         except Exception as e:
-            logger.error(f"Failed to send confirmation emails: {str(e)}")
+            logger.error(f"Failed to send confirmation notifications: {str(e)}")
 
         # Trigger Square invoice automation if configured
         if await should_send_square_invoice(contract, current_user, db):

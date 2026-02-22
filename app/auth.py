@@ -158,9 +158,15 @@ async def verify_firebase_token(token: str) -> dict:
         current_time = time.time()
         if exp < current_time:
             time_expired = int(current_time - exp)
-            logger.warning(f"⚠️ Token has expired {time_expired} seconds ago")
+            # Only log if significantly expired (> 60 seconds) to reduce noise
+            if time_expired > 60:
+                logger.info(
+                    f"ℹ️ Token expired {time_expired}s ago for {decoded_payload.get('email')}"
+                )
             raise HTTPException(
-                status_code=401, detail="Token has expired. Please refresh your session."
+                status_code=401,
+                detail="Token has expired. Please refresh your session.",
+                headers={"X-Token-Expired": "true"},
             )
 
         # Check issued at time (iat) - token should not be from the future

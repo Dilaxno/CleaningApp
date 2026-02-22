@@ -479,18 +479,23 @@ async def sign_contract_public(
     if business_config:
         business_name = business_config.business_name or user.full_name or "Service Provider"
 
-    # Send confirmation to client
-    if client.email:
-        try:
-            await send_client_signature_confirmation(
-                to=client.email,
-                client_name=client_name,
-                business_name=business_name,
-                contract_title=contract.title,
-                contract_pdf_url=None,
-            )
-        except Exception as e:
-            logger.error(f"Failed to send client confirmation email: {e}")
+    # Send unified notification (email + SMS) to client
+    try:
+        from ...services.notification_service import send_contract_signed_notification
+
+        await send_contract_signed_notification(
+            db=db,
+            user_id=user.id,
+            client_email=client.email,
+            client_phone=client.phone,
+            client_name=client_name,
+            business_name=business_name,
+            contract_title=contract.title,
+            contract_id=contract.id,
+            contract_pdf_url=None,
+        )
+    except Exception as e:
+        logger.error(f"Failed to send client notification: {e}")
 
     # Send notification to provider
     if user.email:

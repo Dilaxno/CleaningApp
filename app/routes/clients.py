@@ -2538,9 +2538,9 @@ async def approve_quote(
 
     logger.info(f"✅ Quote approved for client {client.id} by provider {current_user.id}")
 
-    # Send approval email to client
-    if client.email:
-        from ..email_service import send_quote_approved_email
+    # Send unified notification (email + SMS) to client
+    if client.email or client.phone:
+        from ..services.notification_service import send_estimate_approval_notification
 
         # Get business name from business_config
         business_name = (
@@ -2550,31 +2550,16 @@ async def approve_quote(
         )
 
         background_tasks.add_task(
-            send_quote_approved_email,
-            to=client.email,
+            send_estimate_approval_notification,
+            db=db,
+            user_id=current_user.id,
+            client_email=client.email,
+            client_phone=client.phone,
             client_name=client.contact_name or client.business_name,
             business_name=business_name,
-            final_quote_amount=client.original_quote_amount or 0,
-            was_adjusted=False,
-            adjustment_notes=None,
+            estimate_amount=client.original_quote_amount or 0,
             client_public_id=client.public_id,
         )
-
-    # Send SMS notification to client if Twilio is enabled
-    if client.phone:
-        try:
-            from ..services.twilio_service import send_estimate_approval_sms
-
-            background_tasks.add_task(
-                send_estimate_approval_sms,
-                db=db,
-                user_id=current_user.id,
-                client_phone=client.phone,
-                client_name=client.contact_name or client.business_name,
-                estimate_amount=client.original_quote_amount or 0,
-            )
-        except Exception as e:
-            logger.error(f"Failed to send estimate approval SMS: {e}")
 
     return {
         "message": "Quote approved successfully",

@@ -39,7 +39,7 @@ async def send_sms(
     Args:
         db: Database session
         user_id: User ID
-        to_phone: Recipient phone number
+        to_phone: Recipient phone number (should be in E.164 format)
         message_body: SMS message content
         message_type: Type of message (estimate_approval, schedule_confirmation, etc.)
         entity_type: Optional entity type (Contract, Schedule, etc.)
@@ -48,6 +48,16 @@ async def send_sms(
     Returns:
         Tuple of (success: bool, error_message: Optional[str])
     """
+    # Validate phone number format
+    if not to_phone:
+        logger.debug(f"No phone number provided for user {user_id}")
+        return False, "No phone number provided"
+
+    # Ensure phone number is in E.164 format
+    if not to_phone.startswith("+"):
+        logger.warning(f"Phone number not in E.164 format: {to_phone}")
+        return False, "Phone number must be in E.164 format (e.g., +1234567890)"
+
     # Get integration
     integration = db.query(TwilioIntegration).filter(TwilioIntegration.user_id == user_id).first()
 
@@ -87,6 +97,8 @@ async def send_sms(
 
     # Prepare message data
     try:
+        logger.info(f"📱 Preparing SMS: type={message_type}, to={to_phone}, user={user_id}")
+
         data = {
             "To": to_phone,
             "Body": message_body,
@@ -95,10 +107,13 @@ async def send_sms(
         if integration.messaging_service_sid:
             messaging_service_sid = decrypt_credential(integration.messaging_service_sid)
             data["MessagingServiceSid"] = messaging_service_sid
+            logger.debug(f"Using Messaging Service SID for user {user_id}")
         else:
             data["From"] = integration.phone_number
+            logger.debug(f"Using From number: {integration.phone_number}")
 
         # Send SMS via Twilio API
+        logger.info(f"🚀 Sending SMS to Twilio API for {to_phone}")
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json",
@@ -106,6 +121,8 @@ async def send_sms(
                 data=data,
                 timeout=10.0,
             )
+
+            logger.info(f"📡 Twilio API response status: {response.status_code}")
 
             if response.status_code in [200, 201]:
                 result = response.json()
@@ -127,12 +144,13 @@ async def send_sms(
                 db.commit()
 
                 logger.info(
-                    f"SMS sent successfully: {message_type} to {to_phone} (SID: {message_sid})"
+                    f"✅ SMS sent successfully: {message_type} to {to_phone} (SID: {message_sid})"
                 )
                 return True, None
             else:
                 error_data = response.json()
                 error_message = error_data.get("message", "Unknown error")
+                error_code = error_data.get("code")
 
                 # Log failed SMS
                 sms_log = TwilioSMSLog(
@@ -144,12 +162,14 @@ async def send_sms(
                     entity_type=entity_type,
                     entity_id=entity_id,
                     status="failed",
-                    error_message=error_message,
+                    error_message=(
+                        f"[{error_code}] {error_message}" if error_code else error_message
+                    ),
                 )
                 db.add(sms_log)
                 db.commit()
 
-                logger.error(f"Failed to send SMS: {error_message}")
+                logger.error(f"❌ Twilio API error [{error_code}]: {error_message}")
                 return False, error_message
 
     except httpx.HTTPError as e:

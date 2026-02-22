@@ -179,10 +179,17 @@ class ContractService:
                 f"CLN-{contract.public_id[:8].upper()}" if contract.public_id else f"#{contract.id}"
             )
 
-            # Send fully executed email
+            # Send unified notification (email + SMS) for fully executed contract
             try:
-                await send_contract_fully_executed_email(
-                    to=client.email,
+                from ...services.notification_service import (
+                    send_contract_fully_executed_notification,
+                )
+
+                await send_contract_fully_executed_notification(
+                    db=self.db,
+                    user_id=user.id,
+                    client_email=client.email,
+                    client_phone=client.phone,
                     client_name=client.business_name or client.contact_name,
                     business_name=business_name,
                     contract_title=contract.title or "Service Agreement",
@@ -190,9 +197,9 @@ class ContractService:
                     service_type=contract.contract_type or "Cleaning Service",
                     total_value=contract.total_value,
                 )
-                logger.info(f"✅ Sent fully executed email for contract {contract.id}")
+                logger.info(f"✅ Sent fully executed notification for contract {contract.id}")
             except Exception as e:
-                logger.error(f"Failed to send fully executed email: {e}")
+                logger.error(f"Failed to send fully executed notification: {e}")
 
             # Send scheduling invitation to client
             try:

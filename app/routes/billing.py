@@ -1710,11 +1710,16 @@ async def _handle_client_invoice_payment(data, db: Session):
             except Exception as e:
                 logger.error(f"Failed to send provider notification: {e}")
 
-        # Send thank you email to client
-        if client and client.email:
+        # Send unified notification (email + SMS) to client
+        if client:
             try:
-                await send_payment_thank_you_email(
+                from ..services.notification_service import send_payment_confirmation_notification
+
+                await send_payment_confirmation_notification(
+                    db=db,
+                    user_id=invoice.user_id,
                     client_email=client.email,
+                    client_phone=client.phone,
                     client_name=client.contact_name or client.business_name,
                     business_name=business_name,
                     invoice_number=invoice.invoice_number,
@@ -1722,7 +1727,7 @@ async def _handle_client_invoice_payment(data, db: Session):
                     currency=invoice.currency,
                 )
             except Exception as e:
-                logger.error(f"Failed to send client thank you email: {e}")
+                logger.error(f"Failed to send client payment notification: {e}")
 
     except Exception as e:
         logger.error(f"Error processing invoice payment: {e}")

@@ -512,18 +512,29 @@ async def approve_schedule(
 
                 # Format date properly for email
                 formatted_date = schedule.scheduled_date.strftime("%B %d, %Y")
+                schedule_time = f"{schedule.start_time} - {schedule.end_time}"
 
-                await email_service.send_appointment_confirmed_to_client(
-                    client_email=client.email,
-                    client_name=client.business_name or client.contact_name or "Client",
-                    provider_name=business_name,
-                    confirmed_date=formatted_date,
-                    confirmed_start_time=schedule.start_time,
-                    confirmed_end_time=schedule.end_time,
-                )
-                logger.info(f"✅ Appointment confirmation sent to client: {client.email}")
+                # Send unified notification (email + SMS) to client
+                try:
+                    from ..services.notification_service import (
+                        send_schedule_confirmation_notification,
+                    )
+
+                    await send_schedule_confirmation_notification(
+                        db=db,
+                        user_id=current_user.id,
+                        client_email=client.email,
+                        client_phone=client.phone,
+                        client_name=client.business_name or client.contact_name or "Client",
+                        business_name=business_name,
+                        schedule_date=formatted_date,
+                        schedule_time=schedule_time,
+                    )
+                    logger.info(f"✅ Schedule confirmation sent to client: {client.email}")
+                except Exception as e:
+                    logger.error(f"⚠️ Failed to send confirmation notification to client: {str(e)}")
             except Exception as e:
-                logger.error(f"⚠️ Failed to send confirmation email to client: {str(e)}")
+                logger.error(f"⚠️ Failed to send confirmation to client: {str(e)}")
 
         # Send confirmation email to provider
         if current_user.email:

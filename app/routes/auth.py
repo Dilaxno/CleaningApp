@@ -544,3 +544,16 @@ async def update_me(
     db.commit()
     db.refresh(current_user)
     return current_user
+
+
+@router.post("/refresh-token")
+async def refresh_token():
+    """
+    Endpoint for frontend to refresh Firebase tokens.
+    The actual token refresh happens on the client side using Firebase SDK.
+    This endpoint just validates that the refresh flow is working.
+    """
+    return {
+        "message": "Token refresh should be handled by Firebase SDK on client side",
+        "instructions": "Call firebase.auth().currentUser.getIdToken(true) to force refresh",
+    }
