@@ -155,6 +155,59 @@ class ContractService:
         signed_at = datetime.utcnow()
         contract = self.repo.sign_contract_provider(self.db, contract, signature_data, signed_at)
 
+        # Regenerate PDF with provider signature
+        try:
+            from ...routes.contracts_pdf import calculate_quote, generate_contract_html, html_to_pdf
+            from ...routes.upload import get_r2_client
+            from ...config import R2_BUCKET_NAME
+
+            logger.info(f"🔄 Regenerating PDF with provider signature for contract {contract.id}")
+
+            # Get business config and client
+            business_config = self.repo.get_business_config(self.db, user.id)
+            client = self.repo.get_client_by_id(self.db, contract.client_id)
+
+            if business_config and client:
+                # Calculate quote
+                quote = calculate_quote(business_config, client.form_data)
+
+                # Generate HTML with both signatures
+                html_content = await generate_contract_html(
+                    business_config,
+                    client,
+                    client.form_data,
+                    quote,
+                    self.db,
+                    client_signature=contract.client_signature,
+                    provider_signature=signature_data,
+                    contract_created_at=contract.created_at,
+                    contract_public_id=contract.public_id,
+                )
+
+                # Convert to PDF
+                pdf_bytes = await html_to_pdf(html_content)
+
+                # Upload to R2
+                r2_client = get_r2_client()
+                pdf_key = f"contracts/{user.firebase_uid}/{contract.public_id}.pdf"
+
+                r2_client.put_object(
+                    Bucket=R2_BUCKET_NAME,
+                    Key=pdf_key,
+                    Body=pdf_bytes,
+                    ContentType="application/pdf",
+                )
+
+                # Update contract with new PDF key
+                contract.pdf_key = pdf_key
+                self.db.commit()
+
+                logger.info(f"✅ PDF regenerated successfully with provider signature: {pdf_key}")
+        except Exception as e:
+            logger.error(f"❌ Failed to regenerate PDF with provider signature: {e}")
+            # Don't fail the signing process if PDF regeneration fails
+            pass
+
         # Check if both parties have signed
         if contract.client_signature:
             # Both parties signed - mark as fully executed

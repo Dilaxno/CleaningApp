@@ -119,17 +119,16 @@ def get_usage_stats(user: User, db: Session) -> dict:
     """
     Get current usage statistics for the user.
     Returns dict with limit, current, remaining, and reset_date.
-    Counts clients with 'scheduled' or 'active' status created this month.
+    Counts clients with fully signed contracts (both parties signed) this billing period.
     """
     from datetime import datetime
-    from .models import Client
+    from .models import Client, Contract
 
     check_and_reset_monthly_counter(user, db)
 
     limit = get_plan_limit(user.plan)
 
-    # Count actual clients with scheduled or active status from this month
-    # Use subscription_start_date or month_reset_date to determine the billing period
+    # Calculate the start of the current billing period
     if user.month_reset_date:
         # Calculate the start of the current billing period
         from dateutil.relativedelta import relativedelta
@@ -142,14 +141,17 @@ def get_usage_stats(user: User, db: Session) -> dict:
         now = datetime.utcnow()
         billing_start = datetime(now.year, now.month, 1)
 
-    # Count clients with scheduled or active status created in this billing period
+    # Count clients with fully signed contracts (status = "signed") in this billing period
+    # A client counts when both parties have signed the MSA
     current = (
-        db.query(Client)
+        db.query(Client.id)
+        .join(Contract, Contract.client_id == Client.id)
         .filter(
             Client.user_id == user.id,
-            Client.status.in_(["scheduled", "active"]),
-            Client.created_at >= billing_start,
+            Contract.status == "signed",  # Both parties signed
+            Contract.signed_at >= billing_start,
         )
+        .distinct()
         .count()
     )
 

@@ -158,16 +158,22 @@ async def get_usage_stats(
     period_start = subscription_start + timedelta(days=cycles_passed * 30)
     period_end = subscription_start + timedelta(days=(cycles_passed + 1) * 30)
 
-    # Count clients created this billing period
-    clients_count = (
-        db.query(Client)
+    # Count clients with fully signed contracts this billing period
+    # A client counts when both parties have signed the MSA
+    clients_with_signed_contracts = (
+        db.query(Client.id)
+        .join(Contract, Contract.client_id == Client.id)
         .filter(
             Client.user_id == user.id,
-            Client.created_at >= period_start,
-            Client.created_at < period_end,
+            Contract.status == "signed",  # Both parties signed
+            Contract.signed_at >= period_start,
+            Contract.signed_at < period_end,
         )
+        .distinct()
         .count()
     )
+
+    clients_count = clients_with_signed_contracts
 
     # Count contracts created this billing period
     contracts_count = (
