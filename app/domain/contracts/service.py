@@ -168,6 +168,21 @@ class ContractService:
             if client:
                 self.repo.update_client_status(self.db, client, "active")
 
+            # Auto-generate initial visits for recurring contracts
+            logger.info(
+                f"🔍 Checking if visits should be generated for contract {contract.id}, frequency: {contract.frequency}"
+            )
+            if contract.frequency:
+                try:
+                    from ...services.visit_service import VisitService
+
+                    visits = VisitService.generate_visits_for_contract(self.db, contract, limit=10)
+                    logger.info(
+                        f"✅ Generated {len(visits)} initial visits for contract {contract.id} after full signature"
+                    )
+                except Exception as e:
+                    logger.error(f"❌ Failed to generate visits for contract {contract.id}: {e}")
+
             # Get business config for business name
             business_config = (
                 self.db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()

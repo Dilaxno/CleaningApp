@@ -226,32 +226,35 @@ async def handle_payment_event(event_data: dict, db: Session):
     """
     Handle payment.created and payment.updated events
     Tracks payment status and triggers confirmation flow
+
+    This is the source of truth for payment confirmation.
+    The redirect endpoint provides immediate UX feedback, but this webhook
+    handles all the actual database updates and notifications.
     """
     try:
         payment_data = event_data.get("object", {}).get("payment", {})
         payment_id = payment_data.get("id")
         status = payment_data.get("status", "").upper()
         order_id = payment_data.get("order_id")
-        invoice_id = payment_data.get("invoice_id")
 
-        logger.info(f"💳 Payment event: {payment_id} - Status: {status}")
+        logger.info(f"💳 Payment event: {payment_id} - Status: {status} - Order: {order_id}")
 
         # Only process COMPLETED payments
         if status != "COMPLETED":
             logger.info(f"ℹ️ Payment {payment_id} status is {status}, not COMPLETED. Skipping.")
             return
 
-        # Find contract by invoice ID or order ID
-        contract = None
-        if invoice_id:
-            contract = db.query(Contract).filter(Contract.square_invoice_id == invoice_id).first()
-        elif order_id:
-            contract = db.query(Contract).filter(Contract.square_invoice_id == order_id).first()
+        if not order_id:
+            logger.warning(f"⚠️ No order_id in payment {payment_id}")
+            return
+
+        # Find contract using order metadata
+        from ..services.square_service import find_contract_by_order
+
+        contract = await find_contract_by_order(order_id, db)
 
         if not contract:
-            logger.warning(
-                f"⚠️ No contract found for payment {payment_id} (invoice: {invoice_id}, order: {order_id})"
-            )
+            logger.warning(f"⚠️ No contract found for payment {payment_id} (order: {order_id})")
             return
 
         # Get related data

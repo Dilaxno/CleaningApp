@@ -1,20 +1,22 @@
 """
-Square Invoice Service
-Handles automatic Square invoice creation after schedule approval
+Square Checkout Service
+Handles Square Checkout API integration for job deposit payments
+Uses Square Checkout instead of hosted invoice pages for better UX
 """
 
 import logging
 import os
-from datetime import datetime, timedelta
+import uuid
+from datetime import datetime
 from typing import Any, Optional
 
 import httpx
-from cryptography.fernet import Fernet
 from sqlalchemy.orm import Session
 
-from ..config import SECRET_KEY
+from ..config import FRONTEND_URL
 from ..models import Client, Contract, Schedule, User
 from ..models_square import SquareIntegration
+from ..security_utils import decrypt_token
 
 logger = logging.getLogger(__name__)
 
@@ -25,565 +27,295 @@ if SQUARE_ENVIRONMENT == "production":
 else:
     SQUARE_API_URL = "https://connect.squareupsandbox.com/v2"
 
-# Encryption for tokens
-cipher_suite = Fernet(SECRET_KEY.encode()[:44].ljust(44, b"="))
-
-
-def decrypt_token(encrypted_token: str) -> str:
-    """Decrypt a stored token"""
-    return cipher_suite.decrypt(encrypted_token.encode()).decode()
-
-
-async def _get_location_id(access_token: str, merchant_id: str) -> str:
-    """
-    Get the first active location_id for the merchant.
-    Square requires a location_id for orders and invoices.
-    """
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as http_client:
-            response = await http_client.get(
-                f"{SQUARE_API_URL}/locations",
-                headers={
-                    "Square-Version": "2024-12-18",
-                    "Authorization": f"Bearer {access_token}",
-                    "Content-Type": "application/json",
-                },
-            )
-
-            if response.status_code != 200:
-                logger.error(f"Failed to fetch locations: {response.text}")
-                # Fallback to merchant_id (might work for some accounts)
-                return merchant_id
-
-            locations_data = response.json()
-            locations = locations_data.get("locations", [])
-
-            # Find first active location
-            for location in locations:
-                if location.get("status") == "ACTIVE":
-                    location_id = location.get("id")
-                    logger.info(f"✅ Found active location: {location_id}")
-                    return location_id
-
-            # If no active location, use first location
-            if locations:
-                location_id = locations[0].get("id")
-                logger.warning(f"⚠️ No active location found, using first location: {location_id}")
-                return location_id
-
-            # Last resort: use merchant_id
-            logger.warning(f"⚠️ No locations found, falling back to merchant_id: {merchant_id}")
-            return merchant_id
-
-    except Exception as e:
-        logger.error(f"Error fetching location_id: {e}")
-        return merchant_id
-
 
 async def create_square_invoice_for_contract(
-    contract: Contract, client: Client, schedule: Schedule, user: User, db: Session
+    contract: Contract,
+    client: Client,
+    schedule: Schedule,
+    user: User,
+    db: Session,
 ) -> dict[str, Any]:
     """
-    Create a Square invoice after provider accepts the schedule
+    Create Square Checkout session for contract deposit payment
+
+    This replaces the old invoice-based flow with Square Checkout API.
+    Creates a checkout link under the merchant's Square account and redirects
+    to CleanEnroll after payment completion.
 
     Args:
-        contract: The signed contract
-        client: The client who will receive the invoice
-        schedule: The accepted schedule
+        contract: The contract requiring payment
+        client: The client who will pay
+        schedule: The schedule associated with the contract
         user: The provider (business owner)
         db: Database session
 
     Returns:
-        Dict with success status, invoice_id, and invoice_url
+        Dict with success status, checkout_url, and payment_link_id
     """
     try:
-        # Check if Square is connected for this user
+        # Check if Square is connected
         square_integration = (
             db.query(SquareIntegration)
-            .filter(SquareIntegration.user_id == user.firebase_uid, SquareIntegration.is_active)
+            .filter(
+                SquareIntegration.user_id == user.firebase_uid,
+                SquareIntegration.is_active == True,
+            )
             .first()
         )
 
         if not square_integration:
-            logger.info(f"Square not connected for user {user.id}, skipping invoice creation")
+            logger.info(f"Square not connected for user {user.id}, skipping checkout creation")
             return {
                 "success": False,
                 "reason": "square_not_connected",
                 "message": "Square integration not connected",
             }
 
-        # Check if invoice already exists for this contract
+        # Check if checkout already created
         if contract.square_invoice_id:
             logger.info(
-                f"Square invoice already exists for contract {contract.id}: {contract.square_invoice_id}"
+                f"Checkout already exists for contract {contract.id}: {contract.square_invoice_id}"
             )
             return {
                 "success": False,
-                "reason": "invoice_exists",
-                "message": "Invoice already created",
-                "invoice_id": contract.square_invoice_id,
-                "invoice_url": contract.square_invoice_url,
+                "reason": "checkout_exists",
+                "message": "Checkout already created",
+                "checkout_url": contract.square_invoice_url,
             }
+
+        # Calculate deposit amount (50% of total)
+        deposit_amount = contract.total_value / 2 if contract.total_value else 0
+        remaining_balance = contract.total_value - deposit_amount if contract.total_value else 0
 
         # Decrypt access token
         access_token = decrypt_token(square_integration.access_token)
 
-        # Get the actual location_id (merchant_id is not the same as location_id)
-        location_id = await _get_location_id(access_token, square_integration.merchant_id)
-
-        # Prepare invoice data
-        invoice_data = await _prepare_invoice_data(
+        # Create checkout session
+        checkout_result = await _create_checkout_session(
+            access_token=access_token,
+            merchant_id=square_integration.merchant_id,
             contract=contract,
             client=client,
-            schedule=schedule,
-            location_id=location_id,
-            access_token=access_token,
+            deposit_amount=deposit_amount,
         )
 
-        # Create Square invoice via API
+        if not checkout_result.get("success"):
+            return checkout_result
+
+        payment_link_id = checkout_result["payment_link_id"]
+        checkout_url = checkout_result["checkout_url"]
+
+        # Update contract with checkout details
+        contract.square_invoice_id = payment_link_id
+        contract.square_invoice_url = checkout_url
+        contract.square_invoice_created_at = datetime.utcnow()
+        contract.square_payment_status = "pending"
+        contract.deposit_amount = deposit_amount
+        contract.remaining_balance = remaining_balance
+
+        db.commit()
+
+        logger.info(f"✅ Square Checkout created for contract {contract.id}: {payment_link_id}")
+
+        return {
+            "success": True,
+            "payment_link_id": payment_link_id,
+            "checkout_url": checkout_url,
+            "deposit_amount": deposit_amount,
+        }
+
+    except Exception as e:
+        logger.error(f"Error creating Square Checkout for contract {contract.id}: {str(e)}")
+        logger.exception(e)
+        db.rollback()
+        return {
+            "success": False,
+            "reason": "exception",
+            "message": f"Error: {str(e)}",
+        }
+
+
+async def _create_checkout_session(
+    access_token: str,
+    merchant_id: str,
+    contract: Contract,
+    client: Client,
+    deposit_amount: float,
+) -> dict[str, Any]:
+    """
+    Create Square Checkout payment link
+
+    Uses Square Payment Links API to create a checkout session that redirects
+    back to CleanEnroll after payment completion.
+    """
+    try:
+        # Generate idempotency key
+        idempotency_key = str(uuid.uuid4())
+
+        # Build redirect URL with contract metadata
+        redirect_url = (
+            f"{FRONTEND_URL}/payment-result"
+            f"?contract_id={contract.public_id or contract.id}"
+            f"&client_id={client.id}"
+        )
+
+        # Create order for the checkout
+        order_payload = {
+            "idempotency_key": f"order-{contract.id}-{int(datetime.utcnow().timestamp())}",
+            "order": {
+                "location_id": merchant_id,
+                "line_items": [
+                    {
+                        "name": f"{contract.title} - Deposit (50%)",
+                        "quantity": "1",
+                        "base_price_money": {
+                            "amount": int(deposit_amount * 100),  # Convert to cents
+                            "currency": contract.currency or "USD",
+                        },
+                        "note": f"Deposit payment for contract {contract.public_id or contract.id}",
+                    }
+                ],
+                "metadata": {
+                    "contract_id": str(contract.id),
+                    "contract_public_id": contract.public_id or "",
+                    "client_id": str(client.id),
+                    "provider_id": str(contract.user_id),
+                    "payment_type": "deposit",
+                    "deposit_percentage": "50",
+                },
+            },
+        }
+
         async with httpx.AsyncClient(timeout=30.0) as http_client:
-            response = await http_client.post(
-                f"{SQUARE_API_URL}/invoices",
-                json=invoice_data,
+            # Create order
+            logger.info(f"Creating Square order for contract {contract.id}")
+            order_response = await http_client.post(
+                f"{SQUARE_API_URL}/orders",
+                json=order_payload,
                 headers={
-                    "Square-Version": "2024-12-18",
                     "Authorization": f"Bearer {access_token}",
                     "Content-Type": "application/json",
+                    "Square-Version": "2024-12-18",
                 },
             )
 
-            if response.status_code not in [200, 201]:
-                error_detail = response.text
-                logger.error(f"Square invoice creation failed: {error_detail}")
+            if order_response.status_code != 200:
+                error_text = order_response.text
+                logger.error(f"Failed to create Square order: {error_text}")
                 return {
                     "success": False,
-                    "reason": "api_error",
-                    "message": f"Square API error: {error_detail}",
-                    "status_code": response.status_code,
+                    "reason": "order_creation_failed",
+                    "message": f"Failed to create order: {error_text}",
                 }
 
-            invoice_response = response.json()
-            invoice = invoice_response.get("invoice", {})
+            order = order_response.json()["order"]
+            order_id = order["id"]
 
-            invoice_id = invoice.get("id")
-            invoice_url = invoice.get("public_url")
+            # Create payment link (checkout session)
+            payment_link_payload = {
+                "idempotency_key": idempotency_key,
+                "order_id": order_id,
+                "checkout_options": {
+                    "redirect_url": redirect_url,
+                    "ask_for_shipping_address": False,
+                    "merchant_support_email": client.email or "",
+                    "accepted_payment_methods": {
+                        "apple_pay": True,
+                        "google_pay": True,
+                        "cash_app_pay": True,
+                        "afterpay_clearpay": False,
+                    },
+                },
+                "pre_populated_data": {
+                    "buyer_email": client.email or "",
+                    "buyer_phone_number": client.phone or "",
+                },
+                "payment_note": f"Deposit for {contract.title}",
+            }
 
-            if not invoice_id:
-                logger.error(f"No invoice ID in Square response: {invoice_response}")
+            logger.info(f"Creating Square Payment Link for order {order_id}")
+            payment_link_response = await http_client.post(
+                f"{SQUARE_API_URL}/online-checkout/payment-links",
+                json=payment_link_payload,
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "Content-Type": "application/json",
+                    "Square-Version": "2024-12-18",
+                },
+            )
+
+            if payment_link_response.status_code not in [200, 201]:
+                error_text = payment_link_response.text
+                logger.error(f"Failed to create Square Payment Link: {error_text}")
+                return {
+                    "success": False,
+                    "reason": "payment_link_creation_failed",
+                    "message": f"Failed to create payment link: {error_text}",
+                }
+
+            payment_link_data = payment_link_response.json()
+            payment_link = payment_link_data.get("payment_link", {})
+
+            payment_link_id = payment_link.get("id")
+            checkout_url = payment_link.get("url")
+
+            if not payment_link_id or not checkout_url:
+                logger.error(f"Invalid payment link response: {payment_link_data}")
                 return {
                     "success": False,
                     "reason": "invalid_response",
                     "message": "Invalid response from Square",
                 }
 
-            # Update contract with Square invoice details and deposit tracking
-            contract.square_invoice_id = invoice_id
-            contract.square_invoice_url = invoice_url
-            contract.square_payment_status = "pending"
-            contract.square_invoice_created_at = datetime.utcnow()
-
-            # Store deposit and balance amounts
-            total_amount = contract.total_value
-            contract.deposit_amount = total_amount / 2
-            contract.remaining_balance = total_amount / 2
-            contract.deposit_paid = False
-
-            db.commit()
-
-            logger.info(
-                f"✅ Square invoice created successfully: {invoice_id} for contract {contract.id}"
-            )
-
-            # Publish the invoice (makes it active and generates payment link)
-            # Note: With SHARE_MANUALLY delivery method, Square won't send emails
-            publish_result = await _publish_square_invoice(invoice_id, access_token)
-            if not publish_result.get("success"):
-                logger.warning(
-                    f"⚠️ Failed to publish invoice {invoice_id}: {publish_result.get('message')}"
-                )
-            else:
-                logger.info(f"✅ Square invoice published (ready for manual sharing): {invoice_id}")
-
-                # Try to get the public_url from the publish response first
-                published_url = publish_result.get("public_url")
-                if published_url and published_url != invoice_url:
-                    contract.square_invoice_url = published_url
-                    db.commit()
-                    invoice_url = published_url
-                    logger.info(f"✅ Got invoice URL from publish response: {published_url}")
-                elif not invoice_url:
-                    # If no URL yet, construct the Square invoice URL manually
-                    # Format: https://squareup.com/pay-invoice/{invoice_id}
-                    constructed_url = f"https://squareup.com/pay-invoice/{invoice_id}"
-                    contract.square_invoice_url = constructed_url
-                    db.commit()
-                    invoice_url = constructed_url
-                    logger.info(f"✅ Constructed invoice URL: {constructed_url}")
+            logger.info(f"✅ Square Payment Link created: {payment_link_id}")
 
             return {
                 "success": True,
-                "invoice_id": invoice_id,
-                "invoice_url": invoice_url,
-                "published": publish_result.get("success", False),
-                "message": "Square invoice created and ready for Cleanenroll to send",
+                "payment_link_id": payment_link_id,
+                "checkout_url": checkout_url,
+                "order_id": order_id,
             }
 
     except Exception as e:
-        logger.error(f"Error creating Square invoice for contract {contract.id}: {str(e)}")
-        db.rollback()
-        return {"success": False, "reason": "exception", "message": f"Error: {str(e)}"}
-
-
-async def _prepare_invoice_data(
-    contract: Contract, client: Client, schedule: Schedule, location_id: str, access_token: str
-) -> dict[str, Any]:
-    """
-    Prepare Square invoice data structure with 50% deposit
-
-    Square requires creating an Order first, then attaching it to the invoice.
-    The invoice will charge 50% upfront as a deposit, with the remaining 50% due after job completion.
-    https://developer.squareup.com/reference/square/invoices-api/create-invoice
-    """
-    # Calculate due date (default 15 days from now)
-    due_date = datetime.utcnow() + timedelta(days=15)
-
-    # Calculate 50% deposit amount
-    total_amount = contract.total_value
-    deposit_amount = total_amount / 2  # 50% deposit
-    remaining_balance = total_amount - deposit_amount
-
-    # Step 1: Create an Order with line items showing the split
-    service_description = contract.description or contract.title
-    if schedule.service_type:
-        service_description = (
-            f"{schedule.service_type.replace('-', ' ').title()} - {service_description}"
-        )
-
-    order_data = {
-        "order": {
-            "location_id": location_id,
-            "line_items": [
-                {
-                    "name": f"{contract.title} - 50% Deposit",
-                    "quantity": "1",
-                    "base_price_money": {
-                        "amount": int(deposit_amount * 100),  # Convert to cents
-                        "currency": contract.currency or "USD",
-                    },
-                    "note": f"{service_description} | Total Job Amount: ${total_amount:.2f} | Deposit (50%): ${deposit_amount:.2f} | Balance Due After Completion: ${remaining_balance:.2f}",
-                }
-            ],
-            "metadata": {
-                "contract_id": str(contract.id),
-                "schedule_id": str(schedule.id),
-                "payment_type": "deposit",
-                "deposit_percentage": "50",
-                "total_amount": str(total_amount),
-                "remaining_balance": str(remaining_balance),
-            },
-        },
-        "idempotency_key": f"order-{contract.id}-{int(datetime.utcnow().timestamp())}",
-    }
-
-    # Create the order
-    async with httpx.AsyncClient(timeout=30.0) as http_client:
-        order_response = await http_client.post(
-            f"{SQUARE_API_URL}/orders",
-            json=order_data,
-            headers={
-                "Square-Version": "2024-12-18",
-                "Authorization": f"Bearer {access_token}",
-                "Content-Type": "application/json",
-            },
-        )
-
-        if order_response.status_code not in [200, 201]:
-            error_detail = order_response.text
-            logger.error(f"Square order creation failed: {error_detail}")
-            raise Exception(f"Failed to create Square order: {error_detail}")
-
-        order_result = order_response.json()
-        order_id = order_result.get("order", {}).get("id")
-
-        if not order_id:
-            raise Exception("No order ID returned from Square")
-
-        logger.info(f"✅ Square order created: {order_id}")
-
-    # Step 2: Create or get Square customer
-    customer_id = await _get_or_create_square_customer(client=client, access_token=access_token)
-
-    # Step 3: Create invoice with the order_id and customer_id
-    # Use SHARE_MANUALLY so Cleanenroll handles all email communications
-    invoice_data = {
-        "invoice": {
-            "location_id": location_id,
-            "order_id": order_id,
-            "primary_recipient": {"customer_id": customer_id},
-            "payment_requests": [
-                {
-                    "request_type": "BALANCE",
-                    "due_date": due_date.strftime("%Y-%m-%d"),
-                    "automatic_payment_source": "NONE",
-                }
-            ],
-            "delivery_method": "SHARE_MANUALLY",
-            "invoice_number": f"INV-{contract.public_id[:8].upper()}-DEP",  # -DEP suffix for deposit
-            "title": f"{contract.title} - 50% Deposit",
-            "description": f"50% deposit for service scheduled on {schedule.scheduled_date.strftime('%B %d, %Y')} at {schedule.start_time}. Total job amount: ${total_amount:.2f}. Remaining balance of ${remaining_balance:.2f} will be invoiced after job completion.",
-            "accepted_payment_methods": {
-                "card": True,
-                "square_gift_card": False,
-                "bank_account": False,
-                "buy_now_pay_later": False,
-                "cash_app_pay": True,
-            },
-        },
-        "idempotency_key": f"invoice-{contract.id}-{int(datetime.utcnow().timestamp())}",
-    }
-
-    return invoice_data
-
-
-async def _get_or_create_square_customer(client: Client, access_token: str) -> str:
-    """
-    Get existing Square customer or create a new one
-
-    Returns:
-        customer_id: Square customer ID
-    """
-    try:
-        # First, try to search for existing customer by email
-        if client.email:
-            async with httpx.AsyncClient(timeout=30.0) as http_client:
-                search_response = await http_client.post(
-                    f"{SQUARE_API_URL}/customers/search",
-                    json={"query": {"filter": {"email_address": {"exact": client.email}}}},
-                    headers={
-                        "Square-Version": "2024-12-18",
-                        "Authorization": f"Bearer {access_token}",
-                        "Content-Type": "application/json",
-                    },
-                )
-
-                if search_response.status_code == 200:
-                    search_result = search_response.json()
-                    customers = search_result.get("customers", [])
-                    if customers:
-                        customer_id = customers[0].get("id")
-                        logger.info(f"✅ Found existing Square customer: {customer_id}")
-                        return customer_id
-
-        # Customer not found, create new one
-        customer_data = {
-            "idempotency_key": f"customer-{client.id}-{int(datetime.utcnow().timestamp())}",
-            "given_name": client.contact_name or client.business_name,
-            "email_address": client.email,
-            "phone_number": client.phone if client.phone else None,
-            "company_name": client.business_name if client.contact_name else None,
-            "reference_id": f"client-{client.id}",
+        logger.error(f"Error creating checkout session: {str(e)}")
+        logger.exception(e)
+        return {
+            "success": False,
+            "reason": "exception",
+            "message": f"Error: {str(e)}",
         }
 
-        # Remove None values
-        customer_data = {k: v for k, v in customer_data.items() if v is not None}
 
-        async with httpx.AsyncClient(timeout=30.0) as http_client:
-            create_response = await http_client.post(
-                f"{SQUARE_API_URL}/customers",
-                json=customer_data,
-                headers={
-                    "Square-Version": "2024-12-18",
-                    "Authorization": f"Bearer {access_token}",
-                    "Content-Type": "application/json",
-                },
-            )
-
-            if create_response.status_code not in [200, 201]:
-                error_detail = create_response.text
-                logger.error(f"Square customer creation failed: {error_detail}")
-                raise Exception(f"Failed to create Square customer: {error_detail}")
-
-            customer_result = create_response.json()
-            customer_id = customer_result.get("customer", {}).get("id")
-
-            if not customer_id:
-                raise Exception("No customer ID returned from Square")
-
-            logger.info(f"✅ Square customer created: {customer_id}")
-            return customer_id
-
-    except Exception as e:
-        logger.error(f"Error getting/creating Square customer: {str(e)}")
-        raise
-
-
-async def _publish_square_invoice(invoice_id: str, access_token: str) -> dict[str, Any]:
-    """
-    Publish a Square invoice to send it to the customer
-
-    Square invoices are created in DRAFT status and must be published
-    to send them to customers via email.
-
-    https://developer.squareup.com/reference/square/invoices-api/publish-invoice
-    """
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as http_client:
-            response = await http_client.post(
-                f"{SQUARE_API_URL}/invoices/{invoice_id}/publish",
-                json={
-                    "version": 0,  # Version 0 for newly created invoices
-                    "idempotency_key": f"publish-{invoice_id}-{int(datetime.utcnow().timestamp())}",
-                },
-                headers={
-                    "Square-Version": "2024-12-18",
-                    "Authorization": f"Bearer {access_token}",
-                    "Content-Type": "application/json",
-                },
-            )
-
-            if response.status_code not in [200, 201]:
-                error_detail = response.text
-                logger.error(f"Square invoice publish failed: {error_detail}")
-                return {"success": False, "message": f"Failed to publish invoice: {error_detail}"}
-
-            # Extract public_url from the publish response
-            publish_result = response.json()
-            published_invoice = publish_result.get("invoice", {})
-            public_url = published_invoice.get("public_url")
-
-            logger.info(f"✅ Square invoice published: {invoice_id}")
-            return {
-                "success": True,
-                "message": "Invoice published successfully",
-                "public_url": public_url,
-            }
-
-    except Exception as e:
-        logger.error(f"Error publishing Square invoice {invoice_id}: {str(e)}")
-        return {"success": False, "message": f"Error: {str(e)}"}
-
-
-async def check_square_payment_status(contract: Contract, db: Session) -> Optional[str]:
-    """
-    Check the payment status of a Square invoice (deposit or balance)
-
-    Returns:
-        Payment status: "paid", "pending", "failed", "cancelled", or None if not found
-    """
-    if not contract.square_invoice_id:
-        return None
-
-    try:
-        # Get Square integration for the contract owner
-        user = db.query(User).filter(User.id == contract.user_id).first()
-        if not user:
-            return None
-
-        square_integration = (
-            db.query(SquareIntegration)
-            .filter(SquareIntegration.user_id == user.firebase_uid, SquareIntegration.is_active)
-            .first()
-        )
-
-        if not square_integration:
-            return None
-
-        # Decrypt access token
-        access_token = decrypt_token(square_integration.access_token)
-
-        # Get invoice from Square API
-        async with httpx.AsyncClient(timeout=30.0) as http_client:
-            response = await http_client.get(
-                f"{SQUARE_API_URL}/invoices/{contract.square_invoice_id}",
-                headers={"Square-Version": "2024-12-18", "Authorization": f"Bearer {access_token}"},
-            )
-
-            if response.status_code != 200:
-                logger.error(f"Failed to get Square invoice status: {response.text}")
-                return None
-
-            invoice_data = response.json()
-            invoice = invoice_data.get("invoice", {})
-            status = invoice.get("status", "").lower()
-
-            # Map Square status to our status
-            status_map = {
-                "paid": "paid",
-                "unpaid": "pending",
-                "scheduled": "pending",
-                "draft": "pending",
-                "canceled": "cancelled",
-                "failed": "failed",
-            }
-
-            mapped_status = status_map.get(status, "pending")
-
-            # Update contract if status changed
-            if contract.square_payment_status != mapped_status:
-                contract.square_payment_status = mapped_status
-
-                # If deposit invoice is paid, mark deposit as paid
-                if mapped_status == "paid" and not contract.deposit_paid:
-                    contract.deposit_paid = True
-                    contract.deposit_paid_at = datetime.utcnow()
-                    logger.info(f"✅ Deposit paid for contract {contract.id}")
-
-                db.commit()
-                logger.info(
-                    f"Updated Square payment status for contract {contract.id}: {mapped_status}"
-                )
-
-            return mapped_status
-
-    except Exception as e:
-        logger.error(f"Error checking Square payment status for contract {contract.id}: {str(e)}")
-        return None
-
-
-async def create_balance_invoice_for_contract(
-    contract: Contract, client: Client, user: User, db: Session
+async def verify_payment_status(
+    payment_link_id: str,
+    contract_id: int,
+    user: User,
+    db: Session,
 ) -> dict[str, Any]:
     """
-    Create a Square invoice for the remaining 50% balance after job completion
+    Verify payment status from Square API
+
+    This is called from the redirect endpoint to verify that payment
+    was actually completed before showing success page.
+    Never trust query parameters alone - always verify server-side.
 
     Args:
-        contract: The contract with completed job
-        client: The client who will receive the invoice
-        user: The provider (business owner)
+        payment_link_id: Square payment link ID
+        contract_id: Internal contract ID
+        user: The provider
         db: Database session
 
     Returns:
-        Dict with success status, invoice_id, and invoice_url
+        Dict with payment status and details
     """
     try:
-        # Check if balance invoice already exists
-        if contract.balance_invoice_id:
-            logger.info(
-                f"Balance invoice already exists for contract {contract.id}: {contract.balance_invoice_id}"
-            )
-            return {
-                "success": False,
-                "reason": "invoice_exists",
-                "message": "Balance invoice already created",
-                "invoice_id": contract.balance_invoice_id,
-                "invoice_url": contract.balance_invoice_url,
-            }
-
-        # Check if deposit was paid
-        if not contract.deposit_paid:
-            logger.warning(
-                f"Cannot create balance invoice - deposit not paid for contract {contract.id}"
-            )
-            return {
-                "success": False,
-                "reason": "deposit_not_paid",
-                "message": "Deposit must be paid before creating balance invoice",
-            }
-
         # Get Square integration
         square_integration = (
             db.query(SquareIntegration)
-            .filter(SquareIntegration.user_id == user.firebase_uid, SquareIntegration.is_active)
+            .filter(
+                SquareIntegration.user_id == user.firebase_uid,
+                SquareIntegration.is_active == True,
+            )
             .first()
         )
 
@@ -597,165 +329,245 @@ async def create_balance_invoice_for_contract(
         # Decrypt access token
         access_token = decrypt_token(square_integration.access_token)
 
-        # Get location_id
-        location_id = await _get_location_id(access_token, square_integration.merchant_id)
-
-        # Prepare balance invoice data
-        invoice_data = await _prepare_balance_invoice_data(
-            contract=contract,
-            client=client,
-            location_id=location_id,
-            access_token=access_token,
-        )
-
-        # Create Square invoice via API
+        # Retrieve payment link to get order ID
         async with httpx.AsyncClient(timeout=30.0) as http_client:
-            response = await http_client.post(
-                f"{SQUARE_API_URL}/invoices",
-                json=invoice_data,
+            payment_link_response = await http_client.get(
+                f"{SQUARE_API_URL}/online-checkout/payment-links/{payment_link_id}",
                 headers={
-                    "Square-Version": "2024-12-18",
                     "Authorization": f"Bearer {access_token}",
-                    "Content-Type": "application/json",
+                    "Square-Version": "2024-12-18",
                 },
             )
 
-            if response.status_code not in [200, 201]:
-                error_detail = response.text
-                logger.error(f"Square balance invoice creation failed: {error_detail}")
+            if payment_link_response.status_code != 200:
+                error_text = payment_link_response.text
+                logger.error(f"Failed to retrieve payment link: {error_text}")
                 return {
                     "success": False,
-                    "reason": "api_error",
-                    "message": f"Square API error: {error_detail}",
+                    "reason": "payment_link_not_found",
+                    "message": "Payment link not found",
                 }
 
-            invoice_response = response.json()
-            invoice = invoice_response.get("invoice", {})
-            invoice_id = invoice.get("id")
-            invoice_url = invoice.get("public_url")
+            payment_link_data = payment_link_response.json()
+            payment_link = payment_link_data.get("payment_link", {})
+            order_id = payment_link.get("order_id")
 
-            if not invoice_id:
+            if not order_id:
                 return {
                     "success": False,
-                    "reason": "invalid_response",
-                    "message": "Invalid response from Square",
+                    "reason": "order_not_found",
+                    "message": "Order not found",
                 }
 
-            # Update contract with balance invoice details
-            contract.balance_invoice_id = invoice_id
-            contract.balance_invoice_url = invoice_url
-            db.commit()
+            # Retrieve order to check payment status
+            order_response = await http_client.get(
+                f"{SQUARE_API_URL}/orders/{order_id}",
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "Square-Version": "2024-12-18",
+                },
+            )
 
-            logger.info(f"✅ Balance invoice created: {invoice_id} for contract {contract.id}")
+            if order_response.status_code != 200:
+                error_text = order_response.text
+                logger.error(f"Failed to retrieve order: {error_text}")
+                return {
+                    "success": False,
+                    "reason": "order_retrieval_failed",
+                    "message": "Failed to retrieve order",
+                }
 
-            # Publish the invoice
-            publish_result = await _publish_square_invoice(invoice_id, access_token)
-            if publish_result.get("success"):
-                published_url = publish_result.get("public_url")
-                if published_url:
-                    contract.balance_invoice_url = published_url
-                    db.commit()
-                    invoice_url = published_url
+            order_data = order_response.json()
+            order = order_data.get("order", {})
+
+            # Check if order has payments
+            tenders = order.get("tenders", [])
+            if not tenders:
+                return {
+                    "success": False,
+                    "paid": False,
+                    "reason": "no_payment",
+                    "message": "No payment found for this order",
+                }
+
+            # Check if any tender is completed
+            completed_payment = None
+            for tender in tenders:
+                if (
+                    tender.get("type") == "CARD"
+                    and tender.get("card_details", {}).get("status") == "CAPTURED"
+                ):
+                    completed_payment = tender
+                    break
+
+            if not completed_payment:
+                return {
+                    "success": False,
+                    "paid": False,
+                    "reason": "payment_not_completed",
+                    "message": "Payment not completed",
+                }
+
+            # Payment is verified as completed
+            payment_id = completed_payment.get("id")
+            amount_money = completed_payment.get("amount_money", {})
+            amount = amount_money.get("amount", 0) / 100  # Convert from cents
+
+            logger.info(f"✅ Payment verified for contract {contract_id}: {payment_id} - ${amount}")
 
             return {
                 "success": True,
-                "invoice_id": invoice_id,
-                "invoice_url": invoice_url,
-                "message": "Balance invoice created successfully",
+                "paid": True,
+                "payment_id": payment_id,
+                "amount": amount,
+                "currency": amount_money.get("currency", "USD"),
+                "order_id": order_id,
             }
 
     except Exception as e:
-        logger.error(f"Error creating balance invoice for contract {contract.id}: {str(e)}")
-        db.rollback()
-        return {"success": False, "reason": "exception", "message": f"Error: {str(e)}"}
+        logger.error(f"Error verifying payment status: {str(e)}")
+        logger.exception(e)
+        return {
+            "success": False,
+            "reason": "exception",
+            "message": f"Error: {str(e)}",
+        }
 
 
-async def _prepare_balance_invoice_data(
-    contract: Contract, client: Client, location_id: str, access_token: str
+async def get_order_metadata(
+    order_id: str,
+    user: User,
+    db: Session,
 ) -> dict[str, Any]:
     """
-    Prepare Square invoice data for the remaining 50% balance
+    Retrieve order metadata from Square API
+
+    Used by webhook handler to match orders to contracts.
+
+    Args:
+        order_id: Square order ID
+        user: The provider
+        db: Database session
+
+    Returns:
+        Dict with order metadata including contract_id
     """
-    # Calculate due date (7 days from now for balance)
-    due_date = datetime.utcnow() + timedelta(days=7)
-
-    remaining_balance = contract.remaining_balance or (contract.total_value / 2)
-
-    # Create Order for balance
-    order_data = {
-        "order": {
-            "location_id": location_id,
-            "line_items": [
-                {
-                    "name": f"{contract.title} - Final Balance",
-                    "quantity": "1",
-                    "base_price_money": {
-                        "amount": int(remaining_balance * 100),
-                        "currency": contract.currency or "USD",
-                    },
-                    "note": f"Final 50% balance payment for completed service. Total job amount: ${contract.total_value:.2f}",
-                }
-            ],
-            "metadata": {
-                "contract_id": str(contract.id),
-                "payment_type": "balance",
-                "total_amount": str(contract.total_value),
-                "deposit_paid": "true",
-            },
-        },
-        "idempotency_key": f"balance-order-{contract.id}-{int(datetime.utcnow().timestamp())}",
-    }
-
-    # Create the order
-    async with httpx.AsyncClient(timeout=30.0) as http_client:
-        order_response = await http_client.post(
-            f"{SQUARE_API_URL}/orders",
-            json=order_data,
-            headers={
-                "Square-Version": "2024-12-18",
-                "Authorization": f"Bearer {access_token}",
-                "Content-Type": "application/json",
-            },
+    try:
+        # Get Square integration
+        square_integration = (
+            db.query(SquareIntegration)
+            .filter(
+                SquareIntegration.user_id == user.firebase_uid,
+                SquareIntegration.is_active == True,
+            )
+            .first()
         )
 
-        if order_response.status_code not in [200, 201]:
-            raise Exception(f"Failed to create balance order: {order_response.text}")
+        if not square_integration:
+            return {
+                "success": False,
+                "reason": "square_not_connected",
+            }
 
-        order_result = order_response.json()
-        order_id = order_result.get("order", {}).get("id")
+        # Decrypt access token
+        access_token = decrypt_token(square_integration.access_token)
 
-        if not order_id:
-            raise Exception("No order ID returned from Square")
+        # Retrieve order
+        async with httpx.AsyncClient(timeout=30.0) as http_client:
+            order_response = await http_client.get(
+                f"{SQUARE_API_URL}/orders/{order_id}",
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "Square-Version": "2024-12-18",
+                },
+            )
 
-    # Get customer_id
-    customer_id = await _get_or_create_square_customer(client=client, access_token=access_token)
-
-    # Create balance invoice
-    invoice_data = {
-        "invoice": {
-            "location_id": location_id,
-            "order_id": order_id,
-            "primary_recipient": {"customer_id": customer_id},
-            "payment_requests": [
-                {
-                    "request_type": "BALANCE",
-                    "due_date": due_date.strftime("%Y-%m-%d"),
-                    "automatic_payment_source": "NONE",
+            if order_response.status_code != 200:
+                error_text = order_response.text
+                logger.error(f"Failed to retrieve order: {error_text}")
+                return {
+                    "success": False,
+                    "reason": "order_retrieval_failed",
                 }
-            ],
-            "delivery_method": "SHARE_MANUALLY",
-            "invoice_number": f"INV-{contract.public_id[:8].upper()}-BAL",
-            "title": f"{contract.title} - Final Balance",
-            "description": f"Final 50% balance payment for completed service. Deposit of ${contract.deposit_amount:.2f} was paid on {contract.deposit_paid_at.strftime('%B %d, %Y') if contract.deposit_paid_at else 'N/A'}.",
-            "accepted_payment_methods": {
-                "card": True,
-                "square_gift_card": False,
-                "bank_account": False,
-                "buy_now_pay_later": False,
-                "cash_app_pay": True,
-            },
-        },
-        "idempotency_key": f"balance-invoice-{contract.id}-{int(datetime.utcnow().timestamp())}",
-    }
 
-    return invoice_data
+            order_data = order_response.json()
+            order = order_data.get("order", {})
+            metadata = order.get("metadata", {})
+
+            return {
+                "success": True,
+                "metadata": metadata,
+                "order": order,
+            }
+
+    except Exception as e:
+        logger.error(f"Error retrieving order metadata: {str(e)}")
+        logger.exception(e)
+        return {
+            "success": False,
+            "reason": "exception",
+            "message": f"Error: {str(e)}",
+        }
+
+
+async def find_contract_by_order(
+    order_id: str,
+    db: Session,
+) -> Optional[Contract]:
+    """
+    Find contract associated with a Square order
+
+    Uses order metadata to match the order to a contract.
+    This is used by the webhook handler.
+
+    Args:
+        order_id: Square order ID
+        db: Database session
+
+    Returns:
+        Contract if found, None otherwise
+    """
+    try:
+        # First, try to find any user with Square integration to query the order
+        square_integration = (
+            db.query(SquareIntegration).filter(SquareIntegration.is_active == True).first()
+        )
+
+        if not square_integration:
+            logger.warning("No active Square integration found")
+            return None
+
+        # Get user
+        user = db.query(User).filter(User.firebase_uid == square_integration.user_id).first()
+        if not user:
+            logger.warning(f"User not found for Square integration: {square_integration.user_id}")
+            return None
+
+        # Get order metadata
+        order_result = await get_order_metadata(order_id, user, db)
+
+        if not order_result.get("success"):
+            logger.warning(f"Failed to get order metadata: {order_result.get('reason')}")
+            return None
+
+        metadata = order_result.get("metadata", {})
+        contract_id = metadata.get("contract_id")
+
+        if not contract_id:
+            logger.warning(f"No contract_id in order metadata for order {order_id}")
+            return None
+
+        # Find contract by ID
+        contract = db.query(Contract).filter(Contract.id == int(contract_id)).first()
+
+        if contract:
+            logger.info(f"✅ Found contract {contract.id} for order {order_id}")
+        else:
+            logger.warning(f"Contract {contract_id} not found for order {order_id}")
+
+        return contract
+
+    except Exception as e:
+        logger.error(f"Error finding contract by order: {str(e)}")
+        logger.exception(e)
+        return None

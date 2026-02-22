@@ -282,6 +282,98 @@ async def disconnect(
         raise HTTPException(status_code=500, detail="Failed to disconnect Square") from e
 
 
+@router.get("/payment-result")
+async def payment_result(
+    contract_id: str,
+    client_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Handle redirect from Square Checkout after payment
+
+    CRITICAL: Never trust query parameters alone. Always verify payment
+    status server-side before confirming payment to the user.
+
+    This endpoint is called when Square redirects the client back after
+    payment completion. We verify the payment status via Square API before
+    showing success.
+    """
+    try:
+        from ..models import Contract
+
+        # Find contract by public_id or id
+        contract = (
+            db.query(Contract)
+            .filter((Contract.public_id == contract_id) | (Contract.id == int(contract_id)))
+            .first()
+        )
+
+        if not contract:
+            logger.error(f"Contract not found: {contract_id}")
+            raise HTTPException(status_code=404, detail="Contract not found")
+
+        # Verify client_id matches
+        if contract.client_id != client_id:
+            logger.error(f"Client ID mismatch: expected {contract.client_id}, got {client_id}")
+            raise HTTPException(status_code=403, detail="Invalid client")
+
+        # Get user for Square integration
+        user = db.query(User).filter(User.id == contract.user_id).first()
+        if not user:
+            logger.error(f"User not found for contract {contract.id}")
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Verify payment status via Square API
+        from ..services.square_service import verify_payment_status
+
+        payment_link_id = contract.square_invoice_id
+        if not payment_link_id:
+            logger.error(f"No payment link ID for contract {contract.id}")
+            raise HTTPException(status_code=400, detail="No payment link found")
+
+        verification_result = await verify_payment_status(
+            payment_link_id=payment_link_id,
+            contract_id=contract.id,
+            user=user,
+            db=db,
+        )
+
+        if not verification_result.get("success") or not verification_result.get("paid"):
+            # Payment not completed - show pending status
+            logger.warning(
+                f"Payment not verified for contract {contract.id}: {verification_result.get('reason')}"
+            )
+            return {
+                "status": "pending",
+                "message": "Payment is being processed",
+                "contract_id": contract.public_id or contract.id,
+                "reason": verification_result.get("reason"),
+            }
+
+        # Payment verified successfully
+        # Note: The webhook will handle the actual database updates and email notifications
+        # This endpoint just confirms to the user that payment was successful
+        logger.info(
+            f"✅ Payment verified for contract {contract.id}: {verification_result.get('payment_id')}"
+        )
+
+        return {
+            "status": "success",
+            "message": "Payment completed successfully",
+            "contract_id": contract.public_id or contract.id,
+            "amount": verification_result.get("amount"),
+            "currency": verification_result.get("currency"),
+            "payment_id": verification_result.get("payment_id"),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing payment result: {str(e)}")
+        logger.exception(e)
+        raise HTTPException(status_code=500, detail="Failed to process payment result")
+
+
 @router.get("/invoices")
 async def get_paid_invoices(
     current_user: User = Depends(get_current_user_with_plan),

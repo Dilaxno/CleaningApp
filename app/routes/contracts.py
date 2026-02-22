@@ -540,6 +540,21 @@ async def sign_contract_as_provider(
     # 2. Schedule is accepted by provider (client_onboarding_status = "completed")
     # The increment happens in schedules.py when provider accepts the schedule
 
+    # Auto-generate initial visits for recurring contracts
+    logger.info(
+        f"🔍 Checking if visits should be generated for contract {contract.id}, frequency: {contract.frequency}"
+    )
+    if contract.frequency:
+        try:
+            from ..services.visit_service import VisitService
+
+            visits = VisitService.generate_visits_for_contract(db, contract, limit=10)
+            logger.info(
+                f"✅ Generated {len(visits)} initial visits for contract {contract.id} after full signature"
+            )
+        except Exception as e:
+            logger.error(f"❌ Failed to generate visits for contract {contract.id}: {e}")
+
     # Regenerate PDF with provider signature
     try:
         import hashlib
@@ -1009,6 +1024,18 @@ async def provider_sign_contract(
             )
 
         logger.info(f"✅ Contract {contract_id} fully signed by both parties")
+
+        # Auto-generate initial visits for recurring contracts
+        if contract.frequency:
+            try:
+                from ..services.visit_service import VisitService
+
+                visits = VisitService.generate_visits_for_contract(db, contract, limit=10)
+                logger.info(
+                    f"✅ Generated {len(visits)} initial visits for contract {contract.id} after full signature"
+                )
+            except Exception as e:
+                logger.error(f"❌ Failed to generate visits for contract {contract.id}: {e}")
 
         # Regenerate PDF with provider signature
         try:
