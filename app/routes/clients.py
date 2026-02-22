@@ -1963,22 +1963,28 @@ async def sign_contract(
     except Exception as email_err:
         logger.warning(f"⚠️ Failed to send contract signed notification: {email_err}")
 
-    # Send confirmation to client
+    # Send unified notification (email + SMS) to client
     try:
         config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
         business_name = config.business_name if config else "Your Business"
 
-        if client.email:
-            await send_client_signature_confirmation(
-                to=client.email,
+        if client.email or client.phone:
+            from ..services.notification_service import send_contract_signed_notification
+
+            await send_contract_signed_notification(
+                db=db,
+                user_id=user.id,
+                client_email=client.email,
+                client_phone=client.phone,
                 client_name=sanitize_string(client.contact_name or client.business_name),
                 business_name=sanitize_string(business_name),
                 contract_title=sanitize_string(contract.title),
+                contract_id=contract.id,
                 contract_pdf_url=signed_pdf_url,
             )
-            logger.info(f"✅ Client signature confirmation sent to {client.email}")
+            logger.info(f"✅ Client signature confirmation sent to {client.email or client.phone}")
     except Exception as email_err:
-        logger.warning(f"⚠️ Failed to send client confirmation email: {email_err}")
+        logger.warning(f"⚠️ Failed to send client confirmation: {email_err}")
 
     return {
         "success": True,
@@ -2627,9 +2633,9 @@ async def adjust_quote(
         f"${client.original_quote_amount} → ${data.adjusted_amount}"
     )
 
-    # Send adjustment email to client
-    if client.email:
-        from ..email_service import send_quote_approved_email
+    # Send unified notification (email + SMS) to client
+    if client.email or client.phone:
+        from ..services.notification_service import send_estimate_approval_notification
 
         # Get business name from business_config
         business_name = (
@@ -2639,31 +2645,16 @@ async def adjust_quote(
         )
 
         background_tasks.add_task(
-            send_quote_approved_email,
-            to=client.email,
+            send_estimate_approval_notification,
+            db=db,
+            user_id=current_user.id,
+            client_email=client.email,
+            client_phone=client.phone,
             client_name=client.contact_name or client.business_name,
             business_name=business_name,
-            final_quote_amount=data.adjusted_amount,
-            was_adjusted=True,
-            adjustment_notes=data.adjustment_notes,
+            estimate_amount=data.adjusted_amount,
             client_public_id=client.public_id,
         )
-
-    # Send SMS notification to client if Twilio is enabled
-    if client.phone:
-        try:
-            from ..services.twilio_service import send_estimate_approval_sms
-
-            background_tasks.add_task(
-                send_estimate_approval_sms,
-                db=db,
-                user_id=current_user.id,
-                client_phone=client.phone,
-                client_name=client.contact_name or client.business_name,
-                estimate_amount=data.adjusted_amount,
-            )
-        except Exception as e:
-            logger.error(f"Failed to send adjusted estimate SMS: {e}")
 
     return {
         "message": "Quote adjusted successfully",

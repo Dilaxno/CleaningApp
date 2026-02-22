@@ -1411,34 +1411,38 @@ async def sign_contract_public(
 
     logger.info(f"✅ Contract {contract.id} signed by client via public endpoint (IP: {client_ip})")
 
-    # Send confirmation emails
-    from ..email_service import (
-        send_client_signature_confirmation,
-        send_contract_signed_notification,
-    )
-
+    # Send unified notification (email + SMS) to client
     business_name = "Service Provider"
     business_config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
     if business_config:
         business_name = business_config.business_name or user.full_name or "Service Provider"
 
-    # Send confirmation to client
-    if client.email:
+    # Send confirmation to client via email and SMS
+    if client.email or client.phone:
         try:
-            await send_client_signature_confirmation(
-                to=client.email,
+            from ..services.notification_service import send_contract_signed_notification
+
+            await send_contract_signed_notification(
+                db=db,
+                user_id=user.id,
+                client_email=client.email,
+                client_phone=client.phone,
                 client_name=data.client_name,
                 business_name=business_name,
                 contract_title=contract.title,
-                contract_public_id=contract.public_id,
+                contract_id=contract.id,
             )
         except Exception as e:
-            logger.error(f"Failed to send client confirmation email: {e}")
+            logger.error(f"Failed to send client confirmation: {e}")
 
     # Send notification to provider
     if user.email:
         try:
-            await send_contract_signed_notification(
+            from ..email_service import (
+                send_contract_signed_notification as send_provider_notification,
+            )
+
+            await send_provider_notification(
                 to=user.email,
                 client_name=data.client_name,
                 business_name=business_name,
