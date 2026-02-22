@@ -11,12 +11,12 @@ from datetime import datetime
 from typing import Any, Optional
 
 import httpx
+from cryptography.fernet import Fernet
 from sqlalchemy.orm import Session
 
-from ..config import FRONTEND_URL
+from ..config import FRONTEND_URL, SECRET_KEY
 from ..models import Client, Contract, Schedule, User
 from ..models_square import SquareIntegration
-from ..security_utils import decrypt_token
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +26,14 @@ if SQUARE_ENVIRONMENT == "production":
     SQUARE_API_URL = "https://connect.squareup.com/v2"
 else:
     SQUARE_API_URL = "https://connect.squareupsandbox.com/v2"
+
+# Encryption for tokens
+cipher_suite = Fernet(SECRET_KEY.encode()[:44].ljust(44, b"="))
+
+
+def decrypt_token(encrypted_token: str) -> str:
+    """Decrypt a stored token"""
+    return cipher_suite.decrypt(encrypted_token.encode()).decode()
 
 
 async def create_square_invoice_for_contract(
