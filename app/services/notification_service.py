@@ -69,7 +69,7 @@ async def send_notification(
                 result["sms_error"] = "Invalid phone number format"
             else:
                 logger.info(f"📱 Attempting to send {notification_type} SMS to {formatted_phone}")
-                sms_kwargs["to_phone"] = formatted_phone
+                sms_kwargs["client_phone"] = formatted_phone
                 success, error = await sms_func(**sms_kwargs)
 
                 if success:
