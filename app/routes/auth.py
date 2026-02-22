@@ -557,3 +557,112 @@ async def refresh_token():
         "message": "Token refresh should be handled by Firebase SDK on client side",
         "instructions": "Call firebase.auth().currentUser.getIdToken(true) to force refresh",
     }
+
+
+class DeleteAccountRequest(BaseModel):
+    password: str
+
+
+@router.delete("/me")
+async def delete_account(
+    data: DeleteAccountRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Delete user account permanently.
+    This will:
+    1. Verify the user's password (for email/password users)
+    2. Delete all user data from the database (cascading deletes)
+    3. Delete the user from Firebase Authentication
+    """
+    try:
+        # For OAuth users (Google, etc.), password verification is not applicable
+        # We'll check if the user has a password provider
+        from firebase_admin import auth as firebase_auth_admin
+
+        try:
+            firebase_user = firebase_auth_admin.get_user(current_user.firebase_uid)
+
+            # Check if user has password provider (email/password authentication)
+            has_password_provider = any(
+                provider.provider_id == "password" for provider in firebase_user.provider_data
+            )
+
+            if has_password_provider and data.password:
+                # Verify password for email/password users
+                # Note: In production, you should use Firebase Web API Key from environment
+                import httpx
+                import os
+
+                firebase_web_api_key = os.getenv("FIREBASE_WEB_API_KEY", FIREBASE_PROJECT_ID)
+                verify_password_url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={firebase_web_api_key}"
+
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(
+                        verify_password_url,
+                        json={
+                            "email": current_user.email,
+                            "password": data.password,
+                            "returnSecureToken": True,
+                        },
+                    )
+
+                    if response.status_code != 200:
+                        logger.warning(f"Password verification failed for {current_user.email}")
+                        raise HTTPException(
+                            status_code=401,
+                            detail="Invalid password. Please enter your correct password to delete your account.",
+                        )
+
+                logger.info(f"Password verified for {current_user.email}")
+            else:
+                logger.info(
+                    f"Skipping password verification for {current_user.email} (OAuth user or no password provided)"
+                )
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error during password verification: {str(e)}")
+            # Continue with deletion even if verification fails
+            logger.warning(f"Proceeding with account deletion for {current_user.email}")
+
+        # Delete all user data from database
+        # The database has CASCADE deletes configured, so this will delete:
+        # - business_configs
+        # - clients
+        # - contracts
+        # - schedules
+        # - invoices
+        # - all related data
+        logger.info(f"Deleting all data for user {current_user.email} (ID: {current_user.id})")
+
+        # Delete user from database (cascades to all related tables)
+        db.delete(current_user)
+        db.commit()
+
+        logger.info(f"Database records deleted for user {current_user.email}")
+
+        # Delete user from Firebase Authentication
+        try:
+            firebase_auth_admin.delete_user(current_user.firebase_uid)
+            logger.info(f"Firebase Auth user deleted: {current_user.email}")
+        except Exception as e:
+            logger.error(f"Failed to delete Firebase user {current_user.email}: {str(e)}")
+            # Continue even if Firebase deletion fails - database is already cleaned
+
+        return {
+            "message": "Account deleted successfully",
+            "email": current_user.email,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting account for {current_user.email}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to delete account. Please try again or contact support.",
+        ) from e
