@@ -316,3 +316,80 @@ async def send_contract_fully_executed_notification(
             "contract_id": contract_numeric_id if contract_numeric_id else 0,
         },
     )
+
+
+async def send_quote_rejection_notification(
+    client_email: str,
+    client_name: str,
+    business_name: str,
+    rejection_reason: str,
+    original_quote_amount: Optional[float] = None,
+):
+    """
+    Send quote rejection notification to client with provider's reason.
+    This is a direct email notification (no SMS for rejections).
+    """
+    try:
+        from ..email_service import send_email
+
+        # Format the quote amount if provided
+        quote_amount_text = ""
+        if original_quote_amount:
+            quote_amount_text = f"${original_quote_amount:,.2f}"
+
+        # Build email content
+        subject = f"Quote Update from {business_name}"
+
+        html_content = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background-color: #f8fafc; padding: 30px; border-radius: 8px;">
+                <h2 style="color: #1e293b; margin-bottom: 20px;">Quote Status Update</h2>
+                
+                <p style="color: #475569; font-size: 16px; line-height: 1.6;">
+                    Hi {client_name},
+                </p>
+                
+                <p style="color: #475569; font-size: 16px; line-height: 1.6;">
+                    Thank you for your interest in our services. After reviewing your quote request
+                    {f" for {quote_amount_text}" if quote_amount_text else ""}, 
+                    we're unable to proceed at this time.
+                </p>
+                
+                <div style="background-color: #fff; border-left: 4px solid #ef4444; padding: 20px; margin: 20px 0; border-radius: 4px;">
+                    <p style="color: #1e293b; font-weight: 600; margin-bottom: 10px;">Reason:</p>
+                    <p style="color: #475569; font-size: 15px; line-height: 1.6; margin: 0;">
+                        {rejection_reason}
+                    </p>
+                </div>
+                
+                <p style="color: #475569; font-size: 16px; line-height: 1.6;">
+                    We appreciate your understanding. If you have any questions or would like to discuss 
+                    alternative options, please don't hesitate to reach out to us directly.
+                </p>
+                
+                <p style="color: #475569; font-size: 16px; line-height: 1.6; margin-top: 30px;">
+                    Best regards,<br>
+                    <strong>{business_name}</strong>
+                </p>
+            </div>
+            
+            <div style="text-align: center; margin-top: 20px; padding: 20px;">
+                <p style="color: #94a3b8; font-size: 12px;">
+                    This is an automated notification from {business_name}
+                </p>
+            </div>
+        </div>
+        """
+
+        await send_email(
+            to=client_email,
+            subject=subject,
+            html_content=html_content,
+        )
+
+        logger.info(f"✅ Quote rejection notification sent to {client_email}")
+        return True
+
+    except Exception as e:
+        logger.error(f"❌ Failed to send quote rejection notification to {client_email}: {str(e)}")
+        raise

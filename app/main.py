@@ -66,6 +66,7 @@ from .routes.users import router as users_router
 from .routes.verification import router as verification_router
 from .routes.visits import router as visits_router
 from .routes.scope_templates import router as scope_templates_router
+from .routes.embed import router as embed_router
 from .security_headers import SecurityHeadersMiddleware
 
 # Configure logging
@@ -280,6 +281,7 @@ app.include_router(twilio_router)
 app.include_router(intercom_router)
 app.include_router(visits_router)
 app.include_router(scope_templates_router)
+app.include_router(embed_router)
 
 
 # Square OAuth callback routes (must match redirect URI exactly)

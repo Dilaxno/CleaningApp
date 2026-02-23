@@ -2369,6 +2369,21 @@ class QuoteApprovalRequest(BaseModel):
     notes: Optional[str] = None
 
 
+class QuoteRejectionRequest(BaseModel):
+    """Schema for provider rejecting a quote"""
+
+    notes: str  # Required field explaining why the quote was rejected
+
+    @field_validator("notes")
+    @classmethod
+    def validate_notes(cls, v):
+        if not v or not v.strip():
+            raise ValueError("Rejection reason is required")
+        if len(v.strip()) < 10:
+            raise ValueError("Rejection reason must be at least 10 characters")
+        return v.strip()
+
+
 class QuoteAdjustmentRequest(BaseModel):
     """Schema for provider adjusting a quote"""
 
@@ -2664,14 +2679,14 @@ async def adjust_quote(
 @router.post("/{client_id}/reject-quote")
 async def reject_quote(
     client_id: int,
-    data: QuoteApprovalRequest,
+    data: QuoteRejectionRequest,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
     Provider rejects the quote request.
-    Updates status and optionally notifies client.
+    Updates status and sends notification to client with rejection reason.
     """
     client = (
         db.query(Client).filter(Client.id == client_id, Client.user_id == current_user.id).first()
@@ -2690,8 +2705,7 @@ async def reject_quote(
     client.quote_status = "rejected"
     client.quote_approved_at = func.now()
     client.quote_approved_by = current_user.email or str(current_user.id)
-    if data.notes:
-        client.quote_adjustment_notes = data.notes
+    client.quote_adjustment_notes = data.notes
 
     # Create quote history entry
     from ..models import QuoteHistory
@@ -2700,7 +2714,7 @@ async def reject_quote(
         client_id=client.id,
         action="rejected",
         amount=client.original_quote_amount,
-        notes=data.notes or "Provider rejected quote request",
+        notes=data.notes,
         created_by=f"provider:{current_user.email or current_user.id}",
     )
     db.add(history_entry)
@@ -2709,8 +2723,30 @@ async def reject_quote(
 
     logger.info(f"❌ Quote rejected for client {client.id} by provider {current_user.id}")
 
+    # Send rejection notification to client
+    try:
+        from ..services.notification_service import send_quote_rejection_notification
+
+        business_config = (
+            db.query(BusinessConfig).filter(BusinessConfig.user_id == current_user.id).first()
+        )
+        business_name = business_config.business_name if business_config else "the provider"
+
+        background_tasks.add_task(
+            send_quote_rejection_notification,
+            client_email=client.email,
+            client_name=client.full_name,
+            business_name=business_name,
+            rejection_reason=data.notes,
+            original_quote_amount=client.original_quote_amount,
+        )
+        logger.info(f"📧 Quote rejection notification queued for {client.email}")
+    except Exception as e:
+        logger.error(f"❌ Failed to queue rejection notification: {str(e)}")
+        # Don't fail the request if notification fails
+
     return {
-        "message": "Quote rejected",
+        "message": "Quote rejected and client notified",
         "client_id": client.id,
         "quote_status": client.quote_status,
     }

@@ -611,3 +611,20 @@ class UserTemplateCustomization(Base):
 
     user = relationship("User")
     template = relationship("FormTemplate")
+
+
+class IntakeToken(Base):
+    """Secure tokens for pre-intake form data transfer"""
+
+    __tablename__ = "intake_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    token = Column(String(255), unique=True, index=True, nullable=False)
+    business_id = Column(String(255), nullable=False)  # Firebase UID of business owner
+    template_id = Column(String(255), nullable=False)
+    full_name = Column(String(255), nullable=False)
+    email = Column(String(255), nullable=False)
+    phone = Column(String(50), nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    used = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
