@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ..auth import get_current_user_with_plan
+from ..auth import get_current_user, get_current_user_with_plan
 from ..config import FRONTEND_URL, SECRET_KEY
 from ..database import get_db
 from ..models import User
@@ -78,7 +78,7 @@ async def test_config():
 
 @router.post("/oauth/initiate")
 async def initiate_oauth(
-    current_user: User = Depends(get_current_user_with_plan), db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
     """
     Initiate Square OAuth 2.0 flow
@@ -119,7 +119,7 @@ async def initiate_oauth(
 async def oauth_callback_handler(
     code: str,
     state: str | None = None,
-    current_user: User = Depends(get_current_user_with_plan),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """

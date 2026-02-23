@@ -63,6 +63,7 @@ class UserUpdate(BaseModel):
     plan: Optional[str] = None
     default_brand_color: Optional[str] = None
     onboarding_step: Optional[int] = None
+    onboarding_completed: Optional[bool] = None  # CRITICAL: Allow updating onboarding completion
     oauth_states: Optional[dict] = None
 
 
@@ -258,6 +259,9 @@ def update_user(
         if data.onboarding_step is not None:
             current_user.onboarding_step = data.onboarding_step
             logger.info(f"📍 User onboarding step updated to: {data.onboarding_step}")
+        if data.onboarding_completed is not None:
+            current_user.onboarding_completed = data.onboarding_completed
+            logger.info(f"✅ User onboarding_completed updated to: {data.onboarding_completed}")
         if data.oauth_states is not None:
             current_user.oauth_states = data.oauth_states
             logger.info(f"🔗 User OAuth states updated")

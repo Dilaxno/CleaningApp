@@ -9,6 +9,7 @@ from ..models import BusinessConfig, User
 router = APIRouter(prefix="/template-selection", tags=["template-selection"])
 
 # Pre-built template definitions (matching frontend templates.ts)
+# Commercial cleaning only - residential templates removed
 AVAILABLE_TEMPLATES = [
     {
         "id": "office",
@@ -65,38 +66,6 @@ AVAILABLE_TEMPLATES = [
         "image": "https://res.cloudinary.com/dxqum9ywx/image/upload/v1768087528/warehouse_korsp2.jpg",
         "color": "#1a1a1a",
         "category": "Commercial",
-    },
-    {
-        "id": "residential",
-        "name": "Residential / Home",
-        "description": "Professional home cleaning services.",
-        "image": "https://res.cloudinary.com/dxqum9ywx/image/upload/v1768087528/residential_aoijhw.jpg",
-        "color": "#1a1a1a",
-        "category": "Residential",
-    },
-    {
-        "id": "airbnb",
-        "name": "Airbnb / Short-Term Rental",
-        "description": "Turnover cleaning for vacation rentals.",
-        "image": "https://res.cloudinary.com/dxqum9ywx/image/upload/v1768087528/Airbnb_qopjpn.jpg",
-        "color": "#1a1a1a",
-        "category": "Residential",
-    },
-    {
-        "id": "move-in-out",
-        "name": "Move In / Move Out",
-        "description": "Deep cleaning for property transitions.",
-        "image": "https://res.cloudinary.com/dxqum9ywx/image/upload/v1768087527/Move_in_Move_out_srjbid.webp",
-        "color": "#1a1a1a",
-        "category": "Residential",
-    },
-    {
-        "id": "deep-clean",
-        "name": "Deep Clean",
-        "description": "Comprehensive deep cleaning services.",
-        "image": "https://res.cloudinary.com/dxqum9ywx/image/upload/v1770038049/deep_clean_tvl1an.jpg",
-        "color": "#1a1a1a",
-        "category": "Residential",
     },
     {
         "id": "post-construction",
