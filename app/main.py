@@ -223,23 +223,27 @@ else:
     logger.info("CSRF protection disabled")
 
 
-# CORS - Secure configuration with specific origins
-# Get allowed origins from environment variable
-ALLOWED_ORIGINS = os.getenv(
-    "ALLOWED_ORIGINS",
-    "http://localhost:3000,http://localhost:5173,https://cleanenroll.com,https://www.cleanenroll.com,https://api.cleanenroll.com",
-).split(",")
+# CORS - Allow all origins for iframe embedding
+# For production, you may want to restrict this to specific domains
+ALLOWED_ORIGINS = (
+    os.getenv(
+        "ALLOWED_ORIGINS",
+        "*",  # Allow all origins for iframe embedding
+    ).split(",")
+    if os.getenv("ALLOWED_ORIGINS") != "*"
+    else ["*"]
+)
 
 # Log CORS configuration for debugging
 logger.info(f"CORS allowed origins: {ALLOWED_ORIGINS}")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,  # Restrict to specific origins only
-    allow_credentials=True,
+    allow_origins=["*"],  # Allow all origins for iframe embedding
+    allow_credentials=False,  # Must be False when allow_origins is ["*"]
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*", "X-CSRF-Token"],
-    expose_headers=["X-CSRF-Token"],
+    allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Routes

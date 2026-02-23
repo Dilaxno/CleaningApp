@@ -141,6 +141,7 @@ class BusinessConfig(Base):
     user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
     # Branding
     business_name = Column(String(255), nullable=True)
+    business_phone = Column(String(50), nullable=True)  # Business phone for client assistance
     logo_url = Column(String(500), nullable=True)
     brand_color = Column(String(7), nullable=True)  # Hex color code for brand (e.g., #00C4B4)
     signature_url = Column(String(500), nullable=True)

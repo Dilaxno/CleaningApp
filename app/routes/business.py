@@ -19,6 +19,7 @@ class BusinessConfigCreate(BaseModel):
     firebaseUid: str
     # Branding
     businessName: Optional[str] = None
+    businessPhone: Optional[str] = None
     logoUrl: Optional[str] = None
     signatureUrl: Optional[str] = None
     onboardingComplete: Optional[bool] = None
@@ -274,6 +275,7 @@ def get_current_user_business_config(
 
     return {
         "businessName": config.business_name,
+        "businessPhone": config.business_phone,
         "logoKey": config.logo_url,
         "logoUrl": logo_presigned_url,
         "signatureKey": config.signature_url,
@@ -363,6 +365,8 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
             # Only update fields that are explicitly provided (not None and not empty string)
             if is_provided(data.businessName):
                 existing.business_name = data.businessName
+            if is_provided(data.businessPhone):
+                existing.business_phone = data.businessPhone
             if is_provided(data.logoUrl):
                 existing.logo_url = data.logoUrl
                 # If user doesn't have a profile picture, set it to the business logo
@@ -520,6 +524,7 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
             config = BusinessConfig(
                 user_id=user.id,
                 business_name=data.businessName,
+                business_phone=data.businessPhone,
                 logo_url=data.logoUrl,
                 signature_url=data.signatureUrl,
                 onboarding_complete=data.onboardingComplete,
