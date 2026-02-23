@@ -62,6 +62,8 @@ class UserUpdate(BaseModel):
     hearAbout: Optional[str] = None
     plan: Optional[str] = None
     default_brand_color: Optional[str] = None
+    onboarding_step: Optional[int] = None
+    oauth_states: Optional[dict] = None
 
 
 class UserResponse(BaseModel):
@@ -75,6 +77,8 @@ class UserResponse(BaseModel):
     account_type: Optional[str]
     plan: Optional[str] = None
     onboarding_completed: bool
+    onboarding_step: int = 1
+    oauth_states: Optional[dict] = None
 
     class Config:
         from_attributes = True
@@ -202,6 +206,8 @@ def get_user(
         "billing_cycle": current_user.billing_cycle,  # Include billing cycle
         "hear_about": current_user.hear_about,
         "onboarding_completed": current_user.onboarding_completed,
+        "onboarding_step": current_user.onboarding_step,
+        "oauth_states": current_user.oauth_states or {},
         "default_brand_color": current_user.default_brand_color,
     }
 
@@ -249,6 +255,12 @@ def update_user(
         if data.default_brand_color is not None:
             current_user.default_brand_color = data.default_brand_color
             logger.info(f"🎨 User default brand color updated to: {data.default_brand_color}")
+        if data.onboarding_step is not None:
+            current_user.onboarding_step = data.onboarding_step
+            logger.info(f"📍 User onboarding step updated to: {data.onboarding_step}")
+        if data.oauth_states is not None:
+            current_user.oauth_states = data.oauth_states
+            logger.info(f"🔗 User OAuth states updated")
 
         db.commit()
         db.refresh(current_user)
@@ -272,6 +284,8 @@ def update_user(
             "billing_cycle": current_user.billing_cycle,  # Include billing cycle
             "hear_about": current_user.hear_about,
             "onboarding_completed": current_user.onboarding_completed,
+            "onboarding_step": current_user.onboarding_step,
+            "oauth_states": current_user.oauth_states or {},
             "default_brand_color": current_user.default_brand_color,
         }
 

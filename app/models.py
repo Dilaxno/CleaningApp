@@ -58,6 +58,10 @@ class User(Base):
         DateTime, nullable=True
     )  # Track when to reset the counter (30 days from subscription date)
     onboarding_completed = Column(Boolean, default=False)
+    onboarding_step = Column(Integer, default=1, nullable=False)  # Current onboarding step (1-14)
+    oauth_states = Column(
+        JSON, default=dict, nullable=True
+    )  # OAuth connection states for preserving onboarding flow
     # Two-Factor Authentication fields
     totp_secret = Column(String(100), nullable=True)  # TOTP secret for authenticator app
     totp_enabled = Column(Boolean, default=False, nullable=False)  # Is TOTP enabled
