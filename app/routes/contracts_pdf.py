@@ -774,13 +774,13 @@ async def generate_contract_html(
     # Prepare signature HTML fragments
     provider_signature_html = ""
     if signature_url:
-        provider_signature_html = f"<img src='{signature_url}' alt='Provider Signature'>"
+        provider_signature_html = f"<img src='{signature_url}' alt='Provider Signature' style='max-height: 75px; max-width: 280px; object-fit: contain; display: block; margin-bottom: 0;'>"
     else:
         provider_signature_html = ""
 
     client_signature_html = ""
     if client_signature:
-        client_signature_html = f"<img src='{client_signature}' alt='Client Signature'>"
+        client_signature_html = f"<img src='{client_signature}' alt='Client Signature' style='max-height: 75px; max-width: 280px; object-fit: contain; display: block; margin-bottom: 0;'>"
     else:
         client_signature_html = ""
 
@@ -822,7 +822,7 @@ async def generate_contract_html(
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Service Agreement - {contract_number}</title>
+    <title>Master Service Agreement - {contract_number}</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * {{
@@ -1003,42 +1003,6 @@ async def generate_contract_html(
             position: absolute;
             left: 0;
         }}
-        .inclusions-exclusions {{
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 24px;
-        }}
-        .inclusions-exclusions h4 {{
-            font-size: 9pt;
-            font-weight: 600;
-            color: #0A2540;
-            margin-bottom: 10px;
-        }}
-        .inclusions-exclusions ul {{
-            list-style: none;
-            padding: 0;
-        }}
-        .inclusions-exclusions li {{
-            padding: 5px 0;
-            padding-left: 20px;
-            position: relative;
-            font-size: 10pt;
-            color: #425466;
-        }}
-        .inclusions li:before {{
-            content: "✓";
-            color: #10B981;
-            position: absolute;
-            left: 0;
-            font-weight: 600;
-        }}
-        .exclusions li:before {{
-            content: "✗";
-            color: #EF4444;
-            position: absolute;
-            left: 0;
-            font-weight: 600;
-        }}
         .signatures {{
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -1058,20 +1022,21 @@ async def generate_contract_html(
             font-weight: 500;
         }}
         .signature-line {{
-            height: 70px;
-            border-bottom: 1px solid #0A2540;
+            height: 80px;
+            border-bottom: 2px solid #0A2540;
             display: flex;
             align-items: flex-end;
             justify-content: flex-start;
             margin-bottom: 8px;
-            padding-bottom: 8px;
-            overflow: hidden;
+            padding-bottom: 2px;
+            position: relative;
         }}
         .signature-line img {{
-            max-height: 100px;
+            max-height: 75px;
             max-width: 280px;
             object-fit: contain;
             display: block;
+            margin-bottom: 0;
         }}
         .signature-name {{
             font-size: 10pt;
@@ -1135,11 +1100,11 @@ async def generate_contract_html(
     </div>
 
     <!-- Contract Title -->
-    <div class="contract-title">Service Agreement</div>
+    <div class="contract-title">Master Service Agreement</div>
 
     <!-- Contract Intro -->
     <p class="contract-intro">
-        This Service Agreement (the "Agreement") is made and entered into on <strong>{contract_date}</strong>
+        This Master Service Agreement (the "Agreement") is made and entered into on <strong>{contract_date}</strong>
         by and between <strong>{business_name}</strong> ("Service Provider") and <strong>{client_name}</strong> ("Client").
         <br/><span style="color: #94A3B8; font-size: 9pt;">Contract #{contract_number}</span>
     </p>
@@ -1156,17 +1121,7 @@ async def generate_contract_html(
     <!-- 2. Scope of Work -->
     <div class="section">
         <div class="section-title"><span class="section-number">2.</span>Scope of Work</div>
-        <p class="section-content" style="margin-bottom: 12px;">Service Provider will provide the following services to Client:</p>
-        <div class="inclusions-exclusions">
-            <div class="inclusions">
-                <h4>Services Included</h4>
-                <ul>{inclusions_html}</ul>
-            </div>
-            <div class="exclusions">
-                <h4>Not Included</h4>
-                <ul>{exclusions_html}</ul>
-            </div>
-        </div>
+        <p class="section-content">Service Provider will provide cleaning and maintenance services to Client as detailed in the attached Exhibit A (Scope of Work), which forms an integral part of this Agreement.</p>
     </div>
 
     <!-- 3. Property & Service Details -->
