@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, joinedload
 from .config import FIREBASE_PROJECT_ID
 from .database import get_db
 from .models import User
+from .security_middleware import set_rls_context
 
 logger = logging.getLogger(__name__)
 
@@ -301,6 +302,10 @@ async def get_current_user(
                 raise
 
         logger.debug(f"✅ User authenticated: {user.email}")
+        
+        # Set RLS context for this database session
+        set_rls_context(db, user.id)
+        
         return user
 
     except HTTPException:

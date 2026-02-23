@@ -215,7 +215,6 @@ if SECURITY_HEADERS_ENABLED:
 else:
     logger.warning("Security headers DISABLED - only use in development!")
 
-
 if CSRF_ENABLED:
     app.add_middleware(CSRFMiddleware)
     logger.info("CSRF protection enabled")
