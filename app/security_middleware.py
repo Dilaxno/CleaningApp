@@ -6,6 +6,7 @@ import logging
 from typing import Callable
 
 from fastapi import Request, Response
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -68,7 +69,7 @@ def set_rls_context(db: Session, user_id: int) -> None:
     """
     try:
         db.execute(
-            "SELECT set_config('app.current_user_id', :user_id, false)",
+            text("SELECT set_config('app.current_user_id', :user_id, false)"),
             {"user_id": str(user_id)}
         )
         logger.debug(f"RLS context set for user_id={user_id}")
@@ -85,7 +86,7 @@ def clear_rls_context(db: Session) -> None:
         db: SQLAlchemy database session
     """
     try:
-        db.execute("SELECT set_config('app.current_user_id', '', false)")
+        db.execute(text("SELECT set_config('app.current_user_id', '', false)"))
         logger.debug("RLS context cleared")
     except Exception as e:
         logger.error(f"Failed to clear RLS context: {e}")
@@ -101,7 +102,7 @@ def bypass_rls(db: Session) -> None:
         db: SQLAlchemy database session
     """
     try:
-        db.execute("SET LOCAL row_security = off")
+        db.execute(text("SET LOCAL row_security = off"))
         logger.warning("RLS bypassed for this transaction - USE WITH CAUTION")
     except Exception as e:
         logger.error(f"Failed to bypass RLS: {e}")
@@ -116,7 +117,7 @@ def enable_rls(db: Session) -> None:
         db: SQLAlchemy database session
     """
     try:
-        db.execute("SET LOCAL row_security = on")
+        db.execute(text("SET LOCAL row_security = on"))
         logger.debug("RLS re-enabled")
     except Exception as e:
         logger.error(f"Failed to enable RLS: {e}")
