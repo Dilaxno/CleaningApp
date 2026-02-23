@@ -268,10 +268,10 @@ def get_current_user_business_config(
     # Return true if EITHER is true (prevents losing onboarding status)
     onboarding_complete = config.onboarding_complete or current_user.onboarding_completed
 
-    logger.info(f"🔄 Onboarding status check for user {current_user.id}:")
-    logger.info(f"   - BusinessConfig.onboarding_complete: {config.onboarding_complete}")
-    logger.info(f"   - User.onboarding_completed: {current_user.onboarding_completed}")
-    logger.info(f"   - Returning onboardingComplete: {onboarding_complete}")
+    if onboarding_complete and not config.onboarding_complete:
+        logger.info(
+            f"🔄 Syncing onboarding status from User to BusinessConfig for user {current_user.id}"
+        )
 
     return {
         "businessName": config.business_name,
@@ -379,9 +379,12 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 existing.onboarding_complete = data.onboardingComplete
                 # CRITICAL FIX: Also update User.onboarding_completed to keep them synchronized
                 user.onboarding_completed = data.onboardingComplete
-                logger.info(
-                    f"🔄 Synchronized onboarding status to {data.onboardingComplete} for user {user.id} (existing config)"
-                )
+                if data.onboardingComplete:
+                    logger.info(f"✅ Onboarding completed for user {user.id}")
+                else:
+                    logger.info(
+                        f"🔄 Onboarding status updated to {data.onboardingComplete} for user {user.id}"
+                    )
             if data.formEmbeddingEnabled is not None:
                 existing.form_embedding_enabled = data.formEmbeddingEnabled
             if is_provided(data.customFormsDomain):
@@ -613,9 +616,12 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
             # Also ensure BusinessConfig is updated if it exists
             if config:
                 config.onboarding_complete = data.onboardingComplete
-            logger.info(
-                f"🔄 Synchronized onboarding status to {data.onboardingComplete} for user {user.id}"
-            )
+            if data.onboardingComplete:
+                logger.info(f"✅ Onboarding completed for user {user.id}")
+            else:
+                logger.info(
+                    f"🔄 Onboarding status updated to {data.onboardingComplete} for user {user.id}"
+                )
 
         db.commit()
 
