@@ -693,6 +693,7 @@ async def generate_contract_html(
     payment_due_days = business_config.payment_due_days or 15
     late_fee = business_config.late_fee_percent or 1.5
     cancellation_window = business_config.cancellation_window or 24
+    weekend_premium = business_config.premium_evening_weekend or None
 
     # Client info
     client_name = client.contact_name or client.business_name
@@ -1198,6 +1199,7 @@ async def generate_contract_html(
             <li><strong>Payment Due:</strong> Payment is due within {payment_due_days} days of service completion</li>
             <li><strong>Late Fee:</strong> A {late_fee}% late fee will be applied to any balance not paid by the due date</li>
             <li><strong>Accepted Methods:</strong> Payment may be made via {accepted_methods}</li>
+            {f"<li><strong>Weekend Premium:</strong> Services performed on Saturdays or Sundays are subject to a {weekend_premium}% premium rate</li>" if weekend_premium and weekend_premium > 0 else ""}
         </ul>
 
         <h4 style="margin-top: 16px; margin-bottom: 8px; color: #000000; font-size: 11pt;">Cancellation Policy</h4>
