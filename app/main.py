@@ -216,13 +216,7 @@ if SECURITY_HEADERS_ENABLED:
 else:
     logger.warning("Security headers DISABLED - only use in development!")
 
-if CSRF_ENABLED:
-    app.add_middleware(CSRFMiddleware)
-    logger.info("CSRF protection enabled")
-else:
-    logger.info("CSRF protection disabled")
-
-# CORS Configuration
+# CORS Configuration - MUST be added BEFORE other middleware
 # For production with credentials (cookies), we need specific origins
 ALLOWED_ORIGINS_STR = os.getenv(
     "ALLOWED_ORIGINS",
@@ -233,8 +227,7 @@ ALLOWED_ORIGINS = [origin.strip() for origin in ALLOWED_ORIGINS_STR.split(",") i
 # Log CORS configuration for debugging
 logger.info(f"CORS allowed origins: {ALLOWED_ORIGINS}")
 
-# IMPORTANT: CORS middleware must be added AFTER security headers middleware
-# to ensure CORS headers take precedence
+# Add CORS middleware FIRST to ensure it handles OPTIONS requests properly
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -244,6 +237,12 @@ app.add_middleware(
     expose_headers=["*"],
     max_age=600,  # Cache preflight requests for 10 minutes
 )
+
+if CSRF_ENABLED:
+    app.add_middleware(CSRFMiddleware)
+    logger.info("CSRF protection enabled")
+else:
+    logger.info("CSRF protection disabled")
 
 # Routes
 app.include_router(auth_router)
