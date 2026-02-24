@@ -58,13 +58,13 @@ CREATE TABLE IF NOT EXISTS scope_proposals (
     CONSTRAINT valid_client_response CHECK (client_response IS NULL OR client_response IN ('approved', 'revision_requested'))
 );
 
-CREATE INDEX idx_scope_proposals_user_id ON scope_proposals(user_id);
-CREATE INDEX idx_scope_proposals_client_id ON scope_proposals(client_id);
-CREATE INDEX idx_scope_proposals_contract_id ON scope_proposals(contract_id);
-CREATE INDEX idx_scope_proposals_public_id ON scope_proposals(public_id);
-CREATE INDEX idx_scope_proposals_review_token ON scope_proposals(review_token);
-CREATE INDEX idx_scope_proposals_status ON scope_proposals(status);
-CREATE INDEX idx_scope_proposals_review_deadline ON scope_proposals(review_deadline);
+CREATE INDEX IF NOT EXISTS idx_scope_proposals_user_id ON scope_proposals(user_id);
+CREATE INDEX IF NOT EXISTS idx_scope_proposals_client_id ON scope_proposals(client_id);
+CREATE INDEX IF NOT EXISTS idx_scope_proposals_contract_id ON scope_proposals(contract_id);
+CREATE INDEX IF NOT EXISTS idx_scope_proposals_public_id ON scope_proposals(public_id);
+CREATE INDEX IF NOT EXISTS idx_scope_proposals_review_token ON scope_proposals(review_token);
+CREATE INDEX IF NOT EXISTS idx_scope_proposals_status ON scope_proposals(status);
+CREATE INDEX IF NOT EXISTS idx_scope_proposals_review_deadline ON scope_proposals(review_deadline);
 
 -- ============================================================
 -- 2. CREATE SCOPE PROPOSAL AUDIT LOG
@@ -82,13 +82,13 @@ CREATE TABLE IF NOT EXISTS scope_proposal_audit_log (
     old_status VARCHAR(50),
     new_status VARCHAR(50),
     notes TEXT,
-    metadata JSON, -- Additional context (IP, user agent, etc.)
+    audit_metadata JSON, -- Additional context (IP, user agent, etc.)
     
     created_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE INDEX idx_scope_audit_proposal_id ON scope_proposal_audit_log(proposal_id);
-CREATE INDEX idx_scope_audit_created_at ON scope_proposal_audit_log(created_at);
+CREATE INDEX IF NOT EXISTS idx_scope_audit_proposal_id ON scope_proposal_audit_log(proposal_id);
+CREATE INDEX IF NOT EXISTS idx_scope_audit_created_at ON scope_proposal_audit_log(created_at);
 
 -- ============================================================
 -- 3. CREATE EMAIL REMINDERS QUEUE
@@ -116,9 +116,9 @@ CREATE TABLE IF NOT EXISTS scope_email_reminders (
     CONSTRAINT valid_reminder_status CHECK (status IN ('pending', 'sent', 'failed', 'cancelled'))
 );
 
-CREATE INDEX idx_scope_reminders_proposal_id ON scope_email_reminders(proposal_id);
-CREATE INDEX idx_scope_reminders_scheduled_for ON scope_email_reminders(scheduled_for);
-CREATE INDEX idx_scope_reminders_status ON scope_email_reminders(status);
+CREATE INDEX IF NOT EXISTS idx_scope_reminders_proposal_id ON scope_email_reminders(proposal_id);
+CREATE INDEX IF NOT EXISTS idx_scope_reminders_scheduled_for ON scope_email_reminders(scheduled_for);
+CREATE INDEX IF NOT EXISTS idx_scope_reminders_status ON scope_email_reminders(status);
 
 -- ============================================================
 -- 4. UPDATE CLIENTS TABLE
@@ -128,7 +128,7 @@ ALTER TABLE clients
 ADD COLUMN IF NOT EXISTS active_scope_proposal_id INTEGER REFERENCES scope_proposals(id) ON DELETE SET NULL,
 ADD COLUMN IF NOT EXISTS scope_approval_status VARCHAR(50) DEFAULT 'pending';
 
-CREATE INDEX idx_clients_active_scope_proposal ON clients(active_scope_proposal_id);
+CREATE INDEX IF NOT EXISTS idx_clients_active_scope_proposal ON clients(active_scope_proposal_id);
 
 -- ============================================================
 -- 5. UPDATE CONTRACTS TABLE
@@ -137,7 +137,7 @@ CREATE INDEX idx_clients_active_scope_proposal ON clients(active_scope_proposal_
 ALTER TABLE contracts
 ADD COLUMN IF NOT EXISTS approved_scope_proposal_id INTEGER REFERENCES scope_proposals(id) ON DELETE SET NULL;
 
-CREATE INDEX idx_contracts_approved_scope_proposal ON contracts(approved_scope_proposal_id);
+CREATE INDEX IF NOT EXISTS idx_contracts_approved_scope_proposal ON contracts(approved_scope_proposal_id);
 
 -- ============================================================
 -- 6. CREATE FUNCTION TO AUTO-EXPIRE PROPOSALS

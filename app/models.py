@@ -722,7 +722,7 @@ class ScopeProposalAuditLog(Base):
     old_status = Column(String(50), nullable=True)
     new_status = Column(String(50), nullable=True)
     notes = Column(Text, nullable=True)
-    metadata = Column(JSON, nullable=True)
+    audit_metadata = Column(JSON, nullable=True)
 
     created_at = Column(DateTime, server_default=func.now())
 

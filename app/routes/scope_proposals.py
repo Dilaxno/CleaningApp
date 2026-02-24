@@ -115,7 +115,7 @@ def create_audit_log(
     old_status: Optional[str] = None,
     new_status: Optional[str] = None,
     notes: Optional[str] = None,
-    metadata: Optional[dict] = None,
+    audit_metadata: Optional[dict] = None,
 ):
     """Create audit log entry"""
     audit_log = ScopeProposalAuditLog(
@@ -126,7 +126,7 @@ def create_audit_log(
         old_status=old_status,
         new_status=new_status,
         notes=notes,
-        metadata=metadata,
+        audit_metadata=audit_metadata,
     )
     db.add(audit_log)
     db.commit()
@@ -432,7 +432,7 @@ async def get_scope_for_review(review_token: str, request: Request, db: Session 
             actor_type="client",
             old_status="sent",
             new_status="viewed",
-            metadata={
+            audit_metadata={
                 "ip": proposal.client_ip,
                 "user_agent": proposal.client_user_agent,
             },
@@ -517,7 +517,7 @@ async def client_respond_to_scope(
         old_status=old_status,
         new_status=response.response,
         notes=response.revision_notes,
-        metadata={"ip": request.client.host},
+        audit_metadata={"ip": request.client.host},
     )
 
     # Send notification email to provider
@@ -581,7 +581,7 @@ async def get_proposal_audit_log(
                 "old_status": log.old_status,
                 "new_status": log.new_status,
                 "notes": log.notes,
-                "metadata": log.metadata,
+                "audit_metadata": log.audit_metadata,
                 "created_at": log.created_at,
             }
             for log in logs
