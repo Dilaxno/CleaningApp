@@ -222,17 +222,19 @@ if CSRF_ENABLED:
 else:
     logger.info("CSRF protection disabled")
 
-
 # CORS Configuration
 # For production with credentials (cookies), we need specific origins
-ALLOWED_ORIGINS = os.getenv(
+ALLOWED_ORIGINS_STR = os.getenv(
     "ALLOWED_ORIGINS",
     "https://cleanenroll.com,https://www.cleanenroll.com,http://localhost:5173,http://localhost:3000",
-).split(",")
+)
+ALLOWED_ORIGINS = [origin.strip() for origin in ALLOWED_ORIGINS_STR.split(",") if origin.strip()]
 
 # Log CORS configuration for debugging
 logger.info(f"CORS allowed origins: {ALLOWED_ORIGINS}")
 
+# IMPORTANT: CORS middleware must be added AFTER security headers middleware
+# to ensure CORS headers take precedence
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -240,6 +242,7 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
     expose_headers=["*"],
+    max_age=600,  # Cache preflight requests for 10 minutes
 )
 
 # Routes
@@ -335,6 +338,8 @@ def debug_cors(request: Request):
         "host": request.headers.get("host"),
         "user_agent": request.headers.get("user-agent"),
         "allowed_origins": ALLOWED_ORIGINS,
+        "allowed_origins_env": os.getenv("ALLOWED_ORIGINS", "NOT_SET"),
+        "cors_configured": len(ALLOWED_ORIGINS) > 0,
         "timestamp": time.time(),
     }
 

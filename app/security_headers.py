@@ -155,16 +155,14 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Permitted-Cross-Domain-Policies"] = "none"
 
         # Cross-Origin-Opener-Policy: Isolate browsing context
-        response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
-
-        # Cross-Origin-Resource-Policy: Restrict cross-origin resource access
-        response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
+        # Using same-origin-allow-popups to allow OAuth flows
+        response.headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups"
 
         # X-DNS-Prefetch-Control: Disable DNS prefetching
         response.headers["X-DNS-Prefetch-Control"] = "off"
 
-        # Cross-Origin-Resource-Policy: Restrict resource sharing
-        response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
+        # Note: Cross-Origin-Resource-Policy is NOT set here to allow CORS to work properly
+        # The CORS middleware handles cross-origin access control
 
         return response
 
@@ -182,8 +180,7 @@ def get_security_headers_dict() -> dict:
         "Content-Security-Policy": get_csp_policy(),
         "Permissions-Policy": get_permissions_policy(),
         "X-Permitted-Cross-Domain-Policies": "none",
-        "Cross-Origin-Opener-Policy": "same-origin",
-        "Cross-Origin-Resource-Policy": "same-origin",
+        "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
         "Cache-Control": "no-store, no-cache, must-revalidate",
     }
 
