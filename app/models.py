@@ -633,3 +633,130 @@ class IntakeToken(Base):
     expires_at = Column(DateTime, nullable=False)
     used = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, server_default=func.now())
+
+
+class ScopeProposal(Base):
+    """Provider-created scope of work proposals for client review"""
+
+    __tablename__ = "scope_proposals"
+
+    id = Column(Integer, primary_key=True, index=True)
+    public_id = Column(String(36), unique=True, nullable=False, default=generate_public_id)
+
+    # Relationships
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    client_id = Column(Integer, ForeignKey("clients.id"), nullable=False)
+    contract_id = Column(Integer, ForeignKey("contracts.id"), nullable=True)
+
+    # Version tracking
+    version = Column(String(10), nullable=False, default="v1.0")
+    parent_proposal_id = Column(Integer, ForeignKey("scope_proposals.id"), nullable=True)
+
+    # Status workflow
+    status = Column(
+        String(50), nullable=False, default="draft"
+    )  # draft, sent, viewed, approved, revision_requested, expired
+
+    # Scope data with frequency per task
+    scope_data = Column(
+        JSON, nullable=False
+    )  # {serviceAreas: [{id, name, tasks: [{id, label, frequency, notes}]}]}
+    provider_notes = Column(Text, nullable=True)
+
+    # PDF storage
+    pdf_key = Column(String(500), nullable=True)  # R2 key
+    pdf_hash = Column(String(64), nullable=True)  # SHA-256 hash
+    pdf_generated_at = Column(DateTime, nullable=True)
+
+    # Client review tracking
+    review_token = Column(String(64), unique=True, nullable=True)
+    review_deadline = Column(DateTime, nullable=True)
+    sent_at = Column(DateTime, nullable=True)
+    viewed_at = Column(DateTime, nullable=True)
+    client_ip = Column(String(45), nullable=True)
+    client_user_agent = Column(String(500), nullable=True)
+
+    # Client response
+    client_response = Column(String(50), nullable=True)  # approved, revision_requested
+    client_response_at = Column(DateTime, nullable=True)
+    client_revision_notes = Column(Text, nullable=True)
+
+    # Email tracking
+    email_sent = Column(Boolean, default=False, nullable=False)
+    reminder_24h_sent = Column(Boolean, default=False, nullable=False)
+    reminder_47h_sent = Column(Boolean, default=False, nullable=False)
+    expiry_notification_sent = Column(Boolean, default=False, nullable=False)
+
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    user = relationship("User")
+    client = relationship("Client")
+    contract = relationship("Contract")
+    parent_proposal = relationship("ScopeProposal", remote_side=[id])
+    audit_logs = relationship(
+        "ScopeProposalAuditLog", back_populates="proposal", cascade="all, delete-orphan"
+    )
+    email_reminders = relationship(
+        "ScopeEmailReminder", back_populates="proposal", cascade="all, delete-orphan"
+    )
+
+
+class ScopeProposalAuditLog(Base):
+    """Audit trail for scope proposal actions"""
+
+    __tablename__ = "scope_proposal_audit_log"
+
+    id = Column(Integer, primary_key=True, index=True)
+    proposal_id = Column(Integer, ForeignKey("scope_proposals.id"), nullable=False)
+
+    # Action tracking
+    action = Column(
+        String(100), nullable=False
+    )  # created, sent, viewed, approved, revision_requested, expired, resent, updated
+    actor_type = Column(String(50), nullable=False)  # provider, client, system
+    actor_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    # Details
+    old_status = Column(String(50), nullable=True)
+    new_status = Column(String(50), nullable=True)
+    notes = Column(Text, nullable=True)
+    metadata = Column(JSON, nullable=True)
+
+    created_at = Column(DateTime, server_default=func.now())
+
+    # Relationships
+    proposal = relationship("ScopeProposal", back_populates="audit_logs")
+    actor = relationship("User")
+
+
+class ScopeEmailReminder(Base):
+    """Email reminder queue for scope proposals"""
+
+    __tablename__ = "scope_email_reminders"
+
+    id = Column(Integer, primary_key=True, index=True)
+    proposal_id = Column(Integer, ForeignKey("scope_proposals.id"), nullable=False)
+
+    # Reminder type
+    reminder_type = Column(
+        String(50), nullable=False
+    )  # 24h_reminder, 47h_reminder, expiry_notification
+
+    # Scheduling
+    scheduled_for = Column(DateTime, nullable=False)
+    sent_at = Column(DateTime, nullable=True)
+
+    # Status
+    status = Column(
+        String(50), nullable=False, default="pending"
+    )  # pending, sent, failed, cancelled
+    error_message = Column(Text, nullable=True)
+    retry_count = Column(Integer, default=0, nullable=False)
+
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    proposal = relationship("ScopeProposal", back_populates="email_reminders")

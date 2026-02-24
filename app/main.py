@@ -67,6 +67,7 @@ from .routes.verification import router as verification_router
 from .routes.visits import router as visits_router
 from .routes.scope_templates import router as scope_templates_router
 from .routes.embed import router as embed_router
+from .routes.scope_proposals import router as scope_proposals_router
 from .security_headers import SecurityHeadersMiddleware
 
 # Configure logging
@@ -226,7 +227,7 @@ else:
 # For production with credentials (cookies), we need specific origins
 ALLOWED_ORIGINS = os.getenv(
     "ALLOWED_ORIGINS",
-    "https://cleanenroll.com,https://www.cleanenroll.com,http://localhost:5173,http://localhost:3000"
+    "https://cleanenroll.com,https://www.cleanenroll.com,http://localhost:5173,http://localhost:3000",
 ).split(",")
 
 # Log CORS configuration for debugging
@@ -280,6 +281,7 @@ app.include_router(twilio_router)
 app.include_router(intercom_router)
 app.include_router(visits_router)
 app.include_router(scope_templates_router)
+app.include_router(scope_proposals_router)
 app.include_router(embed_router)
 
 
