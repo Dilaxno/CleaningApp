@@ -350,6 +350,9 @@ class CompleteOnboardingRequest(BaseModel):
     serviceCities: list[str]
     serviceZipCodes: str
     pricingModel: str
+    ratePerSqft: float
+    hourlyRate: float
+    flatRate: float
     minimumJobPrice: float
     recurringDiscounts: dict
     acceptedFrequencies: list[str]
@@ -405,7 +408,12 @@ def complete_onboarding(
             business_config.business_phone = data.ownerPhone
             business_config.service_areas = [service_areas_data]
             business_config.pricing_model = data.pricingModel
-            business_config.minimum_charge = str(data.minimumJobPrice)
+            business_config.rate_per_sqft = data.ratePerSqft
+            business_config.hourly_rate = data.hourlyRate
+            business_config.flat_rate = data.flatRate
+            business_config.minimum_charge = (
+                str(data.minimumJobPrice) if data.minimumJobPrice else None
+            )
             business_config.discount_weekly = str(data.recurringDiscounts.get("weekly", 0))
             business_config.discount_biweekly = str(data.recurringDiscounts.get("biweekly", 0))
             business_config.discount_monthly = str(data.recurringDiscounts.get("monthly", 0))
@@ -428,7 +436,10 @@ def complete_onboarding(
                 business_phone=data.ownerPhone,
                 service_areas=[service_areas_data],
                 pricing_model=data.pricingModel,
-                minimum_charge=str(data.minimumJobPrice),
+                rate_per_sqft=data.ratePerSqft,
+                hourly_rate=data.hourlyRate,
+                flat_rate=data.flatRate,
+                minimum_charge=str(data.minimumJobPrice) if data.minimumJobPrice else None,
                 discount_weekly=str(data.recurringDiscounts.get("weekly", 0)),
                 discount_biweekly=str(data.recurringDiscounts.get("biweekly", 0)),
                 discount_monthly=str(data.recurringDiscounts.get("monthly", 0)),
