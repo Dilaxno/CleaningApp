@@ -211,6 +211,8 @@ class BusinessConfig(Base):
     addon_carpet_small = Column(Float, nullable=True)  # Small carpet pricing
     addon_carpet_medium = Column(Float, nullable=True)  # Medium carpet pricing
     addon_carpet_large = Column(Float, nullable=True)  # Large carpet pricing
+    contract_term_length = Column(String(20), nullable=True)  # 6, 12, or month-to-month
+    auto_renewal = Column(Boolean, default=True)  # Whether contract auto-renews
     payment_due_days = Column(Integer, default=15)
     late_fee_percent = Column(Float, default=1.5)
     standard_inclusions = Column(JSON, default=list)

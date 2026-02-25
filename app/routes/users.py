@@ -356,6 +356,8 @@ class CompleteOnboardingRequest(BaseModel):
     minimumJobPrice: float
     recurringDiscounts: dict
     acceptedFrequencies: list[str]
+    contractTermLength: str
+    autoRenewal: bool
     paymentDueDays: int
     lateFeePercent: float
     cancellationWindow: int
@@ -418,6 +420,8 @@ def complete_onboarding(
             business_config.discount_biweekly = str(data.recurringDiscounts.get("biweekly", 0))
             business_config.discount_monthly = str(data.recurringDiscounts.get("monthly", 0))
             business_config.accepted_frequencies = data.acceptedFrequencies
+            business_config.contract_term_length = data.contractTermLength
+            business_config.auto_renewal = data.autoRenewal
             business_config.payment_due_days = str(data.paymentDueDays)
             business_config.late_fee_percent = str(data.lateFeePercent)
             business_config.cancellation_window = str(data.cancellationWindow)
@@ -444,6 +448,8 @@ def complete_onboarding(
                 discount_biweekly=str(data.recurringDiscounts.get("biweekly", 0)),
                 discount_monthly=str(data.recurringDiscounts.get("monthly", 0)),
                 accepted_frequencies=data.acceptedFrequencies,
+                contract_term_length=data.contractTermLength,
+                auto_renewal=data.autoRenewal,
                 payment_due_days=str(data.paymentDueDays),
                 late_fee_percent=str(data.lateFeePercent),
                 cancellation_window=str(data.cancellationWindow),
