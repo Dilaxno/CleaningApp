@@ -75,7 +75,7 @@ rate_limit_billing_webhook = create_rate_limiter(
 class CheckoutRequest(BaseModel):
     product_id: str
     # Optional plan metadata for your app state
-    plan: Optional[str] = None  # "team" | "enterprise"
+    plan: Optional[str] = None  # "team" | "scale"
     billing_cycle: Optional[str] = None  # "monthly" | "yearly"
     quantity: int = 1
     # Optional override return url
@@ -107,7 +107,7 @@ class CheckoutRequest(BaseModel):
 
 
 class UpdatePlanRequest(BaseModel):
-    plan: str  # "team", "enterprise"
+    plan: str  # "team", "scale"
 
 
 class CancelRequest(BaseModel):
@@ -121,14 +121,14 @@ class ChangePlanRequest(BaseModel):
     product_id: str
     quantity: int = 1
     proration_billing_mode: str = "prorated_immediately"  # per docs
-    # optional local plan update for app gating ("team" | "enterprise")
+    # optional local plan update for app gating ("team" | "scale")
     plan: Optional[str] = None
 
 
 # Plan limits configuration
 PLAN_LIMITS = {
     "team": {"clients": 50, "contracts": 50, "schedules": 50},
-    "enterprise": {"clients": 999999, "contracts": 999999, "schedules": 999999},  # Unlimited
+    "scale": {"clients": 999999, "contracts": 999999, "schedules": 999999},  # Unlimited
 }
 
 # Default limits for users without a plan (should not happen after onboarding)
@@ -228,7 +228,7 @@ async def update_user_plan(
     Manually update user's plan. Used after successful checkout verification.
     In production, this should verify the subscription status with Dodo Payments.
     """
-    allowed_plans = {"team", "enterprise"}
+    allowed_plans = {"team", "scale"}
     if body.plan not in allowed_plans:
         raise HTTPException(
             status_code=400, detail=f"Invalid plan. Must be one of: {allowed_plans}"
@@ -306,7 +306,7 @@ async def manually_activate_plan(
     plan = request.get("plan")
     billing_cycle = request.get("billing_cycle", "yearly")
 
-    if not plan or plan not in ["team", "enterprise"]:
+    if not plan or plan not in ["team", "scale"]:
         raise HTTPException(status_code=400, detail="Invalid plan")
 
     try:

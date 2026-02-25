@@ -9,7 +9,7 @@ class CheckoutRequest(BaseModel):
     """Schema for creating a checkout session"""
 
     product_id: str
-    plan: Optional[str] = None  # "team" | "enterprise"
+    plan: Optional[str] = None  # "team" | "scale"
     billing_cycle: Optional[str] = None  # "monthly" | "yearly"
     quantity: int = 1
     return_path: Optional[str] = None  # e.g. "/billing?checkout=success"
@@ -42,7 +42,7 @@ class CheckoutRequest(BaseModel):
 class UpdatePlanRequest(BaseModel):
     """Schema for updating user plan"""
 
-    plan: str  # "team", "enterprise"
+    plan: str  # "team", "scale"
 
 
 class CancelRequest(BaseModel):

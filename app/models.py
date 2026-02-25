@@ -37,7 +37,7 @@ class User(Base):
     default_brand_color = Column(String(7), nullable=True)  # e.g., #RRGGBB
     account_type = Column(String(50), nullable=True)
     hear_about = Column(String(100), nullable=True)
-    plan = Column(String(50), nullable=True)  # team, enterprise - null until user selects
+    plan = Column(String(50), nullable=True)  # team, scale - null until user selects
     # Dodo subscription identifier for this user's active subscription; used for change/cancel flows
     subscription_id = Column(String(255), nullable=True)
     subscription_start_date = Column(

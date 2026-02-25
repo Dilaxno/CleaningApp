@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from .models import User
 
 # Plan limits configuration (no free plan - all users must have paid plans)
-PLAN_LIMITS = {"team": 50, "enterprise": None}  # None means unlimited
+PLAN_LIMITS = {"team": 50, "scale": None}  # None means unlimited
 
 
 def get_plan_limit(plan: Optional[str]) -> Optional[int]:

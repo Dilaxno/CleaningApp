@@ -397,6 +397,8 @@ def complete_onboarding(
             db.query(BusinessConfig).filter(BusinessConfig.user_id == current_user.id).first()
         )
 
+        logger.info(f"📊 Business config exists: {business_config is not None}")
+
         # Prepare service areas data
         service_areas_data = {
             "states": data.serviceStates,
@@ -416,24 +418,26 @@ def complete_onboarding(
             business_config.rate_per_sqft = data.ratePerSqft
             business_config.hourly_rate = data.hourlyRate
             business_config.flat_rate = data.flatRate
-            business_config.minimum_charge = (
-                str(data.minimumJobPrice) if data.minimumJobPrice else None
-            )
-            business_config.discount_weekly = str(data.recurringDiscounts.get("weekly", 0))
-            business_config.discount_biweekly = str(data.recurringDiscounts.get("biweekly", 0))
-            business_config.discount_monthly = str(data.recurringDiscounts.get("monthly", 0))
+            business_config.minimum_charge = data.minimumJobPrice if data.minimumJobPrice else None
+            business_config.discount_weekly = data.recurringDiscounts.get("weekly", 0)
+            business_config.discount_biweekly = data.recurringDiscounts.get("biweekly", 0)
+            business_config.discount_monthly = data.recurringDiscounts.get("monthly", 0)
             business_config.accepted_frequencies = data.acceptedFrequencies
             business_config.contract_term_length = data.contractTermLength
             business_config.auto_renewal = data.autoRenewal
-            business_config.payment_due_days = str(data.paymentDueDays)
-            business_config.late_fee_percent = str(data.lateFeePercent)
-            business_config.cancellation_window = str(data.cancellationWindow)
+            business_config.payment_due_days = data.paymentDueDays
+            business_config.late_fee_percent = data.lateFeePercent
+            business_config.cancellation_window = data.cancellationWindow
             business_config.standard_inclusions = data.standardInclusions
             business_config.standard_exclusions = data.standardExclusions
             business_config.day_schedules = data.daySchedules
             business_config.form_embedding_enabled = data.formEmbeddingEnabled
             business_config.payment_handling = data.paymentHandling
+            business_config.onboarding_complete = data.onboardingComplete
             logger.info(f"📝 Updated business config for user {current_user.id}")
+            logger.info(
+                f"💾 Data saved: business_name={data.businessName}, pricing_model={data.pricingModel}, payment_handling={data.paymentHandling}"
+            )
         else:
             # Create new config
             business_config = BusinessConfig(
@@ -447,27 +451,40 @@ def complete_onboarding(
                 rate_per_sqft=data.ratePerSqft,
                 hourly_rate=data.hourlyRate,
                 flat_rate=data.flatRate,
-                minimum_charge=str(data.minimumJobPrice) if data.minimumJobPrice else None,
-                discount_weekly=str(data.recurringDiscounts.get("weekly", 0)),
-                discount_biweekly=str(data.recurringDiscounts.get("biweekly", 0)),
-                discount_monthly=str(data.recurringDiscounts.get("monthly", 0)),
+                minimum_charge=data.minimumJobPrice if data.minimumJobPrice else None,
+                discount_weekly=data.recurringDiscounts.get("weekly", 0),
+                discount_biweekly=data.recurringDiscounts.get("biweekly", 0),
+                discount_monthly=data.recurringDiscounts.get("monthly", 0),
                 accepted_frequencies=data.acceptedFrequencies,
                 contract_term_length=data.contractTermLength,
                 auto_renewal=data.autoRenewal,
-                payment_due_days=str(data.paymentDueDays),
-                late_fee_percent=str(data.lateFeePercent),
-                cancellation_window=str(data.cancellationWindow),
+                payment_due_days=data.paymentDueDays,
+                late_fee_percent=data.lateFeePercent,
+                cancellation_window=data.cancellationWindow,
                 standard_inclusions=data.standardInclusions,
                 standard_exclusions=data.standardExclusions,
                 day_schedules=data.daySchedules,
                 form_embedding_enabled=data.formEmbeddingEnabled,
                 payment_handling=data.paymentHandling,
+                onboarding_complete=data.onboardingComplete,
             )
             db.add(business_config)
             logger.info(f"🆕 Created business config for user {current_user.id}")
+            logger.info(
+                f"💾 Data saved: business_name={data.businessName}, pricing_model={data.pricingModel}, payment_handling={data.paymentHandling}"
+            )
 
         db.commit()
         db.refresh(current_user)
+
+        logger.info(f"✅ Onboarding data committed to database successfully")
+        logger.info(f"📊 User onboarding_completed: {current_user.onboarding_completed}")
+        if business_config:
+            logger.info(
+                f"📊 BusinessConfig onboarding_complete: {business_config.onboarding_complete}"
+            )
+            logger.info(f"📊 BusinessConfig business_name: {business_config.business_name}")
+            logger.info(f"📊 BusinessConfig pricing_model: {business_config.pricing_model}")
 
         return {
             "success": True,
@@ -477,6 +494,10 @@ def complete_onboarding(
 
     except Exception as e:
         logger.error(f"❌ Error completing onboarding: {str(e)}")
+        logger.error(f"❌ Error type: {type(e).__name__}")
+        import traceback
+
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e)) from e
 
