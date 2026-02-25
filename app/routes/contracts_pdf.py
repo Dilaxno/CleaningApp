@@ -583,7 +583,16 @@ async def generate_contract_html(
     contract_created_at: Optional[datetime] = None,
     contract_public_id: Optional[str] = None,
 ) -> str:
-    """Generate HTML for the contract"""
+    """
+    Generate HTML for the Master Service Agreement (MSA)
+
+    MSA Structure (Refactored for CleanEnroll's ICP - 8-25 employee commercial cleaning companies):
+    - Lean, mid-market commercial agreement (3-4 pages)
+    - Contains only legal and commercial terms (parties, term, payment, cancellation, liability, termination)
+    - All scope details (inclusions, exclusions, service tasks, areas, notes, frequency) are in Exhibit A
+    - Simplified sections: rate adjustments, liability, non-solicitation, force majeure
+    - Professional but not overly legal or enterprise-heavy
+    """
 
     # Debug logging for business config pricing
     logger.info(
@@ -722,44 +731,9 @@ async def generate_contract_html(
     if special_requests == "":
         special_requests = None
 
-    # Service details (frequency already extracted above for start_date logic)
-    # Check if client has custom scope of work from scope builder
-    if (
-        hasattr(client, "scope_of_work")
-        and client.scope_of_work
-        and isinstance(client.scope_of_work, dict)
-    ):
-        # Use client's custom scope of work selections
-        scope_data = client.scope_of_work
-        inclusions = scope_data.get("included", [])
-        exclusions = scope_data.get("excluded", [])
-        logger.info(
-            f"📋 Using client's custom scope of work - {len(inclusions)} inclusions, {len(exclusions)} exclusions"
-        )
-    else:
-        # Fallback to business config's standard inclusions/exclusions
-        standard_inclusions = business_config.standard_inclusions or []
-        custom_inclusions = business_config.custom_inclusions or []
-        inclusions = standard_inclusions + custom_inclusions
+    # Note: Scope of work details (inclusions/exclusions) are now in Exhibit A
+    # The MSA references Exhibit A for all service task details
 
-        standard_exclusions = business_config.standard_exclusions or []
-        custom_exclusions = business_config.custom_exclusions or []
-        exclusions = standard_exclusions + custom_exclusions
-        logger.info(
-            f"📋 Using business config scope - {len(inclusions)} inclusions, {len(exclusions)} exclusions"
-        )
-
-    # Build inclusions/exclusions HTML
-    inclusions_html = (
-        "".join([f"<li>{item}</li>" for item in inclusions])
-        if inclusions
-        else "<li>Standard cleaning services</li>"
-    )
-    exclusions_html = (
-        "".join([f"<li>{item}</li>" for item in exclusions])
-        if exclusions
-        else "<li>None specified</li>"
-    )
     logger.info(
         f"🖊️ [BEFORE TEMPLATE] Client client_signature: {'SET (' + str(len(client_signature)) + ' chars)' if client_signature else 'NOT SET (None)'}"
     )
@@ -1122,7 +1096,7 @@ async def generate_contract_html(
     <!-- 2. Scope of Work -->
     <div class="section">
         <div class="section-title"><span class="section-number">2.</span>Scope of Work</div>
-        <p class="section-content">Service Provider will provide cleaning and maintenance services to Client as detailed in the attached Exhibit A (Scope of Work), which forms an integral part of this Agreement.</p>
+        <p class="section-content">Service Provider will provide cleaning and maintenance services to Client as detailed in the attached <strong>Exhibit A – Scope of Work</strong>, which forms an integral part of this Agreement. Exhibit A includes all service tasks, inclusions, exclusions, service areas, special notes, and frequency details.</p>
     </div>
 
     <!-- 3. Property & Service Details -->
@@ -1218,13 +1192,7 @@ async def generate_contract_html(
 
         <h4 style="margin-top: 16px; margin-bottom: 8px; color: #000000; font-size: 11pt;">Rate Adjustments</h4>
         <ul class="bullet-list">
-            <li><strong>Right to Adjust Rates:</strong> Service Provider reserves the right to adjust service rates upon thirty (30) days' written notice to the Client. Written notice may be provided via email to the Client's address on file or via certified mail to the address listed in this Agreement. The notice shall specify the current rates, the adjusted rates, the effective date of the adjustment, and the reason for the adjustment.</li>
-            <li><strong>Annual Price Increases:</strong> Service Provider may implement annual price increases to reflect changes in business operating costs, market conditions, and the cost of providing services. Such annual increases shall not exceed ten percent (10%) of the then-current rates in any twelve (12) month period, unless justified by extraordinary circumstances as described herein.</li>
-            <li><strong>Inflation-Based Adjustments:</strong> Service Provider may adjust rates based on changes in the Consumer Price Index (CPI) for All Urban Consumers as published by the U.S. Bureau of Labor Statistics, or a similar recognized inflationary index. Such adjustments shall be calculated based on the percentage change in the applicable index over the preceding twelve (12) month period and shall be implemented no more frequently than once per calendar year.</li>
-            <li><strong>Cost-Based Adjustments:</strong> Service Provider may adjust rates to reflect material increases in the costs of providing services, including but not limited to: (a) labor costs, including wages, benefits, payroll taxes, and workers' compensation insurance; (b) supply costs, including cleaning products, equipment, and materials; (c) fuel costs and transportation expenses; (d) insurance premiums, including general liability and professional liability insurance; or (e) costs associated with compliance with new or amended federal, state, or local laws, regulations, or ordinances. Any such adjustment shall be reasonably related to the actual increase in costs incurred by Service Provider.</li>
-            <li><strong>Prospective Application:</strong> All rate adjustments shall apply prospectively from the effective date specified in the written notice and shall not be applied retroactively to services already performed or invoiced. The adjusted rates shall apply to all services scheduled or performed on or after the effective date of the adjustment.</li>
-            <li><strong>Acceptance of Adjusted Rates:</strong> Client's continued acceptance of services after the effective date of any rate adjustment shall constitute Client's acceptance of and agreement to pay the adjusted rates. If Client does not wish to accept the adjusted rates, Client may terminate this Agreement in accordance with the Termination provisions set forth herein by providing written notice to Service Provider prior to the effective date of the rate adjustment. In such case, Client shall remain responsible for payment of all services performed prior to the termination date at the rates in effect at the time such services were performed.</li>
-            <li><strong>Rate Adjustment Records:</strong> Service Provider shall maintain records of all rate adjustments, including the date of notice, the effective date of adjustment, the previous rates, the adjusted rates, and the justification for the adjustment. Such records shall be made available to Client upon reasonable request.</li>
+            <li><strong>Rate Adjustment:</strong> Service Provider may adjust rates with thirty (30) days' written notice to Client. Adjusted rates apply prospectively from the effective date specified in the notice.</li>
         </ul>
 
         <h4 style="margin-top: 16px; margin-bottom: 8px; color: #000000; font-size: 11pt;">General Terms</h4>
@@ -1241,42 +1209,23 @@ async def generate_contract_html(
         
         <h4 style="margin-top: 16px; margin-bottom: 8px; color: #000000; font-size: 11pt;">Limitation of Liability</h4>
         <ul class="bullet-list">
-            <li><strong>Liability Cap:</strong> The Service Provider's total cumulative liability arising out of or related to this Agreement, whether in contract, tort (including negligence), or otherwise, shall not exceed the total amount of fees actually paid by the Client to the Service Provider in the three (3) months immediately preceding the date on which the claim arose. This limitation applies to all claims in the aggregate, regardless of the number of events or claims.</li>
-            <li><strong>Exclusion of Damages:</strong> In no event shall either party be liable to the other for any consequential, indirect, incidental, special, exemplary, or punitive damages, including but not limited to lost profits, loss of revenue, loss of business opportunities, business interruption, loss of data, loss of goodwill, or cost of substitute services, even if such party has been advised of the possibility of such damages. This exclusion applies regardless of the legal theory upon which the claim is based.</li>
-            <li><strong>Notice Requirement:</strong> Client must provide Service Provider with written notice of any alleged damage, loss, or claim within forty-eight (48) hours of discovery of such damage, loss, or claim. Failure to provide timely notice shall constitute a complete waiver of any such claim. Written notice must be sent to the Service Provider's email address or physical address as listed in this Agreement and must include a detailed description of the alleged damage or claim.</li>
-            <li><strong>Direct Damages Only:</strong> Service Provider's liability under this Agreement applies only to direct damages proximately caused by Service Provider's proven negligence in the performance of services under this Agreement. Client bears the burden of proving both negligence and causation by a preponderance of the evidence. Service Provider shall not be liable for any damages resulting from Client's failure to provide adequate access, instructions, or information, or from pre-existing conditions at the property.</li>
-            <li><strong>Insurance Coverage:</strong> Service Provider maintains general liability insurance coverage. Any claims covered by such insurance shall be subject to the terms, conditions, and limitations of the applicable insurance policy. Client acknowledges that Service Provider's insurance coverage may contain its own limitations and exclusions that further limit recovery.</li>
+            <li><strong>Liability Cap:</strong> Service Provider's total liability under this Agreement shall not exceed the total fees paid by Client in the three (3) months immediately preceding the claim.</li>
+            <li><strong>Insurance:</strong> Service Provider maintains general liability insurance coverage. Client acknowledges that insurance coverage may contain limitations and exclusions.</li>
         </ul>
 
         <h4 style="margin-top: 16px; margin-bottom: 8px; color: #000000; font-size: 11pt;">Independent Contractor</h4>
         <ul class="bullet-list">
-            <li><strong>Independent Contractor Status:</strong> Service Provider is an independent contractor and not an employee, agent, partner, or joint venturer of the Client. Nothing in this Agreement shall be construed to create an employment relationship, partnership, joint venture, or agency relationship between the parties. Service Provider shall not represent itself as an employee or agent of Client and shall have no authority to bind Client to any obligation or commitment.</li>
-            <li><strong>Control and Method:</strong> Service Provider retains full and exclusive control over the manner, method, means, and details of performing the services under this Agreement, subject only to the requirement that the services meet the specifications and quality standards set forth herein. Client shall not exercise control over the time, place, or manner in which Service Provider performs the services, except to specify the desired results and schedule service appointments.</li>
-            <li><strong>Tax and Employment Obligations:</strong> Service Provider is solely responsible for the payment of all federal, state, and local taxes, including but not limited to income taxes, self-employment taxes, unemployment insurance taxes, and any other taxes arising from the compensation paid under this Agreement. Service Provider shall comply with all applicable tax laws and shall provide Client with appropriate tax documentation (such as Form W-9 or equivalent) upon request.</li>
-            <li><strong>Employee and Subcontractor Responsibility:</strong> Service Provider is solely responsible for the payment, supervision, and management of its own employees, subcontractors, and agents, including but not limited to wages, salaries, benefits, workers' compensation insurance, unemployment insurance, payroll taxes, and compliance with all applicable labor and employment laws. Client shall have no liability or responsibility for any claims, damages, or obligations arising from Service Provider's relationship with its employees, subcontractors, or agents.</li>
-            <li><strong>Insurance and Compliance:</strong> Service Provider shall obtain and maintain, at its own expense, all insurance coverage required by law or reasonably necessary for the performance of services, including but not limited to general liability insurance, workers' compensation insurance (if applicable), and any professional liability insurance. Service Provider shall comply with all applicable federal, state, and local laws, regulations, and ordinances in the performance of services under this Agreement.</li>
-            <li><strong>No Benefits:</strong> Service Provider acknowledges and agrees that it is not entitled to any employee benefits provided by Client, including but not limited to health insurance, retirement benefits, paid time off, sick leave, or any other benefits typically provided to employees. Service Provider is responsible for obtaining its own insurance coverage and benefits.</li>
+            <li><strong>Independent Contractor Status:</strong> Service Provider is an independent contractor, not an employee, agent, or partner of Client. Service Provider retains control over the manner and means of performing services and is responsible for all taxes, insurance, and employment obligations for its personnel.</li>
         </ul>
 
         <h4 style="margin-top: 16px; margin-bottom: 8px; color: #000000; font-size: 11pt;">Force Majeure</h4>
         <ul class="bullet-list">
-            <li><strong>Excused Performance:</strong> Neither party shall be liable for any failure or delay in performing its obligations under this Agreement if such failure or delay is caused by circumstances beyond its reasonable control. Such circumstances include, but are not limited to, acts of God, severe weather events (including hurricanes, tornadoes, floods, ice storms, or blizzards), natural disasters (including earthquakes, wildfires, or tsunamis), government actions or orders, government shutdowns, labor disputes or strikes, supply chain disruptions, pandemics, epidemics, illness outbreaks, public health emergencies, civil unrest, riots, acts of terrorism, war, or other similar emergencies or catastrophic events (collectively, "Force Majeure Events").</li>
-            <li><strong>Notice Requirement:</strong> The party affected by a Force Majeure Event shall provide prompt written notice to the other party within forty-eight (48) hours of becoming aware of the Force Majeure Event. Such notice shall describe the nature of the Force Majeure Event, its expected duration, and the specific obligations affected. The affected party shall provide regular updates regarding the status of the Force Majeure Event and its efforts to resume performance.</li>
-            <li><strong>Mitigation Obligation:</strong> The party affected by a Force Majeure Event shall use commercially reasonable efforts to mitigate the effects of the Force Majeure Event, minimize any delay in performance, and resume performance of its obligations as soon as reasonably possible after the Force Majeure Event has ceased or been resolved. The affected party shall keep the other party reasonably informed of its mitigation efforts and expected timeline for resumption of services.</li>
-            <li><strong>Suspension of Obligations:</strong> During the period of the Force Majeure Event, the affected party's obligations under this Agreement shall be suspended to the extent such obligations are prevented or delayed by the Force Majeure Event. The time for performance of such obligations shall be extended for a period equal to the duration of the Force Majeure Event, provided that the affected party complies with the notice and mitigation requirements set forth herein.</li>
-            <li><strong>Payment and Rescheduling:</strong> If Service Provider is unable to perform scheduled services due to a Force Majeure Event, Client shall not be charged for such unperformed services. The parties shall work together in good faith to reschedule any missed services at a mutually convenient time after the Force Majeure Event has ceased. If the Force Majeure Event continues for more than thirty (30) consecutive days, either party may terminate this Agreement upon written notice without penalty or liability.</li>
-            <li><strong>Limitations:</strong> A Force Majeure Event shall not excuse the Client's obligation to pay for services already performed prior to the Force Majeure Event. Additionally, lack of funds, economic hardship, or changes in market conditions shall not constitute a Force Majeure Event under this Agreement.</li>
+            <li><strong>Excused Performance:</strong> Neither party shall be liable for failure to perform due to events beyond reasonable control, including acts of God, severe weather, natural disasters, government actions, pandemics, or similar emergencies. The affected party shall provide prompt notice and use reasonable efforts to resume performance. If such events continue for more than thirty (30) days, either party may terminate this Agreement without penalty.</li>
         </ul>
 
-        <h4 style="margin-top: 16px; margin-bottom: 8px; color: #000000; font-size: 11pt;">Non-Solicitation of Employees</h4>
+        <h4 style="margin-top: 16px; margin-bottom: 8px; color: #000000; font-size: 11pt;">Non-Solicitation</h4>
         <ul class="bullet-list">
-            <li><strong>Non-Solicitation Covenant:</strong> During the term of this Agreement and for a period of twelve (12) months following the termination or expiration of this Agreement (the "Restricted Period"), Client shall not, directly or indirectly, solicit, recruit, hire, contract with, engage, or otherwise attempt to employ or retain any employee, subcontractor, independent contractor, or representative of Service Provider who performed services for Client under this Agreement or with whom Client had contact or became aware of through the performance of services under this Agreement (collectively, "Service Provider Personnel").</li>
-            <li><strong>Scope of Restriction:</strong> The non-solicitation restriction applies to any form of engagement, whether as an employee, independent contractor, consultant, subcontractor, or in any other capacity, and whether the engagement is direct or through a third party. This restriction includes, but is not limited to, offering employment, making inquiries about availability for employment, encouraging Service Provider Personnel to leave their employment with Service Provider, or assisting any third party in doing the same.</li>
-            <li><strong>Prior Written Consent:</strong> Client may solicit, hire, or engage Service Provider Personnel only with the prior written consent of Service Provider. Service Provider may grant or withhold such consent in its sole discretion. Any request for consent must be submitted in writing to Service Provider and must include the identity of the Service Provider Personnel, the proposed terms of engagement, and the proposed start date. Service Provider shall respond to such request within ten (10) business days.</li>
-            <li><strong>Placement Fee for Violation:</strong> If Client violates the non-solicitation provision set forth herein, Client acknowledges and agrees that Service Provider will suffer substantial damages that are difficult to calculate with precision. Therefore, as liquidated damages and not as a penalty, Client agrees to pay Service Provider a placement fee equal to the greater of: (a) three (3) months of the applicable Service Provider Personnel's gross compensation (including salary, wages, benefits, and any other form of compensation), calculated based on the compensation paid or offered by Client; or (b) Five Thousand Dollars ($5,000.00) per individual solicited or hired. This placement fee shall be paid within thirty (30) days of Service Provider's written demand.</li>
-            <li><strong>Reasonable Restriction:</strong> Client acknowledges and agrees that the restrictions set forth in this section are reasonable in scope, duration, and geographic area, and are necessary to protect Service Provider's legitimate business interests, including its investment in recruiting, training, and retaining qualified personnel. Client further acknowledges that the restrictions do not impose an undue hardship on Client and do not prevent Client from conducting its business.</li>
-            <li><strong>General Solicitation Exception:</strong> This non-solicitation provision shall not prohibit Client from hiring Service Provider Personnel who respond to a general advertisement or solicitation not specifically targeted at Service Provider Personnel, provided that Client did not encourage or facilitate such response and had no direct or indirect contact with such individual regarding employment opportunities during the Restricted Period.</li>
-            <li><strong>Remedies:</strong> Client acknowledges that a breach of this non-solicitation provision would cause irreparable harm to Service Provider for which monetary damages would be an inadequate remedy. Therefore, in addition to the placement fee and any other remedies available at law or in equity, Service Provider shall be entitled to seek injunctive relief to enforce this provision without the necessity of posting a bond. The prevailing party in any action to enforce this provision shall be entitled to recover its reasonable attorneys' fees and costs.</li>
+            <li><strong>Personnel Hiring:</strong> Client agrees not to directly hire assigned personnel during the active term of this Agreement without written consent from Service Provider.</li>
         </ul>
 
         <h4 style="margin-top: 16px; margin-bottom: 8px; color: #000000; font-size: 11pt;">General Legal Terms</h4>
