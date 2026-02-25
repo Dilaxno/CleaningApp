@@ -349,6 +349,8 @@ class CompleteOnboardingRequest(BaseModel):
     serviceStates: list[str]
     serviceCities: list[str]
     serviceZipCodes: str
+    logoUrl: Optional[str] = None
+    brandColor: str
     pricingModel: str
     ratePerSqft: float
     hourlyRate: float
@@ -408,6 +410,8 @@ def complete_onboarding(
             # Update existing config
             business_config.business_name = data.businessName
             business_config.business_phone = data.ownerPhone
+            business_config.logo_url = data.logoUrl
+            business_config.brand_color = data.brandColor
             business_config.service_areas = [service_areas_data]
             business_config.pricing_model = data.pricingModel
             business_config.rate_per_sqft = data.ratePerSqft
@@ -438,6 +442,8 @@ def complete_onboarding(
                 user_id=current_user.id,
                 business_name=data.businessName,
                 business_phone=data.ownerPhone,
+                logo_url=data.logoUrl,
+                brand_color=data.brandColor,
                 service_areas=[service_areas_data],
                 pricing_model=data.pricingModel,
                 rate_per_sqft=data.ratePerSqft,
