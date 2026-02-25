@@ -368,7 +368,6 @@ class CompleteOnboardingRequest(BaseModel):
     daySchedules: dict
     formEmbeddingEnabled: bool
     paymentHandling: str
-    paymentMethod: str
     smsEnabled: bool
     onboardingComplete: bool
 
@@ -434,7 +433,6 @@ def complete_onboarding(
             business_config.day_schedules = data.daySchedules
             business_config.form_embedding_enabled = data.formEmbeddingEnabled
             business_config.payment_handling = data.paymentHandling
-            business_config.payment_method = data.paymentMethod
             logger.info(f"📝 Updated business config for user {current_user.id}")
         else:
             # Create new config
@@ -464,7 +462,6 @@ def complete_onboarding(
                 day_schedules=data.daySchedules,
                 form_embedding_enabled=data.formEmbeddingEnabled,
                 payment_handling=data.paymentHandling,
-                payment_method=data.paymentMethod,
             )
             db.add(business_config)
             logger.info(f"🆕 Created business config for user {current_user.id}")
