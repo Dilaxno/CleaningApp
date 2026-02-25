@@ -74,6 +74,9 @@ class BusinessConfigCreate(BaseModel):
     addonCarpetSmall: Optional[str] = None
     addonCarpetMedium: Optional[str] = None
     addonCarpetLarge: Optional[str] = None
+    # Contract terms
+    contractTermLength: Optional[str] = None  # 6, 12, or month-to-month
+    autoRenewal: Optional[bool] = None  # Whether contract auto-renews
     paymentDueDays: Optional[str] = None
     lateFeePercent: Optional[str] = None
     standardInclusions: Optional[list[str]] = None
@@ -330,6 +333,8 @@ def get_current_user_business_config(
         "addonCarpetSmall": config.addon_carpet_small,
         "addonCarpetMedium": config.addon_carpet_medium,
         "addonCarpetLarge": config.addon_carpet_large,
+        "contractTermLength": config.contract_term_length,
+        "autoRenewal": config.auto_renewal,
         "customPackages": config.custom_packages,
         "activeTemplates": config.active_templates,
         "acceptedFrequencies": config.accepted_frequencies,
@@ -478,6 +483,12 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
             if is_provided(data.addonCarpetLarge):
                 existing.addon_carpet_large = to_float(data.addonCarpetLarge)
 
+            # Contract terms
+            if is_provided(data.contractTermLength):
+                existing.contract_term_length = data.contractTermLength
+            if data.autoRenewal is not None:
+                existing.auto_renewal = data.autoRenewal
+
             if is_provided(data.paymentDueDays):
                 existing.payment_due_days = to_int(data.paymentDueDays) or 15
             if is_provided(data.lateFeePercent):
@@ -575,6 +586,9 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 addon_carpet_small=to_float(data.addonCarpetSmall),
                 addon_carpet_medium=to_float(data.addonCarpetMedium),
                 addon_carpet_large=to_float(data.addonCarpetLarge),
+                # Contract terms
+                contract_term_length=data.contractTermLength,
+                auto_renewal=data.autoRenewal if data.autoRenewal is not None else True,
                 payment_due_days=to_int(data.paymentDueDays) or 15,
                 late_fee_percent=to_float(data.lateFeePercent) or 1.5,
                 standard_inclusions=data.standardInclusions,
@@ -721,6 +735,8 @@ def get_business_config(firebase_uid: str, db: Session = Depends(get_db)):
         "addonCarpetSmall": config.addon_carpet_small,
         "addonCarpetMedium": config.addon_carpet_medium,
         "addonCarpetLarge": config.addon_carpet_large,
+        "contractTermLength": config.contract_term_length,
+        "autoRenewal": config.auto_renewal,
         "customPackages": config.custom_packages,
         "brandColor": config.brand_color,  # Brand color for business settings
         "acceptedFrequencies": config.accepted_frequencies
