@@ -2,12 +2,13 @@ import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 
 from ..auth import get_current_user
 from ..database import get_db
 from ..models import User
+from ..shared.validators import validate_corporate_email
 from .upload import generate_presigned_url
 
 logger = logging.getLogger(__name__)
@@ -52,6 +53,12 @@ class UserCreate(BaseModel):
     accountType: Optional[str] = None
     hearAbout: Optional[str] = None
     profilePictureUrl: Optional[str] = None
+
+    @field_validator("email")
+    @classmethod
+    def validate_email_field(cls, v: str) -> str:
+        """Validate that email is a corporate email"""
+        return validate_corporate_email(v)
 
 
 class UserUpdate(BaseModel):
@@ -329,6 +336,127 @@ def skip_sms_onboarding(
         return {"success": True, "message": "SMS onboarding skipped"}
     except Exception as e:
         logger.error(f"❌ Error marking SMS onboarding as skipped: {str(e)}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+class CompleteOnboardingRequest(BaseModel):
+    firebaseUid: str
+    businessName: str
+    ownerEmail: str
+    ownerPhone: str
+    serviceRegion: str
+    serviceStates: list[str]
+    serviceCities: list[str]
+    serviceZipCodes: str
+    pricingModel: str
+    minimumJobPrice: float
+    recurringDiscounts: dict
+    acceptedFrequencies: list[str]
+    paymentDueDays: int
+    lateFeePercent: float
+    cancellationWindow: int
+    standardInclusions: list[str]
+    standardExclusions: list[str]
+    daySchedules: dict
+    formEmbeddingEnabled: bool
+    paymentHandling: str
+    paymentMethod: str
+    smsEnabled: bool
+    onboardingComplete: bool
+
+
+@router.post("/{firebase_uid}/complete-onboarding")
+def complete_onboarding(
+    firebase_uid: str,
+    data: CompleteOnboardingRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Complete user onboarding and create business configuration"""
+    from ..models import BusinessConfig
+
+    if not validate_firebase_uid(firebase_uid):
+        raise HTTPException(status_code=400, detail="Invalid user identifier")
+
+    verify_user_access(firebase_uid, current_user)
+
+    try:
+        # Update user onboarding status
+        current_user.onboarding_completed = data.onboardingComplete
+        logger.info(f"✅ User {current_user.id} completed onboarding")
+
+        # Create or update business config
+        business_config = (
+            db.query(BusinessConfig).filter(BusinessConfig.user_id == current_user.id).first()
+        )
+
+        # Prepare service areas data
+        service_areas_data = {
+            "states": data.serviceStates,
+            "cities": data.serviceCities,
+            "zipCodes": data.serviceZipCodes,
+            "region": data.serviceRegion,  # Keep legacy field for backward compatibility
+        }
+
+        if business_config:
+            # Update existing config
+            business_config.business_name = data.businessName
+            business_config.business_phone = data.ownerPhone
+            business_config.service_areas = [service_areas_data]
+            business_config.pricing_model = data.pricingModel
+            business_config.minimum_charge = str(data.minimumJobPrice)
+            business_config.discount_weekly = str(data.recurringDiscounts.get("weekly", 0))
+            business_config.discount_biweekly = str(data.recurringDiscounts.get("biweekly", 0))
+            business_config.discount_monthly = str(data.recurringDiscounts.get("monthly", 0))
+            business_config.accepted_frequencies = data.acceptedFrequencies
+            business_config.payment_due_days = str(data.paymentDueDays)
+            business_config.late_fee_percent = str(data.lateFeePercent)
+            business_config.cancellation_window = str(data.cancellationWindow)
+            business_config.standard_inclusions = data.standardInclusions
+            business_config.standard_exclusions = data.standardExclusions
+            business_config.day_schedules = data.daySchedules
+            business_config.form_embedding_enabled = data.formEmbeddingEnabled
+            business_config.payment_handling = data.paymentHandling
+            business_config.payment_method = data.paymentMethod
+            logger.info(f"📝 Updated business config for user {current_user.id}")
+        else:
+            # Create new config
+            business_config = BusinessConfig(
+                user_id=current_user.id,
+                business_name=data.businessName,
+                business_phone=data.ownerPhone,
+                service_areas=[service_areas_data],
+                pricing_model=data.pricingModel,
+                minimum_charge=str(data.minimumJobPrice),
+                discount_weekly=str(data.recurringDiscounts.get("weekly", 0)),
+                discount_biweekly=str(data.recurringDiscounts.get("biweekly", 0)),
+                discount_monthly=str(data.recurringDiscounts.get("monthly", 0)),
+                accepted_frequencies=data.acceptedFrequencies,
+                payment_due_days=str(data.paymentDueDays),
+                late_fee_percent=str(data.lateFeePercent),
+                cancellation_window=str(data.cancellationWindow),
+                standard_inclusions=data.standardInclusions,
+                standard_exclusions=data.standardExclusions,
+                day_schedules=data.daySchedules,
+                form_embedding_enabled=data.formEmbeddingEnabled,
+                payment_handling=data.paymentHandling,
+                payment_method=data.paymentMethod,
+            )
+            db.add(business_config)
+            logger.info(f"🆕 Created business config for user {current_user.id}")
+
+        db.commit()
+        db.refresh(current_user)
+
+        return {
+            "success": True,
+            "message": "Onboarding completed successfully",
+            "onboarding_completed": current_user.onboarding_completed,
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Error completing onboarding: {str(e)}")
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e)) from e
 

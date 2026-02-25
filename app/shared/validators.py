@@ -72,6 +72,65 @@ def validate_email(email: Optional[str]) -> Optional[str]:
     return email
 
 
+# List of common free email providers
+FREE_EMAIL_PROVIDERS = {
+    "gmail.com",
+    "yahoo.com",
+    "hotmail.com",
+    "outlook.com",
+    "aol.com",
+    "icloud.com",
+    "mail.com",
+    "protonmail.com",
+    "zoho.com",
+    "yandex.com",
+    "gmx.com",
+    "inbox.com",
+    "live.com",
+    "msn.com",
+    "me.com",
+    "mac.com",
+    "googlemail.com",
+    "yahoo.co.uk",
+    "yahoo.co.in",
+    "yahoo.fr",
+    "yahoo.de",
+    "hotmail.co.uk",
+    "hotmail.fr",
+    "outlook.fr",
+    "outlook.de",
+}
+
+
+def validate_corporate_email(email: Optional[str]) -> Optional[str]:
+    """
+    Validate corporate email format (no free email providers).
+
+    Args:
+        email: Email address string
+
+    Returns:
+        Lowercase email address
+
+    Raises:
+        ValueError: If email format is invalid or is from a free provider
+    """
+    if not email:
+        return email
+
+    # First validate basic email format
+    email = validate_email(email)
+
+    # Extract domain
+    domain = email.split("@")[1].lower()
+
+    # Check if it's a free email provider
+    if domain in FREE_EMAIL_PROVIDERS:
+        raise ValueError("Please use your company business email address, not a personal email")
+
+    return email
+
+
 def validate_subdomain(subdomain: str) -> str:
     """
     Validate subdomain format.
