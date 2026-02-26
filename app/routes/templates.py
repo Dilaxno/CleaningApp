@@ -667,6 +667,8 @@ async def get_template_by_domain(template_id: str, request: Request, db: Session
 @router.get("/public/{owner_uid}", response_model=list[FormTemplateSchema])
 async def get_public_templates(owner_uid: str, request: Request, db: Session = Depends(get_db)):
     """Get all templates for a business (public access for embed/template selection) - filtered by active templates"""
+    logger.info(f"🔍 Fetching public templates for owner_uid: {owner_uid}")
+
     # If this is a custom domain request, validate that the domain belongs to the requested user
     if hasattr(request.state, "is_custom_domain") and request.state.is_custom_domain:
         if (
@@ -681,7 +683,10 @@ async def get_public_templates(owner_uid: str, request: Request, db: Session = D
     # Find the user by firebase_uid
     user = db.query(User).filter(User.firebase_uid == owner_uid).first()
     if not user:
+        logger.error(f"❌ User not found for owner_uid: {owner_uid}")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    logger.info(f"✅ Found user: {user.email} (id: {user.id})")
 
     # Get user's business config to check active templates
     business_config = db.query(BusinessConfig).filter(BusinessConfig.user_id == user.id).first()
@@ -690,6 +695,9 @@ async def get_public_templates(owner_uid: str, request: Request, db: Session = D
     active_template_ids = None
     if business_config and business_config.active_templates:
         active_template_ids = business_config.active_templates
+        logger.info(f"🎯 Active templates configured: {active_template_ids}")
+    else:
+        logger.info(f"⚠️ No active templates configured, returning all templates")
     # If no active templates configured, return all templates (backward compatibility)
 
     # Get system templates (pre-built)
@@ -704,11 +712,17 @@ async def get_public_templates(owner_uid: str, request: Request, db: Session = D
         )
 
     system_templates = system_templates_query.all()
+    logger.info(f"📋 Found {len(system_templates)} system templates")
+
+    # Log image URLs for debugging
+    for template in system_templates:
+        logger.info(f"   - {template.name}: image={template.image}")
 
     # Get user's custom templates (always include these)
     user_templates = (
         db.query(FormTemplate).filter(FormTemplate.user_id == user.id, FormTemplate.is_active).all()
     )
+    logger.info(f"📋 Found {len(user_templates)} user custom templates")
 
     # Get user's customizations
     customizations = (
@@ -758,6 +772,7 @@ async def get_public_templates(owner_uid: str, request: Request, db: Session = D
             )
         )
 
+    logger.info(f"✅ Returning {len(templates)} total templates")
     return templates
 
 
