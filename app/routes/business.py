@@ -386,12 +386,16 @@ def create_business_config(data: BusinessConfigCreate, db: Session = Depends(get
                 user.onboarding_completed = data.onboardingComplete
                 if data.onboardingComplete:
                     logger.info(f"✅ Onboarding completed for user {user.id}")
+                    logger.info(f"📋 Form embedding enabled: {data.formEmbeddingEnabled}")
                 else:
                     logger.info(
                         f"🔄 Onboarding status updated to {data.onboardingComplete} for user {user.id}"
                     )
             if data.formEmbeddingEnabled is not None:
                 existing.form_embedding_enabled = data.formEmbeddingEnabled
+                logger.info(
+                    f"💾 Saved form_embedding_enabled: {data.formEmbeddingEnabled} for user {user.id}"
+                )
             if is_provided(data.customFormsDomain):
                 existing.custom_forms_domain = data.customFormsDomain
             if data.serviceAreas is not None:

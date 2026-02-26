@@ -499,6 +499,10 @@ def complete_onboarding(
             )
             logger.info(f"📊 BusinessConfig business_name: {business_config.business_name}")
             logger.info(f"📊 BusinessConfig pricing_model: {business_config.pricing_model}")
+            logger.info(
+                f"📊 BusinessConfig form_embedding_enabled: {business_config.form_embedding_enabled}"
+            )
+            logger.info(f"📊 BusinessConfig payment_handling: {business_config.payment_handling}")
 
         return {
             "success": True,
