@@ -48,12 +48,12 @@ def get_csp_policy() -> str:
     directives = [
         "default-src 'self'",  # Allow same-origin by default for API functionality
         f"frame-ancestors {frame_ancestors}",  # Allow embedding from frontend domains and subdomains
-        "script-src 'self' https://apis.google.com https://accounts.google.com https://www.gstatic.com https://*.googleapis.com https://static.cloudflareinsights.com https://challenges.cloudflare.com https://player.vimeo.com https://assets.calendly.com https://widget.intercom.io https://js.intercomcdn.com data:",  # Allow Intercom scripts
+        "script-src 'self' https://apis.google.com https://accounts.google.com https://www.gstatic.com https://*.googleapis.com https://static.cloudflareinsights.com https://challenges.cloudflare.com https://player.vimeo.com https://widget.intercom.io https://js.intercomcdn.com data:",  # Allow Intercom scripts
         "style-src 'self' https://accounts.google.com https://fonts.googleapis.com",  # Removed unsafe-inline
         "font-src 'self' data: https://fonts.gstatic.com https://r2cdn.perplexity.ai https://js.intercomcdn.com",  # Allow Intercom fonts and data URIs
         "img-src 'self' data: blob: https: https://www.google.com https://accounts.google.com https://static.intercomassets.com https://js.intercomcdn.com",  # Allow Intercom images
-        "frame-src 'self' https://accounts.google.com https://*.firebaseapp.com https://calendly.com https://*.calendly.com https://intercom-sheets.com https://*.intercom.io",  # Allow Intercom frames
-        "connect-src 'self' https://accounts.google.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.googleapis.com https://*.firebaseapp.com https://calendly.com https://*.calendly.com https://assets.calendly.com https://api-iam.intercom.io https://api-ping.intercom.io https://nexus-websocket-a.intercom.io wss://nexus-websocket-a.intercom.io https://*.intercom.io",  # Allow Intercom connections
+        "frame-src 'self' https://accounts.google.com https://*.firebaseapp.com https://intercom-sheets.com https://*.intercom.io",  # Allow Intercom frames
+        "connect-src 'self' https://accounts.google.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.googleapis.com https://*.firebaseapp.com https://api-iam.intercom.io https://api-ping.intercom.io https://nexus-websocket-a.intercom.io wss://nexus-websocket-a.intercom.io https://*.intercom.io",  # Allow Intercom connections
         "media-src 'self' blob: https: https://js.intercomcdn.com",  # Allow Intercom media and blob URLs for video preview
         "base-uri 'none'",  # Prevent base tag injection
         "form-action 'self'",  # Allow form submissions to same origin

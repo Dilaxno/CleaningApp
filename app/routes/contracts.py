@@ -920,7 +920,6 @@ async def send_square_invoice_email(
             client_name=sanitize_string(client.business_name or client.contact_name or "Client"),
             business_name=sanitize_string(business_name),
             invoice_number=f"INV-{contract.public_id[:8].upper()}",
-            invoice_title=sanitize_string(contract.title or "Cleaning Service"),
             total_amount=contract.total_value or 0,
             currency=contract.currency or "USD",
             due_date=due_date,

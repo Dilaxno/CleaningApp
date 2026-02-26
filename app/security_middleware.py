@@ -16,10 +16,10 @@ logger = logging.getLogger(__name__)
 class RLSMiddleware(BaseHTTPMiddleware):
     """
     Middleware to set Row-Level Security (RLS) context for each request.
-    
+
     This ensures that database queries are automatically filtered based on
     the authenticated user's ID, preventing unauthorized data access.
-    
+
     Note: This middleware sets the context after authentication, so it works
     with the get_current_user dependency.
     """
@@ -36,27 +36,27 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         response = await call_next(request)
-        
+
         # Add security headers
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        
+
         return response
 
 
 def set_rls_context(db: Session, user_id: int) -> None:
     """
     Set the RLS context for a database session.
-    
+
     This should be called in route handlers after authentication.
-    
+
     Args:
         db: SQLAlchemy database session
         user_id: ID of the authenticated user
-        
+
     Example:
         @router.get("/clients")
         async def get_clients(
@@ -70,7 +70,7 @@ def set_rls_context(db: Session, user_id: int) -> None:
     try:
         db.execute(
             text("SELECT set_config('app.current_user_id', :user_id, false)"),
-            {"user_id": str(user_id)}
+            {"user_id": str(user_id)},
         )
         logger.debug(f"RLS context set for user_id={user_id}")
     except Exception as e:
@@ -81,7 +81,7 @@ def set_rls_context(db: Session, user_id: int) -> None:
 def clear_rls_context(db: Session) -> None:
     """
     Clear the RLS context for a database session.
-    
+
     Args:
         db: SQLAlchemy database session
     """
@@ -95,9 +95,9 @@ def clear_rls_context(db: Session) -> None:
 def bypass_rls(db: Session) -> None:
     """
     Temporarily bypass RLS for administrative operations.
-    
+
     WARNING: Use with extreme caution! Only for system-level operations.
-    
+
     Args:
         db: SQLAlchemy database session
     """
@@ -112,7 +112,7 @@ def bypass_rls(db: Session) -> None:
 def enable_rls(db: Session) -> None:
     """
     Re-enable RLS after bypassing.
-    
+
     Args:
         db: SQLAlchemy database session
     """

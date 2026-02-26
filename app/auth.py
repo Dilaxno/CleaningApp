@@ -302,10 +302,10 @@ async def get_current_user(
                 raise
 
         logger.debug(f"✅ User authenticated: {user.email}")
-        
+
         # Set RLS context for this database session
         set_rls_context(db, user.id)
-        
+
         return user
 
     except HTTPException:

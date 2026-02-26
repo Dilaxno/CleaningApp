@@ -2283,7 +2283,6 @@ async def submit_client_schedule(
                     address=address,
                     price=None,  # Will be set when provider confirms
                     is_recurring=False,
-                    calendly_booking_method="client_selected",
                 )
 
                 db.add(new_schedule)

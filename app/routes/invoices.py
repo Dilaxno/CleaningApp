@@ -473,7 +473,6 @@ async def send_invoice_to_client(
             client_name=sanitize_string(client.contact_name or client.business_name),
             business_name=sanitize_string(business_name),
             invoice_number=sanitize_string(invoice.invoice_number),
-            invoice_title=sanitize_string(invoice.title),
             total_amount=invoice.total_amount,
             currency=invoice.currency,
             due_date=invoice.due_date.strftime("%B %d, %Y") if invoice.due_date else None,

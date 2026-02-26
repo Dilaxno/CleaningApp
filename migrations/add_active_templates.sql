@@ -7,5 +7,5 @@ ADD COLUMN active_templates JSONB DEFAULT '[]'::jsonb;
 
 -- Update existing records to have all templates active by default (backward compatibility)
 UPDATE business_configs 
-SET active_templates = '["office", "retail", "medical", "gym", "restaurant", "residential", "airbnb", "school", "warehouse", "post-construction", "move-in-out", "deep-clean", "outside-cleaning", "carpet-cleaning"]'::jsonb
+SET active_templates = '["office", "retail", "medical", "gym", "restaurant", "school", "warehouse", "post-construction", "outside-cleaning", "carpet-cleaning"]'::jsonb
 WHERE active_templates IS NULL OR jsonb_array_length(active_templates) = 0;

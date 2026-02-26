@@ -392,48 +392,6 @@ async def verify_dodo_webhook_legacy(
     return False, raw_body
 
 
-async def verify_calendly_webhook(
-    request: Request, secret: str, raise_on_failure: bool = True
-) -> tuple[bool, bytes]:
-    """
-    Verify Calendly webhook signature.
-
-    Calendly uses:
-    - Header: 'Calendly-Webhook-Signature' (format: "sha256=<hex_digest>")
-
-    Args:
-        request: FastAPI request object
-        secret: Webhook signing key from Calendly
-        raise_on_failure: If True, raises HTTPException on failure
-
-    Returns:
-        Tuple of (is_valid, raw_body)
-    """
-    raw_body = await request.body()
-    signature_header = request.headers.get("Calendly-Webhook-Signature", "")
-
-    logger.debug("📥 Calendly webhook received")
-
-    if not signature_header:
-        logger.warning("🚫 Calendly webhook missing signature header")
-        if raise_on_failure:
-            raise HTTPException(status_code=401, detail="Missing webhook signature")
-        return False, raw_body
-
-    # Calendly signature format: "sha256=<hex_digest>"
-    expected_signature = compute_hmac_sha256(secret, raw_body)
-    expected_header = f"sha256={expected_signature}"
-
-    if not constant_time_compare(expected_header, signature_header):
-        logger.warning("🚫 Calendly webhook signature mismatch")
-        if raise_on_failure:
-            raise HTTPException(status_code=401, detail="Invalid webhook signature")
-        return False, raw_body
-
-    logger.debug("✅ Calendly webhook signature verified")
-    return True, raw_body
-
-
 async def verify_stripe_webhook(
     request: Request, secret: str, raise_on_failure: bool = True
 ) -> tuple[bool, bytes]:
@@ -500,16 +458,14 @@ def create_webhook_signature(secret: str, payload: bytes, provider: str = "gener
     Args:
         secret: Signing secret
         payload: Request body bytes
-        provider: Provider format ('generic', 'calendly', 'stripe')
+        provider: Provider format ('generic', 'stripe')
 
     Returns:
         Signature string in provider's format
     """
     signature = compute_hmac_sha256(secret, payload)
 
-    if provider == "calendly":
-        return f"sha256={signature}"
-    elif provider == "stripe":
+    if provider == "stripe":
         timestamp = int(time.time())
         signed_payload = f"{timestamp}.{payload.decode('utf-8')}"
         sig = compute_hmac_sha256(secret, signed_payload.encode())

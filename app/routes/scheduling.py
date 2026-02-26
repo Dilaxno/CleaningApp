@@ -139,7 +139,7 @@ async def get_scheduling_info_by_client(client_id: str, db: Session = Depends(ge
     elif user:
         business_name = user.full_name or "Service Provider"
 
-    # Calendly integration removed
+    # Calendly integration removed - always return False
     has_calendly = False
 
     # Check if meetings are required
@@ -865,8 +865,7 @@ async def get_public_scheduling_info(contract_public_id: str, db: Session = Depe
     elif user:
         business_name = user.full_name or "Service Provider"
 
-    # Check if provider has Calendly and requires consultations
-    # Calendly integration removed
+    # Calendly integration removed - always return False
     consultation_required = False
     consultation_booking_url = None
 

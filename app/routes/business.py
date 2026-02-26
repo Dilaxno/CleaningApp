@@ -881,10 +881,11 @@ def get_public_addons(firebase_uid: str, request: Request, db: Session = Depends
 def get_public_calendly_status(firebase_uid: str, request: Request, db: Session = Depends(get_db)):
     """
     Public endpoint to check if business owner has Calendly integration connected.
-    Returns Calendly booking URL if connected and configured.
+    DEPRECATED: Calendly integration has been removed.
+    Returns hasCalendly: False for backward compatibility.
     No authentication required - accessed via client forms.
     """
-    logger.info(f"📥 Checking Calendly status for firebase_uid: {firebase_uid}")
+    logger.info(f"📥 Checking Calendly status for firebase_uid: {firebase_uid} (deprecated)")
 
     # Custom domain security validation
     if hasattr(request.state, "is_custom_domain") and request.state.is_custom_domain:
@@ -915,7 +916,7 @@ def get_public_calendly_status(firebase_uid: str, request: Request, db: Session 
         logger.warning(f"❌ User not found for firebase_uid: {firebase_uid}")
         raise HTTPException(status_code=404, detail="Business not found")
 
-    # Calendly integration removed
+    # Calendly integration removed - return false for backward compatibility
     return {
         "hasCalendly": False,
         "bookingUrl": None,

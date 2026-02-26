@@ -875,7 +875,6 @@ async def send_invoice_payment_link_email(
     client_name: str,
     business_name: str,
     invoice_number: str,
-    invoice_title: str,
     total_amount: float,
     currency: str = "USD",
     due_date: Optional[str] = None,

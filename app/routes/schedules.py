@@ -77,9 +77,6 @@ class ScheduleResponse(BaseModel):
     price: Optional[float]
     isRecurring: bool
     recurrencePattern: Optional[str]
-    calendlyEventUri: Optional[str] = None
-    calendlyEventId: Optional[str] = None
-    calendlyBookingMethod: Optional[str] = None
     googleCalendarEventId: Optional[str] = None
     contractStatus: Optional[str] = None  # Contract status for validation
     createdAt: datetime
@@ -149,9 +146,6 @@ async def get_schedules(
                 price=s.price,
                 isRecurring=s.is_recurring or False,
                 recurrencePattern=s.recurrence_pattern,
-                calendlyEventUri=s.calendly_event_uri,
-                calendlyEventId=s.calendly_event_id,
-                calendlyBookingMethod=s.calendly_booking_method,
                 contractStatus=contract_status,
                 createdAt=s.created_at,
             )
@@ -458,7 +452,6 @@ async def approve_schedule(
                             or current_user.business_name
                             or "Your Service Provider",
                             invoice_number=f"INV-{contract.public_id[:8].upper()}-DEP",
-                            invoice_title=contract.title or "Cleaning Service",
                             total_amount=contract.deposit_amount or (contract.total_value / 2),
                             currency=contract.currency or "USD",
                             due_date=(datetime.utcnow() + timedelta(days=15)).strftime("%B %d, %Y"),
