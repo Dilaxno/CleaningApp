@@ -742,6 +742,7 @@ def get_business_config(firebase_uid: str, db: Session = Depends(get_db)):
         "acceptedFrequencies": config.accepted_frequencies
         or ["daily", "2x-per-week", "3x-per-week", "weekly", "bi-weekly", "monthly"],
         "acceptedPaymentMethods": config.accepted_payment_methods or [],
+        "serviceAreas": config.service_areas or [],
     }
 
 
