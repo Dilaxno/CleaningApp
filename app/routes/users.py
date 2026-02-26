@@ -225,6 +225,7 @@ def get_user(
         "plan": current_user.plan,
         "billing_cycle": current_user.billing_cycle,  # Include billing cycle
         "hear_about": current_user.hear_about,
+        "company_name": current_user.company_name,  # Include company name for onboarding prefill
         "onboarding_completed": current_user.onboarding_completed,
         "onboarding_step": current_user.onboarding_step,
         "oauth_states": current_user.oauth_states or {},
@@ -400,8 +401,9 @@ def complete_onboarding(
     verify_user_access(firebase_uid, current_user)
 
     try:
-        # Update user onboarding status
+        # Update user onboarding status and company name
         current_user.onboarding_completed = data.onboardingComplete
+        current_user.company_name = data.businessName  # Keep user.company_name in sync
         logger.info(f"✅ User {current_user.id} completed onboarding")
 
         # Create or update business config
