@@ -50,8 +50,10 @@ class UserCreate(BaseModel):
     firebaseUid: str
     email: str
     fullName: Optional[str] = None
-    accountType: Optional[str] = None
-    hearAbout: Optional[str] = None
+    companyName: Optional[str] = None
+    employeeCount: Optional[str] = None
+    primaryServiceType: Optional[str] = None
+    contractType: Optional[str] = None
     profilePictureUrl: Optional[str] = None
 
     @field_validator("email")
@@ -65,8 +67,10 @@ class UserUpdate(BaseModel):
     fullName: Optional[str] = None
     email: Optional[str] = None
     profilePictureUrl: Optional[str] = None
-    accountType: Optional[str] = None
-    hearAbout: Optional[str] = None
+    companyName: Optional[str] = None
+    employeeCount: Optional[str] = None
+    primaryServiceType: Optional[str] = None
+    contractType: Optional[str] = None
     plan: Optional[str] = None
     default_brand_color: Optional[str] = None
     onboarding_step: Optional[int] = None
@@ -96,7 +100,9 @@ class UserResponse(BaseModel):
 def create_or_update_user(data: UserCreate, db: Session = Depends(get_db)):
     """Create or update a user from Firebase"""
     logger.info(f"📥 Creating/updating user: {data.firebaseUid}")
-    logger.info(f"📋 Data received: accountType={data.accountType}, hearAbout={data.hearAbout}")
+    logger.info(
+        f"📋 Data received: companyName={data.companyName}, employeeCount={data.employeeCount}, primaryServiceType={data.primaryServiceType}, contractType={data.contractType}"
+    )
 
     # Validate profile picture URL - reject data URIs (too long for database)
     profile_picture_url = None
@@ -119,11 +125,15 @@ def create_or_update_user(data: UserCreate, db: Session = Depends(get_db)):
             user.email = data.email
             if data.fullName:
                 user.full_name = data.fullName
-            # Only update account_type and hear_about if explicitly provided (not None/empty)
-            if data.accountType:
-                user.account_type = data.accountType
-            if data.hearAbout:
-                user.hear_about = data.hearAbout
+            # Update commercial cleaning business fields
+            if data.companyName:
+                user.company_name = data.companyName
+            if data.employeeCount:
+                user.employee_count = data.employeeCount
+            if data.primaryServiceType:
+                user.primary_service_type = data.primaryServiceType
+            if data.contractType:
+                user.contract_type = data.contractType
             # Set profile picture from Google if provided and user doesn't have one
             if profile_picture_url and not user.profile_picture_url:
                 user.profile_picture_url = profile_picture_url
@@ -134,8 +144,10 @@ def create_or_update_user(data: UserCreate, db: Session = Depends(get_db)):
                 firebase_uid=data.firebaseUid,
                 email=data.email,
                 full_name=data.fullName,
-                account_type=data.accountType,
-                hear_about=data.hearAbout,
+                company_name=data.companyName,
+                employee_count=data.employeeCount,
+                primary_service_type=data.primaryServiceType,
+                contract_type=data.contractType,
                 profile_picture_url=profile_picture_url,  # Only set if provided, otherwise None
                 plan=None,  # Users must select a paid plan after onboarding
             )

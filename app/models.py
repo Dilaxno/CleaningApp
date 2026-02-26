@@ -37,6 +37,13 @@ class User(Base):
     default_brand_color = Column(String(7), nullable=True)  # e.g., #RRGGBB
     account_type = Column(String(50), nullable=True)
     hear_about = Column(String(100), nullable=True)
+    # Commercial ICP fields (mid-size commercial cleaning companies)
+    company_name = Column(String(255), nullable=True)  # Company name
+    employee_count = Column(String(20), nullable=True)  # 1-9, 10-24, 25-74, 75+
+    primary_service_type = Column(
+        String(100), nullable=True
+    )  # Office, Medical, Retail, Industrial, Multi-site
+    contract_type = Column(String(100), nullable=True)  # Mostly recurring, Mixed, Mostly one-time
     plan = Column(String(50), nullable=True)  # team, scale - null until user selects
     # Dodo subscription identifier for this user's active subscription; used for change/cancel flows
     subscription_id = Column(String(255), nullable=True)
