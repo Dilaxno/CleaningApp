@@ -40,9 +40,6 @@ from backend.migrations.form_templates import (
     get_restaurant_template,
     get_school_template,
     get_warehouse_template,
-    get_post_construction_template,
-    get_outside_cleaning_template,
-    get_carpet_cleaning_template,
 )
 
 # Get database URL from environment
@@ -126,9 +123,6 @@ TEMPLATE_FUNCTIONS = [
     get_restaurant_template,
     get_school_template,
     get_warehouse_template,
-    get_post_construction_template,
-    get_outside_cleaning_template,
-    get_carpet_cleaning_template,
 ]
 
 
